@@ -43,7 +43,7 @@ const CierreActaForm = () => {
     doc.text(`Nombre o Razón Social: Dato de pestañas anteriores`, 20, 90);
     doc.text(`Auditor: Dato de pestañas anteriores`, 20, 100);
     doc.text(`Supervisor: Dato de pestañas anteriores`, 20, 110);
-    doc.text(`Director: Dato de pestañas anteriores`, 20, 120);
+    doc.text(`Director: Nombre del director`, 20, 120);
 
     doc.save('acta-descargada.pdf');
   };
