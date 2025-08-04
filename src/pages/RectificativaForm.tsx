@@ -40,12 +40,7 @@ const RectificativaForm = () => {
           </Box>
         </Grid>
 
-        {/* Flecha */}
-        {mostrarCampos && (
-          <Grid item>
-            <Typography variant="h4">➡️</Typography>
-          </Grid>
-        )}
+       
 
         {/* Campos de Ajuste y Diferencia */}
         {mostrarCampos && (
