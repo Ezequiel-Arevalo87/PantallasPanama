@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import { TablaAutoApertura } from './TablaAutoApertura';
+import CierreActaForm from './CierreActaForm';
 
 export const Cierre = () => {
   const [formData, setFormData] = useState({
@@ -172,7 +173,7 @@ export const Cierre = () => {
       </Grid>
 
       {mostrarResultados && (
-        <TablaAutoApertura />
+        <CierreActaForm />
       )}
     </Box>
   );
