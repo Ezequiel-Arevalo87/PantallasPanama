@@ -109,7 +109,7 @@ const CierreActaForm = () => {
               <Typography><strong>Supervisor:</strong> Dato de pestañas anteriores</Typography>
             </Box>
             <Box>
-              <Typography><strong>Director:</strong> Dato de pestañas anteriores</Typography>
+              <Typography><strong>Director:</strong>Nombre del director</Typography>
             </Box>
           </Paper>
         </Grid>
