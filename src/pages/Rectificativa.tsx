@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import { TablaAutoApertura } from './TablaAutoApertura';
+import RectificativaForm from './RectificativaForm';
 
 export const Rectificativa = () => {
   const [formData, setFormData] = useState({
@@ -172,7 +173,7 @@ export const Rectificativa = () => {
       </Grid>
 
       {mostrarResultados && (
-        <TablaAutoApertura />
+        <RectificativaForm />
       )}
     </Box>
   );
