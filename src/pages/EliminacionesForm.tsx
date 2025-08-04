@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   Box, Grid, TextField, MenuItem, Button, Typography, Table,
-  TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton
+  TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -24,6 +26,7 @@ export const EliminacionesForm = () => {
   const [editId, setEditId] = useState<number | null>(null);
   const [editTipo, setEditTipo] = useState('');
   const [editValor, setEditValor] = useState('');
+    const [openSnackbar, setOpenSnackbar] = useState(false);
 
   const subtotal = items.reduce((acc, item) => acc + parseFloat(item.valor), 0);
 
@@ -165,10 +168,21 @@ export const EliminacionesForm = () => {
           <Typography variant="h6">${subtotal.toFixed(2)}</Typography>
         </Box>
 
-        <Box mt={3} display="flex" justifyContent="flex-end">
-          <Button variant="contained" color="primary">CONTINUAR</Button>
-        </Box>
+          <Box mt={3} display="flex" justifyContent="flex-end">
+                  <Button variant="contained" color="primary" onClick={() => {setOpenSnackbar(true)}}>CONTINUAR</Button>
+                </Box>
+              </Box>
+               <Snackbar
+                      open={openSnackbar}
+                      autoHideDuration={3000}
+                      onClose={() => setOpenSnackbar(false)}
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                    >
+                      <Alert severity="success" variant="filled" onClose={() => setOpenSnackbar(false)}>
+                        ✅ Eliminación correctamente
+                      </Alert>
+                      </Snackbar>
       </Box>
-    </Box>
+    
   );
 };

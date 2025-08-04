@@ -70,13 +70,14 @@ const TablaOmisos: React.FC<TablaProps> = ({ categoria, onExport }) => {
 
   return (
     <Box>
-      <Button
-        variant="outlined"
-        sx={{ mb: 1 }}
-        onClick={() => onExport('Omisos', datos, columnas)}
-      >
-        DESCARGAR EXCEL
-      </Button>
+  <Box display="flex" justifyContent="flex-end" mb={1}>
+  <Button
+    variant="outlined"
+    onClick={() => onExport('Omisos', datos, columnas)}
+  >
+    DESCARGAR EXCEL
+  </Button>
+</Box>
 
       <TableContainer component={Paper}>
         <Table size="small">
@@ -123,6 +124,7 @@ const TablaInexactos: React.FC<TablaProps> = ({ categoria, onExport }) => {
 
   return (
     <Box>
+      <Box display="flex" justifyContent="flex-end" mb={1}>
       <Button
         variant="outlined"
         sx={{ mb: 1 }}
@@ -130,6 +132,7 @@ const TablaInexactos: React.FC<TablaProps> = ({ categoria, onExport }) => {
       >
         DESCARGAR EXCEL
       </Button>
+      </Box>
 
       <TableContainer component={Paper}>
         <Table size="small">
@@ -175,6 +178,7 @@ const TablaExtemporaneo: React.FC<TablaProps> = ({ categoria, onExport }) => {
 
   return (
     <Box>
+      <Box display="flex" justifyContent="flex-end" mb={1}>
       <Button
         variant="outlined"
         sx={{ mb: 1 }}
@@ -182,7 +186,7 @@ const TablaExtemporaneo: React.FC<TablaProps> = ({ categoria, onExport }) => {
       >
         DESCARGAR EXCEL
       </Button>
-
+</Box>
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>

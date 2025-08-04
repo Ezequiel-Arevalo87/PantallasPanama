@@ -192,7 +192,7 @@ export const LiquidacionesAdicionalesForm = () => {
         </Box>
 
         <Box mt={3} display="flex" justifyContent="flex-end">
-          <Button variant="contained" color="primary">CONTINUAR</Button>
+          <Button variant="contained" color="primary" onClick={() => {setOpenSnackbar(true)}}>CONTINUAR</Button>
         </Box>
       </Box>
        <Snackbar
