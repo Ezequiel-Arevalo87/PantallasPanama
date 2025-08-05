@@ -64,7 +64,7 @@ export const Aprobacion = () => {
         </Grid>
 
       
-        <Grid item xs={12} sm={6}>
+        {/* <Grid item xs={12} sm={6}>
           <TextField
             select
             label="RED"
@@ -95,7 +95,7 @@ export const Aprobacion = () => {
             <MenuItem value="Grandes Contribuyentes">Grandes Contribuyentes</MenuItem>
             <MenuItem value="Auditoría Sectorial">Auditoría Sectorial</MenuItem>
           </TextField>
-        </Grid>
+        </Grid> */}
 
    
         <Grid item xs={12}>

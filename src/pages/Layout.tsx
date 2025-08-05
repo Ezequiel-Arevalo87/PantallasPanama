@@ -13,6 +13,8 @@ import { Rectificativa } from './Rectificativa';
 import { Cierre } from './Cierre';
 import { LiquidacionesAdicionales } from './LiquidacionesAdicionales';
 import { Aprobacion } from './Aprobacion';
+import { Apertura } from './Apertura';
+
 
 
 export const Layout: React.FC = () => {
@@ -20,14 +22,14 @@ export const Layout: React.FC = () => {
 
   return (
     <Box display="flex" flexDirection="column" height="100vh" width="100vw" sx={{ overflow: 'hidden' }}>
-     
+
       <Box sx={{ width: '100%' }}>
         <img src={logoDos} alt="Encabezado DGI" style={{ width: '100%', height: 'auto', display: 'block' }} />
       </Box>
 
-   
+
       <Box display="flex" flexGrow={1} sx={{ minHeight: 0 }}>
-   
+
         <Box
           sx={{
             width: 260,
@@ -39,7 +41,7 @@ export const Layout: React.FC = () => {
           <Sidebar onSelect={(opcion) => setOpcionSeleccionada(opcion)} />
         </Box>
 
-    
+
         <Box
           component="main"
           sx={{
@@ -52,9 +54,10 @@ export const Layout: React.FC = () => {
           <Typography variant="h5" gutterBottom>
             {opcionSeleccionada || 'Selecciona una opción del menú'}
           </Typography>
-               {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
-          {opcionSeleccionada === 'INICIO DEL SELECTOR' && <InicioSelectorForm />}
-     
+          {opcionSeleccionada === 'REPORTES' && <InicioSelectorForm />}
+          {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
+          {opcionSeleccionada === 'AUTO DE APERTURA' && <Apertura />}
+
           {opcionSeleccionada === 'PROGRAMACIÓN DE AUDITORIAS' && <ProgramacionAutoAperturaForm />}
           {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />}
           {opcionSeleccionada === 'PRESENTACIÓN VOLUNTARIA' && <PresentacionVoluntaria />}

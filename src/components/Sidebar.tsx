@@ -21,8 +21,10 @@ export const Sidebar = ({ onSelect }: Props) => {
 
       <List dense>
         {[
+          
+          'REPORTES',
           'APROBACIÓN',
-          'INICIO DEL SELECTOR',
+          'AUTO DE APERTURA',
         
         ].map((op) => (
           <ListItem key={op} disablePadding>
