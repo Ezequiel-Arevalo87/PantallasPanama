@@ -1,4 +1,3 @@
-// components/Sidebar.tsx
 import {
   List,
   ListItem,
@@ -19,13 +18,21 @@ export const Sidebar = ({ onSelect }: Props) => {
       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
         SELECTOR DE CASOS
       </Typography>
+
       <List dense>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => onSelect('INICIO DEL SELECTOR')}>
-            <ListItemText primary="INICIO DEL SELECTOR" />
-          </ListItemButton>
-        </ListItem>
+        {[
+          'APROBACIÓN',
+          'INICIO DEL SELECTOR',
+        
+        ].map((op) => (
+          <ListItem key={op} disablePadding>
+            <ListItemButton onClick={() => onSelect(op)}>
+              <ListItemText primary={op} />
+            </ListItemButton>
+          </ListItem>
+        ))}
       </List>
+   
 
       <Divider sx={{ my: 1 }} />
 

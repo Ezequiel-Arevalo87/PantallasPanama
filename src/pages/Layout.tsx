@@ -12,6 +12,8 @@ import { Eliminaciones } from './Eliminaciones';
 import { Rectificativa } from './Rectificativa';
 import { Cierre } from './Cierre';
 import { LiquidacionesAdicionales } from './LiquidacionesAdicionales';
+import { Aprobacion } from './Aprobacion';
+
 
 export const Layout: React.FC = () => {
   const [opcionSeleccionada, setOpcionSeleccionada] = useState('');
@@ -50,7 +52,9 @@ export const Layout: React.FC = () => {
           <Typography variant="h5" gutterBottom>
             {opcionSeleccionada || 'Selecciona una opción del menú'}
           </Typography>
+               {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
           {opcionSeleccionada === 'INICIO DEL SELECTOR' && <InicioSelectorForm />}
+     
           {opcionSeleccionada === 'PROGRAMACIÓN DE AUDITORIAS' && <ProgramacionAutoAperturaForm />}
           {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />}
           {opcionSeleccionada === 'PRESENTACIÓN VOLUNTARIA' && <PresentacionVoluntaria />}
