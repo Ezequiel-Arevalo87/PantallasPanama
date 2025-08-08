@@ -14,17 +14,18 @@ type Props = {
 export const Sidebar = ({ onSelect }: Props) => {
   return (
     <>
-      {/* SELECTOR DE CASOS */}
+     
       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-        SELECTOR DE CASOS
+        FISCALIZACIÓN
       </Typography>
 
       <List dense>
         {[
           
-          'REPORTES',
+          'SELECCIÓN DE CASOS',
+          'PRIORIZACIÓN',
           'APROBACIÓN',
-          'AUTO DE APERTURA',
+          'ASIGNACIÓN',
         
         ].map((op) => (
           <ListItem key={op} disablePadding>
@@ -38,14 +39,14 @@ export const Sidebar = ({ onSelect }: Props) => {
 
       <Divider sx={{ my: 1 }} />
 
-      {/* SEGUIMIENTO Y CONTROL */}
       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-        SEGUIMIENTO Y CONTROL
+       PROCESOS DE AUDITORIAS
       </Typography>
       <List dense>
         {[
           'PROGRAMACIÓN DE AUDITORIAS',
-          'ASIGNACIÓN',
+          // 'ASIGNACIÓN',
+          'GENERACIÓN AUTO DE APERTURA',
           'PRESENTACIÓN VOLUNTARIA',
           'LIQUIDACIONES ADICIONALES',
           'ELIMINACIONES',
@@ -62,7 +63,7 @@ export const Sidebar = ({ onSelect }: Props) => {
 
       <Divider sx={{ my: 1 }} />
 
-      {/* OTROS MÓDULOS */}
+     
       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
         MÓDULO COMUNICACIÓN
       </Typography>

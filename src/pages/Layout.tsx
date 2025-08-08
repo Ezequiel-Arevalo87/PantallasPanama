@@ -14,6 +14,7 @@ import { Cierre } from './Cierre';
 import { LiquidacionesAdicionales } from './LiquidacionesAdicionales';
 import { Aprobacion } from './Aprobacion';
 import { Apertura } from './Apertura';
+import { Priorizacion } from './Priorizacion';
 
 
 
@@ -54,12 +55,15 @@ export const Layout: React.FC = () => {
           <Typography variant="h5" gutterBottom>
             {opcionSeleccionada || 'Selecciona una opción del menú'}
           </Typography>
-          {opcionSeleccionada === 'REPORTES' && <InicioSelectorForm />}
+          {opcionSeleccionada === 'SELECCIÓN DE CASOS' && <InicioSelectorForm />}
+          {opcionSeleccionada === 'PRIORIZACIÓN' && <Priorizacion />}
           {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
-          {opcionSeleccionada === 'AUTO DE APERTURA' && <Apertura />}
+          {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Apertura />} */}
+          {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />}
 
           {opcionSeleccionada === 'PROGRAMACIÓN DE AUDITORIAS' && <ProgramacionAutoAperturaForm />}
-          {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />}
+          {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />} */}
+           {opcionSeleccionada === 'GENERACIÓN AUTO DE APERTURA' && <Asignacion />} 
           {opcionSeleccionada === 'PRESENTACIÓN VOLUNTARIA' && <PresentacionVoluntaria />}
           {opcionSeleccionada === 'LIQUIDACIONES ADICIONALES' && <LiquidacionesAdicionales />}
           {opcionSeleccionada === 'ELIMINACIONES' && <Eliminaciones />}
