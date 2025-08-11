@@ -46,7 +46,9 @@ export const Sidebar = ({ onSelect }: Props) => {
         {[
           'PROGRAMACIÓN DE AUDITORIAS',
           // 'ASIGNACIÓN',
-          'GENERACIÓN AUTO DE APERTURA',
+          'REVISIÓN AUDITOR',
+          'REVISIÓN SUPERVISOR',
+          'REVISIÓN JEFE DE SECCIÓN',
           'PRESENTACIÓN VOLUNTARIA',
           'LIQUIDACIONES ADICIONALES',
           'ELIMINACIONES',

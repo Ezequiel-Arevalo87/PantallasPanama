@@ -15,6 +15,7 @@ import { LiquidacionesAdicionales } from './LiquidacionesAdicionales';
 import { Aprobacion } from './Aprobacion';
 import { Apertura } from './Apertura';
 import { Priorizacion } from './Priorizacion';
+import { AsignacionesVarias } from './AsignacionesVarias';
 
 
 
@@ -63,7 +64,15 @@ export const Layout: React.FC = () => {
 
           {opcionSeleccionada === 'PROGRAMACIÓN DE AUDITORIAS' && <ProgramacionAutoAperturaForm />}
           {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />} */}
-           {opcionSeleccionada === 'GENERACIÓN AUTO DE APERTURA' && <Asignacion />} 
+       {opcionSeleccionada === 'REVISIÓN AUDITOR' && (
+  <AsignacionesVarias tipo="REVISIÓN AUDITOR" />
+)}
+{opcionSeleccionada === 'REVISIÓN SUPERVISOR' && (
+  <AsignacionesVarias tipo="REVISIÓN SUPERVISOR" />
+)}
+{opcionSeleccionada === 'REVISIÓN JEFE DE SECCIÓN' && (
+  <AsignacionesVarias tipo="REVISIÓN JEFE DE SECCIÓN" />
+)}
           {opcionSeleccionada === 'PRESENTACIÓN VOLUNTARIA' && <PresentacionVoluntaria />}
           {opcionSeleccionada === 'LIQUIDACIONES ADICIONALES' && <LiquidacionesAdicionales />}
           {opcionSeleccionada === 'ELIMINACIONES' && <Eliminaciones />}
