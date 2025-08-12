@@ -44,7 +44,7 @@ export const Sidebar = ({ onSelect }: Props) => {
       </Typography>
       <List dense>
         {[
-          'PROGRAMACIÓN DE AUDITORIAS',
+          'GESTIÓN DE AUDITORIA',
           // 'ASIGNACIÓN',
           'REVISIÓN AUDITOR',
           'REVISIÓN SUPERVISOR',

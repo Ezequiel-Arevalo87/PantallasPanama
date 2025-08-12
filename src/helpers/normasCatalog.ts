@@ -1,0 +1,30 @@
+import { NormaCatalogo } from './normasTypes';
+
+// Catálogo base. Puedes moverlo a tu API luego.
+export const NORMAS_CATALOGO: NormaCatalogo[] = [
+  { id: 'cpt-138',  titulo: 'CPT Artículo 138: Deber de los contribuyentes de proporcionar información y facilitar la auditoría.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1990 },
+  { id: 'cpt-139',  titulo: 'CPT Artículo 139: Facultades de la DGI para fiscalizar.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1991 },
+  { id: 'cpt-140',  titulo: 'CPT Artículo 140: Facultades para solicitar libros y documentos.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1992 },
+  { id: 'cpt-143',  titulo: 'CPT Artículo 143: Inicio formal del procedimiento de fiscalización.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1993 },
+  { id: 'cpt-144',  titulo: 'CPT Artículo 144: Plazos para que el contribuyente atienda los requerimientos.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1994 },
+  { id: 'cpt-146',  titulo: 'CPT Artículo 146: Plazo para culminar la fiscalización (1 año, prorrogable).', vigente: 'SI', desde: 'FEB/13/2019', anio: 1995 },
+  { id: 'cpt-147',  titulo: 'CPT Artículo 147: Derechos y deberes del contribuyente fiscalizado.', vigente: 'SI', desde: 'FEB/13/2019', anio: 1996 },
+  { id: 'cf-746',   titulo: 'Cod Fiscal Artículo 746: Obligación de los contribuyentes de llevar libros y registros contables.', vigente: 'SI', desde: 'ENE/01/1957', anio: 1997 },
+  { id: 'cf-747',   titulo: 'Cod Fiscal Artículo 747: Requisitos para los libros contables.', vigente: 'SI', desde: 'ENE/01/1957', anio: 1998 },
+  { id: 'cf-751',   titulo: 'Cod Fiscal Artículo 751: Revisión de libros por parte de la administración tributaria.', vigente: 'SI', desde: 'ENE/01/1957', anio: 1999 },
+  { id: 'cf-752',   titulo: 'Cod Fiscal Artículo 752: Sanciones por omisión de entrega o resistencia a la fiscalización.', vigente: 'SI', desde: 'ENE/01/1957', anio: 2000 },
+  { id: 'cf-758',   titulo: 'Cod Fiscal Artículo 758: Deber de conservar documentos por 5 años.', vigente: 'SI', desde: 'ENE/01/1957', anio: 2001 },
+  { id: 'cf-762n',  titulo: 'Cod Fiscal Artículo 762-N: Sanciones por evasión fiscal y defraudación tributaria.', vigente: 'SI', desde: 'ENE/01/1957', anio: 2002 },
+  { id: 'res-201-0076', titulo: 'Resolución N° 201-0076 (relacionada con auditorías electrónicas).', vigente: 'SI', desde: 'NOV/14/2023', anio: 2003 },
+  { id: 'res-201-0008', titulo: 'Resolución N° 201-0008 (relacionada con normas internas de fiscalización).', vigente: 'SI', desde: 'FEB/27/2020', anio: 2004 },
+  { id: 'ley-8-1956',   titulo: 'Ley N° 8 de 27 de enero de 1956 - Código Fiscal', vigente: 'SI', desde: 'ENE/27/1956', anio: 2005 },
+  { id: 'ley-38-2000',  titulo: 'Ley N° 38 de 31 de julio de 2000 - Procedimiento Administrativo General', vigente: 'SI', desde: 'JUL/31/2000', anio: 2006 },
+  { id: 'ley-76-2019',  titulo: 'Ley N° 76 del 13 de febrero de 2019 - Código de Procedimiento Tributario', vigente: 'SI', desde: 'FEB/13/2019', anio: 2007 },
+  { id: 'ley-81-2019',  titulo: 'Ley N° 81 de 26 de marzo de 2019 - Sobre protección de datos personales', vigente: 'SI', desde: 'MAR/26/2019', anio: 2008 },
+  { id: 'ley-337-2022', titulo: 'Ley N° 337 de 14 de noviembre de 2022 - Acuerdos de pago extraordinario en actos dictados por la DGI', vigente: 'SI', desde: 'NOV/14/2022', anio: 2009 },
+  { id: 'de-98-2010',   titulo: 'Decreto Ejecutivo 98 de 27 de septiembre de 2010 - Disposiciones sobre el impuesto sobre la renta', vigente: 'SI', desde: 'SEP/27/2010', anio: 2010 },
+  { id: 'de-84-2005',   titulo: 'Decreto Ejecutivo N° 84 de 26 de agosto de 2005 - Reglamenta el Impuesto de Transferencia de Bienes Muebles y Servicios', vigente: 'SI', desde: 'AGO/26/2005', anio: 2011 },
+  { id: 'de-285-2021',  titulo: 'Decreto Ejecutivo N° 285 de 28 de mayo de 2021 - Reglamenta la ley 81 de 2019 sobre proteccion de datos personales', vigente: 'SI', desde: 'MAY/28/2021', anio: 2012 },
+  { id: 'res-201-17026',titulo: 'Resolución No. 201-17026 del 11 de diciembre de 2013 - Que obliga a personas a presentar informes de compras', vigente: 'SI', desde: 'DIC/11/2013', anio: 2013 },
+  { id: 'res-201-18480',titulo: 'Resolución No. 201-18480 del 13 de noviembre de 2015 - Documentación y demás formalidades para presentación de informe de ventas por tarjeta de débito, crédito y los reportes de retención del ITBMS', vigente: 'SI', desde: 'NOV/13/2015', anio: 2014 },
+];

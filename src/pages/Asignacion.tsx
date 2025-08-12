@@ -6,6 +6,8 @@ import {
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import { TablaAutoApertura } from './TablaAutoApertura';
 import { FormularioAsignacionDetalle } from './FormularioAsignacionDetalle';
+import { AutoApertura } from './AutoApertura';
+import { ProgramacionAutoAperturaForm } from './ProgramacionAutoAperturaForm';
 
 export const Asignacion = () => {
   const [formData, setFormData] = useState({
@@ -172,7 +174,7 @@ export const Asignacion = () => {
         </Grid>
       </Grid>
 
-    {mostrarResultados && <FormularioAsignacionDetalle />}
+    {mostrarResultados && <ProgramacionAutoAperturaForm />}
 
     </Box>
   );

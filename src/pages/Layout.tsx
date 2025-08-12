@@ -59,20 +59,20 @@ export const Layout: React.FC = () => {
           {opcionSeleccionada === 'SELECCIÓN DE CASOS' && <InicioSelectorForm />}
           {opcionSeleccionada === 'PRIORIZACIÓN' && <Priorizacion />}
           {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
-          {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Apertura />} */}
-          {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />}
-
-          {opcionSeleccionada === 'PROGRAMACIÓN DE AUDITORIAS' && <ProgramacionAutoAperturaForm />}
+          {opcionSeleccionada === 'ASIGNACIÓN' && <Apertura />}
           {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />} */}
-       {opcionSeleccionada === 'REVISIÓN AUDITOR' && (
-  <AsignacionesVarias tipo="REVISIÓN AUDITOR" />
-)}
-{opcionSeleccionada === 'REVISIÓN SUPERVISOR' && (
-  <AsignacionesVarias tipo="REVISIÓN SUPERVISOR" />
-)}
-{opcionSeleccionada === 'REVISIÓN JEFE DE SECCIÓN' && (
-  <AsignacionesVarias tipo="REVISIÓN JEFE DE SECCIÓN" />
-)}
+
+          {opcionSeleccionada === 'GESTIÓN DE AUDITORIA' && <ProgramacionAutoAperturaForm />}
+          {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />} */}
+          {opcionSeleccionada === 'REVISIÓN AUDITOR' && (
+            <AsignacionesVarias tipo="REVISIÓN AUDITOR" />
+          )}
+          {opcionSeleccionada === 'REVISIÓN SUPERVISOR' && (
+            <AsignacionesVarias tipo="REVISIÓN SUPERVISOR" />
+          )}
+          {opcionSeleccionada === 'REVISIÓN JEFE DE SECCIÓN' && (
+            <AsignacionesVarias tipo="REVISIÓN JEFE DE SECCIÓN" />
+          )}
           {opcionSeleccionada === 'PRESENTACIÓN VOLUNTARIA' && <PresentacionVoluntaria />}
           {opcionSeleccionada === 'LIQUIDACIONES ADICIONALES' && <LiquidacionesAdicionales />}
           {opcionSeleccionada === 'ELIMINACIONES' && <Eliminaciones />}

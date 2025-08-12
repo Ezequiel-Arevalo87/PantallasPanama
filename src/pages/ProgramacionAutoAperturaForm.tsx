@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import { TablaAutoApertura } from './TablaAutoApertura';
+import AutoAperturaFlow from '../components/AutoAperturaFlow';
 
 export const ProgramacionAutoAperturaForm = () => {
   const [formData, setFormData] = useState({
@@ -172,7 +173,7 @@ export const ProgramacionAutoAperturaForm = () => {
       </Grid>
 
       {mostrarResultados && (
-        <TablaAutoApertura />
+        <AutoAperturaFlow  />
       )}
     </Box>
   );
