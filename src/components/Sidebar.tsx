@@ -21,11 +21,11 @@ export const Sidebar = ({ onSelect }: Props) => {
 
       <List dense>
         {[
-          
+          'VARIACIÓN EN INGRESOS',
           'SELECCIÓN DE CASOS',
           'PRIORIZACIÓN',
-          'APROBACIÓN',
           'ASIGNACIÓN',
+       
         
         ].map((op) => (
           <ListItem key={op} disablePadding>
@@ -44,6 +44,7 @@ export const Sidebar = ({ onSelect }: Props) => {
       </Typography>
       <List dense>
         {[
+          'INICIO DE AUDITORIA',
           'GESTIÓN DE AUDITORIA',
           // 'ASIGNACIÓN',
           'REVISIÓN AUDITOR',

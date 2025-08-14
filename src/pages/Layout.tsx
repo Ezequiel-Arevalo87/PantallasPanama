@@ -16,6 +16,7 @@ import { Aprobacion } from './Aprobacion';
 import { Apertura } from './Apertura';
 import { Priorizacion } from './Priorizacion';
 import { AsignacionesVarias } from './AsignacionesVarias';
+import VariacionesIngreso from './VariacionesIngreso';
 
 
 
@@ -56,10 +57,11 @@ export const Layout: React.FC = () => {
           <Typography variant="h5" gutterBottom>
             {opcionSeleccionada || 'Selecciona una opción del menú'}
           </Typography>
+          {opcionSeleccionada === 'VARIACIÓN EN INGRESOS' && <VariacionesIngreso />}
           {opcionSeleccionada === 'SELECCIÓN DE CASOS' && <InicioSelectorForm />}
           {opcionSeleccionada === 'PRIORIZACIÓN' && <Priorizacion />}
-          {opcionSeleccionada === 'APROBACIÓN' && <Aprobacion />}
-          {opcionSeleccionada === 'ASIGNACIÓN' && <Apertura />}
+          {opcionSeleccionada === 'ASIGNACIÓN' && <Aprobacion />}
+          {opcionSeleccionada === 'INICIO DE AUDITORIA' && <Apertura />}
           {/* {opcionSeleccionada === 'ASIGNACIÓN' && <Asignacion />} */}
 
           {opcionSeleccionada === 'GESTIÓN DE AUDITORIA' && <ProgramacionAutoAperturaForm />}
