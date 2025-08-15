@@ -99,8 +99,8 @@ export default function VariacionesIngreso() {
   const [ruc, setRuc] = useState("");
 
   // Criterios (puedes fijarlos si es solo visual)
-  const [pctMin, setPctMin] = useState(-0.15); // 15% en negativo (mostrar en rojo)
-  const [pctMax, setPctMax] = useState(0.15); // 15% en positivo (mostrar en rojo)
+  const [pctMin, setPctMin] = useState(-15); // 15% en negativo (mostrar en rojo)
+  const [pctMax, setPctMax] = useState(15); // 15% en positivo (mostrar en rojo)
   const [ingresoMayorIgual, setIngresoMayorIgual] = useState(1000000);
 
   // Periodos (descendentes)
@@ -230,7 +230,7 @@ const consultar = () => {
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Análisis variaciones Ingresos declarados ISR vs ITBMS
+        Análisis variaciones Ingresos declarados ISR
       </Typography>
 
       <Grid container spacing={2}>
