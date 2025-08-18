@@ -79,7 +79,7 @@ export const DetalleAutoApertura: React.FC<{
 
 
   const accionMsg = (m: string) =>{  
-    debugger  
+      
   setToast(m);
   if(m==='Aprobado' ){
   setReadOnly(true)
