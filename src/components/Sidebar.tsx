@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   List,
@@ -11,17 +11,14 @@ import {
   Typography,
   ListItemIcon,
 } from '@mui/material';
-import {
-  ExpandLess,
-  ExpandMore,
-  ChevronRight,
-} from '@mui/icons-material';
+import { ExpandLess, ExpandMore, ChevronRight } from '@mui/icons-material';
 
 type Props = {
-  onSelect: (op: string) => void;
+  onSelect: (path: string) => void;  // e.g. "PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/XXXXX"
   selected?: string;
 };
 
+/** ----- Estilos ----- */
 const SECTION_STYLE = {
   borderRadius: 1.5,
   px: 1,
@@ -36,9 +33,10 @@ const ITEM_STYLE = {
   '& .MuiListItemText-primary': { fontSize: 14 },
   '&.Mui-selected': {
     bgcolor: 'action.selected',
+    position: 'relative' as const,
     '&:before': {
       content: '""',
-      position: 'absolute',
+      position: 'absolute' as const,
       left: 0,
       top: 6,
       bottom: 6,
@@ -50,135 +48,214 @@ const ITEM_STYLE = {
   '&.Mui-selected:hover': { bgcolor: 'action.selected' },
 };
 
-export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
-  // acordeón: solo una sección abierta a la vez
-  const [open, setOpen] = useState<{ [k: string]: boolean }>({
-    FISCALIZACIÓN: false,
-    'PROCESOS DE AUDITORIAS': false,
-  });
+/** ----- Tipos del árbol ----- */
+type MenuNode = {
+  label: string;
+  children?: MenuNode[];
+};
 
-  const toggle = (key: string) =>
-    setOpen((prev) => {
-      const next: any = {};
-      Object.keys(prev).forEach((k) => (next[k] = k === key ? !prev[k] : false));
+/** Util para crear paths únicos por nivel */
+const buildPath = (parent: string, label: string) =>
+  parent ? `${parent}/${label}` : label;
+
+/** Datos del menú (con submenús anidados) */
+const useMenuData = () => {
+  const fiscalizacion: MenuNode[] = [
+    { label: 'VARIACIÓN EN INGRESOS' },
+    { label: 'SELECCIÓN DE CASOS' },
+    { label: 'PRIORIZACIÓN' },
+    { label: 'ASIGNACIÓN' },
+  ];
+
+  const auditorias: MenuNode[] = [
+    { label: 'INICIO DE AUDITORIA' },
+    {
+      label: 'GESTIÓN DE AUDITORIA',
+      children: [
+        { label: 'AUDITOR' },
+        { label: 'SUPERVISOR' },
+        
+        // {
+        //   label: 'SUB BLOQUE',
+        //   children: [
+        //     { label: 'Detalle A' },
+        //     { label: 'Detalle B' },
+        //   ],
+        // },
+      ],
+    },
+    { label: 'REVISIÓN AUDITOR' },
+    { label: 'REVISIÓN SUPERVISOR' },
+    { label: 'REVISIÓN JEFE DE SECCIÓN' },
+    { label: 'PRESENTACIÓN VOLUNTARIA' },
+    { label: 'LIQUIDACIONES ADICIONALES' },
+    { label: 'ELIMINACIONES' },
+    { label: 'RECTIFICATIVA' },
+    { label: 'CIERRE' },
+  ];
+
+  const modulos: MenuNode[] = [
+    { label: 'MÓDULO COMUNICACIÓN' },
+    { label: 'MÓDULO CONSULTAS' },
+    { label: 'MÓDULO ALERTAS' },
+  ];
+
+  return { fiscalizacion, auditorias, modulos };
+};
+
+export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
+  // Para abrir/cerrar submenús por "path"
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  const { fiscalizacion, auditorias, modulos } = useMenuData();
+
+  /** Comportamiento "acordeón por sección principal":
+   * cuando abres una raíz, cierra las otras raíces, pero deja libres los subniveles dentro.
+   */
+  const ROOTS = useMemo(() => ['FISCALIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
+  const toggleRoot = (root: typeof ROOTS[number]) => {
+    setOpenMap((prev) => {
+      const next: Record<string, boolean> = { ...prev };
+      ROOTS.forEach((r) => {
+        // La clave del root es exactamente su nombre
+        next[r] = r === root ? !prev[r] : false;
+      });
       return next;
     });
+  };
 
-  const fiscalizacion = [
-    'VARIACIÓN EN INGRESOS',
-    'SELECCIÓN DE CASOS',
-    'PRIORIZACIÓN',
-    'ASIGNACIÓN',
-  ];
+  /** Toggle genérico para cualquier nodo con children (por path) */
+  const togglePath = (path: string) =>
+    setOpenMap((prev) => ({ ...prev, [path]: !prev[path] }));
 
-  const auditorias = [
-    'INICIO DE AUDITORIA',
-    'GESTIÓN DE AUDITORIA',
-    'REVISIÓN AUDITOR',
-    'REVISIÓN SUPERVISOR',
-    'REVISIÓN JEFE DE SECCIÓN',
-    'PRESENTACIÓN VOLUNTARIA',
-    'LIQUIDACIONES ADICIONALES',
-    'ELIMINACIONES',
-    'RECTIFICATIVA',
-    'CIERRE',
-  ];
+  /** Render recursivo de nodos */
+  const renderNodes = (nodes: MenuNode[], parentPath: string) => (
+    <List dense disablePadding sx={{ pl: parentPath ? 1 : 0 }}>
+      {nodes.map((node) => {
+        const thisPath = buildPath(parentPath, node.label);
+        const hasChildren = !!node.children?.length;
+        const isOpen = !!openMap[thisPath];
 
-  const SectionHeader = ({
-    label,
-    isOpen,
-    onClick,
-  }: {
-    label: string;
-    isOpen: boolean;
-    onClick: () => void;
-  }) => (
-    <ListItemButton onClick={onClick} sx={SECTION_STYLE}>
-      <Typography
-        variant="subtitle2"
-        sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
-      >
-        {label}
-      </Typography>
-      {isOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-    </ListItemButton>
-  );
+        if (hasChildren) {
+          return (
+            <React.Fragment key={thisPath}>
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => togglePath(thisPath)} sx={ITEM_STYLE}>
+                  <ListItemIcon sx={{ minWidth: 28 }}>
+                    {isOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                  </ListItemIcon>
+                  <ListItemText primary={node.label} />
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                {renderNodes(node.children!, thisPath)}
+              </Collapse>
+            </React.Fragment>
+          );
+        }
 
-  const renderItems = (items: string[]) => (
-    <List dense disablePadding sx={{ pl: 1 }}>
-      {items.map((op) => (
-        <ListItem key={op} disablePadding>
-          <ListItemButton
-            onClick={() => onSelect(op)}
-            selected={selected === op}
-            sx={ITEM_STYLE}
-          >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              <ChevronRight fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary={op} />
-          </ListItemButton>
-        </ListItem>
-      ))}
+        // Hoja (item clickeable)
+        return (
+          <ListItem key={thisPath} disablePadding>
+            <ListItemButton
+              onClick={() => onSelect(thisPath)}
+              selected={selected === thisPath}
+              sx={ITEM_STYLE}
+            >
+              <ListItemIcon sx={{ minWidth: 28 }}>
+                <ChevronRight fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary={node.label} />
+            </ListItemButton>
+          </ListItem>
+        );
+      })}
     </List>
   );
 
   return (
-    <Box
-      sx={{
-        width: 280,
-        p: 1.5,
-        pt: 0.5,
-        color: 'text.primary',
-      }}
-    >
+    <Box sx={{ width: 280, p: 1.5, pt: 0.5, color: 'text.primary' }}>
       <List
         subheader={
           <ListSubheader
             component="div"
             disableSticky
-            sx={{ bgcolor: 'transparent', px: 0, py: 1, fontWeight: 800, fontSize: 12, color: 'text.disabled' }}
+            sx={{
+              bgcolor: 'transparent',
+              px: 0,
+              py: 1,
+              fontWeight: 800,
+              fontSize: 12,
+              color: 'text.disabled',
+            }}
           >
             MENÚ PRINCIPAL
           </ListSubheader>
         }
       >
-        {/* FISCALIZACIÓN */}
-        <SectionHeader
-          label="FISCALIZACIÓN"
-          isOpen={open['FISCALIZACIÓN']}
-          onClick={() => toggle('FISCALIZACIÓN')}
-        />
-        <Collapse in={open['FISCALIZACIÓN']} timeout="auto" unmountOnExit>
-          {renderItems(fiscalizacion)}
+        {/* FISCALIZACIÓN (root) */}
+        <ListItemButton
+          onClick={() => toggleRoot('FISCALIZACIÓN')}
+          sx={SECTION_STYLE}
+          selected={!!openMap['FISCALIZACIÓN']}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
+          >
+            FISCALIZACIÓN
+          </Typography>
+          {openMap['FISCALIZACIÓN'] ? (
+            <ExpandLess fontSize="small" />
+          ) : (
+            <ExpandMore fontSize="small" />
+          )}
+        </ListItemButton>
+        <Collapse in={!!openMap['FISCALIZACIÓN']} timeout="auto" unmountOnExit>
+          {renderNodes(fiscalizacion, 'FISCALIZACIÓN')}
         </Collapse>
 
         <Divider sx={{ my: 1.5 }} />
 
-        {/* PROCESOS DE AUDITORIAS */}
-        <SectionHeader
-          label="PROCESOS DE AUDITORIAS"
-          isOpen={open['PROCESOS DE AUDITORIAS']}
-          onClick={() => toggle('PROCESOS DE AUDITORIAS')}
-        />
-        <Collapse in={open['PROCESOS DE AUDITORIAS']} timeout="auto" unmountOnExit>
-          {renderItems(auditorias)}
+        {/* PROCESOS DE AUDITORIAS (root) */}
+        <ListItemButton
+          onClick={() => toggleRoot('PROCESOS DE AUDITORIAS')}
+          sx={SECTION_STYLE}
+          selected={!!openMap['PROCESOS DE AUDITORIAS']}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
+          >
+            PROCESOS DE AUDITORIAS
+          </Typography>
+          {openMap['PROCESOS DE AUDITORIAS'] ? (
+            <ExpandLess fontSize="small" />
+          ) : (
+            <ExpandMore fontSize="small" />
+          )}
+        </ListItemButton>
+        <Collapse in={!!openMap['PROCESOS DE AUDITORIAS']} timeout="auto" unmountOnExit>
+          {renderNodes(auditorias, 'PROCESOS DE AUDITORIAS')}
         </Collapse>
 
         <Divider sx={{ my: 1.5 }} />
 
-        {/* Módulos simples (no colapsables) */}
-        {[
-          'MÓDULO COMUNICACIÓN',
-          'MÓDULO CONSULTAS',
-          'MÓDULO ALERTAS',
-        ].map((t) => (
-          <ListItemButton key={t} sx={{ ...SECTION_STYLE, py: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
-              {t}
-            </Typography>
-          </ListItemButton>
-        ))}
+        {/* Módulos simples */}
+        {modulos.map((m) => {
+          const path = m.label; // si quieres, ponlos también como path raíz
+          return (
+            <ListItemButton
+              key={path}
+              sx={{ ...SECTION_STYLE, py: 1 }}
+              onClick={() => onSelect(path)}
+              selected={selected === path}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {m.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
       </List>
     </Box>
   );

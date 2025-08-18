@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { Alcance, FichaContribuyente, ObjeticoInvestigacion } from './types';
+import { Alcance, FichaContribuyente, ObjeticoInvestigacion, ObjeticoInvestigacionDos } from './types';
 
 export const withDefaults = (f: Partial<FichaContribuyente>, ruc: string): Required<FichaContribuyente> => ({
   nombre: f.nombre ?? '—',
@@ -23,6 +23,14 @@ export const withDefaultsDos = (f: Partial<ObjeticoInvestigacion>, _ruc: string)
   fundamentos:
     f.fundamentos ??
     'Objeto de la Investigación o Auditoría [Descripción detallada del objeto de la investigación o auditoría, incluyendo los períodos y los impuestos].',
+});
+export const withDefaultsCuatro = (f: Partial<ObjeticoInvestigacionDos>, _ruc: string): Required<ObjeticoInvestigacionDos> => ({
+  investigacionDos:
+    f.investigacionDos ??
+      'La presente auditoría comprenderá las operaciones económicas declaradas por el contribuyente, así como cualquier otra información que la Dirección General de Ingresos considere pertinente, como:',
+  fundamentos:
+    f.fundamentos ??
+    'Alcance de la Investigación o Auditoria [Descripción del alcance de la investigación o auditoría, incluyendo los libros y registros que se revisarán]',
 });
 export const withDefaultsTres = (f: Partial<Alcance>, _ruc: string): Required<Alcance> => ({
   alcance:

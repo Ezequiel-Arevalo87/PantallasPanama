@@ -3,11 +3,10 @@ import React, { useState } from 'react';
 import {
   Box, Grid, TextField, MenuItem, Typography, Button, Stack
 } from '@mui/material';
-import { TablasResultadosSelector } from './TablasResultadosSelector';
-import { TablaAutoApertura } from './TablaAutoApertura';
+
 import AutoAperturaFlow from '../components/AutoAperturaFlow';
 
-export const ProgramacionAutoAperturaForm = () => {
+export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:any; setReadOnly:any}) => {
   const [formData, setFormData] = useState({
     red: '659',
     categoria: 'Fiscalización Masiva',
@@ -57,7 +56,9 @@ export const ProgramacionAutoAperturaForm = () => {
     setMostrarResultados(false);
   };
 
-  const programas = opcionesPrograma[formData.estado] || [];
+  const programas = opcionesPrograma[formData.estado] || []; 
+
+  console.log({readOnly})
 
   return (
     <Box>
@@ -173,7 +174,7 @@ export const ProgramacionAutoAperturaForm = () => {
       </Grid>
 
       {mostrarResultados && (
-        <AutoAperturaFlow  />
+        <AutoAperturaFlow readOnly = {readOnly} setReadOnly = {setReadOnly}  />
       )}
     </Box>
   );

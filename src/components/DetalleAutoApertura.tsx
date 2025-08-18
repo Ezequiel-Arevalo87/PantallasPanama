@@ -24,7 +24,7 @@ import { AyudaButton } from './AyudaButton';
 import { NormasRelacionadas } from './NormasRelacionadas';
 import { PeriodosInvestigacion } from './PeriodosInvestigacion';
 import { ObjetoInvestigacion } from './ObjetoInvestigacion';
-import { Alcance, FichaContribuyente, ObjeticoInvestigacion } from '../helpers/types';
+import { Alcance, FichaContribuyente, ObjeticoInvestigacion, ObjeticoInvestigacionDos } from '../helpers/types';
 
 // catálogo de documentos
 const DOC_OPCIONES = [
@@ -40,8 +40,12 @@ export const DetalleAutoApertura: React.FC<{
   ficha: Required<FichaContribuyente>;
   investigacionObtejo: Required<ObjeticoInvestigacion> | null;
   alcance?: Required<Alcance> | null; // opcional
+  investigacionObtejoDos: Required<ObjeticoInvestigacionDos> | null;
   onVolver?: () => void;
-}> = ({ ficha, investigacionObtejo, alcance }) => {
+  readOnly:any;
+  setReadOnly:any;
+}> = ({ ficha, investigacionObtejo, alcance, investigacionObtejoDos,  readOnly,
+  setReadOnly }) => {
   // --- Estado local para "Alcance / Documentos"
   const [docSel, setDocSel] = useState<string>('');
   const [docOtro, setDocOtro] = useState<string>('');
@@ -73,9 +77,16 @@ export const DetalleAutoApertura: React.FC<{
     setDocs((prev) => prev.filter((d) => d !== label));
   };
 
-  // --- Botonera inferior (mensajes)
-  const accionMsg = (m: string) => setToast(m);
 
+  const accionMsg = (m: string) =>{  
+    debugger  
+  setToast(m);
+  if(m==='Aprobado' ){
+  setReadOnly(true)
+  }
+
+
+}
   return (
     <Box mt={3}>
       <Grid container spacing={2}>
@@ -174,7 +185,7 @@ export const DetalleAutoApertura: React.FC<{
           <Typography variant="h6" fontWeight={700} mb={2}>
             Normas Relacionadas
           </Typography>
-          <NormasRelacionadas />
+          <NormasRelacionadas readOnly = {readOnly} />
         </Grid>
 
         {/* Períodos Fiscales */}
@@ -196,7 +207,7 @@ export const DetalleAutoApertura: React.FC<{
           <Typography variant="h6" fontWeight={700} mb={1}>
             Períodos Fiscales
           </Typography>
-          <PeriodosInvestigacion />
+          <PeriodosInvestigacion  readOnly = {readOnly} />
         </Grid>
 
            {/* 4. ALCANCE DE LA INVESTIGACIÓN */}
@@ -205,6 +216,12 @@ export const DetalleAutoApertura: React.FC<{
             <Typography align="center" fontWeight={700}>
               4. ALCANCE DE LA INVESTIGACIÓN
             </Typography>
+          </Box>
+              <Box mt={2}>
+            <ObjetoInvestigacion
+              texto={investigacionObtejoDos?.investigacionDos}
+              ayuda={investigacionObtejoDos?.fundamentos}
+            />
           </Box>
 
           {/* Formulario Documentos + OTRO + AGREGAR */}
@@ -249,7 +266,7 @@ export const DetalleAutoApertura: React.FC<{
               </TableContainer>
             </Grid>
 
-            <Grid item xs="auto">
+           { !readOnly && <Grid item xs="auto">
               <Button
                 variant="contained"
                 sx={{ bgcolor: '#2E3A47', '&:hover': { bgcolor: '#26313B' }, height: '100%' }}
@@ -257,7 +274,7 @@ export const DetalleAutoApertura: React.FC<{
               >
                 AGREGAR
               </Button>
-            </Grid>
+            </Grid>}
           </Grid>
 
           {/* Tabla de documentos agregados */}
@@ -328,7 +345,8 @@ export const DetalleAutoApertura: React.FC<{
         </Grid>
 
         {/* Botonera inferior */}
-        <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+      { !readOnly &&
+       (<Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
           <Button variant="contained" onClick={() => accionMsg('Guardado')}>
             GUARDAR
           </Button>
@@ -341,7 +359,20 @@ export const DetalleAutoApertura: React.FC<{
           <Button variant="contained" onClick={() => accionMsg('Aprobado')}>
             APROBAR
           </Button>
-        </Grid>
+        </Grid>)}
+
+  { readOnly &&     <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+    
+          <Button variant="contained" onClick={() => accionMsg('Imprimiendo')}>
+            IMPRIMIR
+          </Button>
+          <Button variant="contained" onClick={() => accionMsg('Aprobado')}>
+            APROBAR
+          </Button>
+                 <Button variant="contained" onClick={() => accionMsg('Devolver')}>
+            DEVOLVER
+          </Button>
+        </Grid>}
       </Grid>
 
       {/* Snackbar de mensajes (agregar, errores y botones azules) */}
@@ -358,3 +389,5 @@ export const DetalleAutoApertura: React.FC<{
     </Box>
   );
 };
+
+

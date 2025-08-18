@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { CasoAsignado, FichaContribuyente, ObjeticoInvestigacion, Alcance } from './types';
+import { CasoAsignado, FichaContribuyente, ObjeticoInvestigacion, Alcance, ObjeticoInvestigacionDos } from './types';
 
 export const CASOS: CasoAsignado[] = [
   { id: '1', categoria: 'Fiscalización Masiva', nombre: 'Grupo ABC', ruc: '1233445', fecha: '12/03/25' },
@@ -37,6 +37,16 @@ export const INVESTIGACIONOBJETO: Record<string, ObjeticoInvestigacion> = {
       'Determinar la veracidad y exactitud de la información contenida en las declaraciones juradas de impuestos sobre la renta, ITBMS y demás tributos administrados por la Dirección General de Ingresos, verificar el cumplimiento de las obligaciones tributarias por parte del contribuyente, correspondientes a los periodos fiscales:',
     fundamentos:
       'Objeto de la Investigación o Auditoría [Descripción detallada del objeto de la investigación o auditoría, incluyendo los períodos y los impuestos involucrados]',
+  },
+
+
+};
+export const INVESTIGACIONOBJETODOS: Record<string, ObjeticoInvestigacionDos> = {
+  '1233445': {
+    investigacionDos:
+      'La presente auditoría comprenderá las operaciones económicas declaradas por el contribuyente, así como cualquier otra información que la Dirección General de Ingresos considere pertinente, como:',
+    fundamentos:
+     'Alcance de la Investigación o Auditoria [Descripción del alcance de la investigación o auditoría, incluyendo los libros y registros que se revisarán]',
   },
 
 

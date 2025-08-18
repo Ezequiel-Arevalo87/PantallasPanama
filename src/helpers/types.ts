@@ -21,6 +21,11 @@ export type ObjeticoInvestigacion = {
   investigacion?: string;
   fundamentos?: string;
 };
+export type ObjeticoInvestigacionDos = {
+
+  investigacionDos?: string;
+  fundamentos?: string;
+};
 export type Alcance = {
 
   alcance?: string;

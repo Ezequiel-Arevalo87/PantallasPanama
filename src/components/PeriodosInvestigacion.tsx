@@ -8,7 +8,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { PERIODOS_CATALOGO } from '../helpers/periodosCatalog';
 import { AyudaButton } from './AyudaButton';
 
-export const PeriodosInvestigacion: React.FC = () => {
+export const PeriodosInvestigacion = ({readOnly}: {readOnly:any}) => {
   const [periodo, setPeriodo] = useState<number | ''>('');
   const [lista, setLista] = useState<number[]>([]);
   const [msg, setMsg] = useState('');
@@ -48,7 +48,7 @@ export const PeriodosInvestigacion: React.FC = () => {
           </TableContainer>
         </Grid>
 
-        <Grid item xs="auto">
+   {!readOnly &&  <Grid item xs="auto">
           <Button
             variant="contained"
             sx={{ bgcolor: '#2E3A47', '&:hover': { bgcolor: '#26313B' }, height: '100%' }}
@@ -56,7 +56,7 @@ export const PeriodosInvestigacion: React.FC = () => {
           >
             AGREGAR
           </Button>
-        </Grid>
+        </Grid>}
       </Grid>
 
       {/* Tabla de periodos */}

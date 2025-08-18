@@ -9,7 +9,7 @@ import { NormaSeleccionada } from '../helpers/normasTypes';
 
 const normalizar = (s: string) => s.trim().toLowerCase();
 
-export const NormasRelacionadas: React.FC = () => {
+export const NormasRelacionadas = ({readOnly}:{readOnly:any}) => {
   // selección actual del usuario (form de arriba)
   const [leyNorma, setLeyNorma] = useState<string>('');
   const [vigente, setVigente] = useState<'SI' | 'NO'>('SI');
@@ -136,7 +136,7 @@ export const NormasRelacionadas: React.FC = () => {
         </Grid>
 
         {/* Botón AGREGAR centrado */}
-        <Grid item xs={12}>
+     { !readOnly &&   <Grid item xs={12}>
           <Stack alignItems="center">
             <Button
               variant="contained"
@@ -152,7 +152,7 @@ export const NormasRelacionadas: React.FC = () => {
               AGREGAR
             </Button>
           </Stack>
-        </Grid>
+        </Grid>}
       </Grid>
 
       {/* Tabla resultado */}

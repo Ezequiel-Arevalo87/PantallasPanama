@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { Alcance, FichaContribuyente, ObjeticoInvestigacion } from '../helpers/types';
-import { withDefaults, withDefaultsDos, withDefaultsTres } from '../helpers/withDefaults';
+import { Alcance, FichaContribuyente, ObjeticoInvestigacion, ObjeticoInvestigacionDos } from '../helpers/types';
+import { withDefaults, withDefaultsCuatro, withDefaultsDos, withDefaultsTres } from '../helpers/withDefaults';
 import { TablaCasosAsignados } from './TablaCasosAsignados';
 import { FormAutoApertura } from './FormAutoApertura';
 import { DetalleAutoApertura } from './DetalleAutoApertura';
-import { ALCANCE, FICHAS, INVESTIGACIONOBJETO } from '../helpers/data'; // 👈 importa aquí
+import { ALCANCE, FICHAS, INVESTIGACIONOBJETO, INVESTIGACIONOBJETODOS } from '../helpers/data'; // 👈 importa aquí
 
 type Paso = 'inicio' | 'tabla' | 'form' | 'detalle';
 
-export default function AutoAperturaFlow() {
+export default function AutoAperturaFlow({readOnly, setReadOnly}:{readOnly:any; setReadOnly:any}) {
   const [paso, setPaso] = useState<Paso>('inicio');
   const [rucSeleccionado, setRucSeleccionado] = useState<string>('');
   const [ficha, setFicha] = useState<Required<FichaContribuyente> | null>(null);
   const [investigacionObtejo, setInvestigacionObtejo] = useState<Required<ObjeticoInvestigacion> | null>(null);
+  const [investigacionObtejoDos, setInvestigacionObtejoDos] = useState<Required<ObjeticoInvestigacionDos> | null>(null);
   const [alcance, setAlcance] = useState<Required<Alcance> | null>(null);
 
   const handleCasosAsignados = () => setPaso('tabla');
@@ -32,7 +33,13 @@ export default function AutoAperturaFlow() {
     // 2) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
     const baseObj = INVESTIGACIONOBJETO[ruc] ?? {};
     const objCompleto = withDefaultsDos(baseObj, ruc);
+
     setInvestigacionObtejo(objCompleto);
+    
+    // 2) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
+    const baseObjDos = INVESTIGACIONOBJETODOS[ruc] ?? {};
+    const objCompletoDos = withDefaultsCuatro(baseObjDos, ruc);
+    setInvestigacionObtejoDos(objCompletoDos);
 
     // 3) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
     const baseAlcance = ALCANCE[ruc] ?? {};
@@ -79,6 +86,9 @@ export default function AutoAperturaFlow() {
           <DetalleAutoApertura
             ficha={ficha}
             investigacionObtejo={investigacionObtejo} 
+            investigacionObtejoDos={investigacionObtejoDos} 
+            readOnly = {readOnly}
+            setReadOnly = {setReadOnly}
          
           />
           <Box mt={2} display="flex" justifyContent="space-between">
