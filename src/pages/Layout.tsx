@@ -35,7 +35,7 @@ export const Layout: React.FC = () => {
 
         <Box
           sx={{
-            width: 260,
+            width: 300,
             backgroundColor: '#fdfdf5',
             borderRight: '1px solid #ddd',
             p: 2
