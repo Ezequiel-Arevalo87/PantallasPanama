@@ -73,9 +73,9 @@ export const PeriodosInvestigacion = ({readOnly}: {readOnly:any}) => {
               {lista.map(p => (
                 <TableRow key={p}>
                   <TableCell>{p}</TableCell>
-                  <TableCell align="center">
+                {!readOnly &&  <TableCell align="center">
                     <IconButton onClick={() => handleEliminar(p)}><DeleteOutlineIcon /></IconButton>
-                  </TableCell>
+                  </TableCell>}
                 </TableRow>
               ))}
               {lista.length === 0 && (

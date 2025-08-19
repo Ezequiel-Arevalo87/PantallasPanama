@@ -73,7 +73,8 @@ const useMenuData = () => {
       label: 'GESTIÓN DE AUDITORIA',
       children: [
         { label: 'AUDITOR' },
-        { label: 'SUPERVISOR' },
+        
+        {  label: 'SUPERVISOR'},
         
         // {
         //   label: 'SUB BLOQUE',

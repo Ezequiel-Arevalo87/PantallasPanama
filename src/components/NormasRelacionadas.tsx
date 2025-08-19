@@ -174,9 +174,9 @@ export const NormasRelacionadas = ({readOnly}:{readOnly:any}) => {
                   <TableCell align="center">{r.vigente}</TableCell>
                   <TableCell align="center">{r.desde}</TableCell>
                   <TableCell align="center">
-                    <IconButton onClick={() => handleEliminar(r.id)}>
+              {!readOnly &&      <IconButton onClick={() => handleEliminar(r.id)}>
                       <DeleteOutlineIcon />
-                    </IconButton>
+                    </IconButton>}
                   </TableCell>
                 </TableRow>
               ))}

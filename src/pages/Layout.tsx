@@ -1,5 +1,5 @@
 // pages/Layout.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../components/Sidebar';
 import { Box, Typography } from '@mui/material';
 import { InicioSelectorForm } from './InicioSelectorForm';
@@ -15,33 +15,37 @@ import { Apertura } from './Apertura';
 import { Priorizacion } from './Priorizacion';
 import { AsignacionesVarias } from './AsignacionesVarias';
 import VariacionesIngreso from './VariacionesIngreso';
-// Si DetalleAutoApertura se usa en esta vista y debe bloquear "AGREGAR":
-
 
 export const Layout: React.FC = () => {
   const [selectedPath, setSelectedPath] = useState<string>('');
-  const [readOnly, setReadOnly] = useState(false);
+  const [readOnly, setReadOnly] = useState<boolean>(false);
 
   const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
   const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
 
-  const handleSelect = (ruta: string) => {
-    // Si navega a AUDITOR -> saltar a SUPERVISOR y bloquear edición
-    if (ruta === AUD_PATH || ruta.endsWith('/AUDITOR')) {
-      setSelectedPath(SUP_PATH);
- 
-      return;
-    }
-    // En cualquier otra ruta, decide si es supervisor para bloquear
-    setSelectedPath(ruta);
-    setReadOnly(ruta === SUP_PATH || ruta.endsWith('/SUPERVISOR'));
-  };
-console.log('laya, readOnly', readOnly)
+  // Toma el último segmento de la ruta
   const leaf = useMemo(() => {
     if (!selectedPath) return '';
     const parts = selectedPath.split('/');
     return parts[parts.length - 1] ?? '';
   }, [selectedPath]);
+
+  // 🔁 Sincroniza ruta <-> readOnly
+  useEffect(() => {
+    if (!selectedPath) return;
+
+    if (leaf === 'AUDITOR' && readOnly && selectedPath !== SUP_PATH) {
+      setSelectedPath(SUP_PATH);        // aprobar -> ir a SUPERVISOR
+    } else if (leaf === 'SUPERVISOR' && !readOnly && selectedPath !== AUD_PATH) {
+      setSelectedPath(AUD_PATH);        // devolver -> volver a AUDITOR
+    }
+  }, [readOnly, leaf, selectedPath]);   // ojo con deps
+
+  // Clicks desde el Sidebar (no fuerza saltos; solo refleja selección y setea readOnly si eligen SUPERVISOR)
+  const handleSelect = (ruta: string) => {
+    setSelectedPath(ruta);
+    setReadOnly(ruta === SUP_PATH || ruta.endsWith('/SUPERVISOR'));
+  };
 
   const renderContent = () => {
     switch (leaf) {
@@ -58,13 +62,25 @@ console.log('laya, readOnly', readOnly)
         return <Aprobacion />;
 
       case 'INICIO DE AUDITORIA':
-        // Si aquí usas DetalleAutoApertura, pásale readOnly para bloquear AGREGAR cuando vengas desde SUPERVISOR
-        return <Apertura />; // o <DetalleAutoApertura readOnly={readOnly} ... />
+        return <Apertura />;
+
+      case 'AUDITOR':
+        // Aquí el botón "APROBAR" de tu pantalla debe hacer setReadOnly(true)
+        return (
+          <ProgramacionAutoAperturaForm
+            readOnly={readOnly}
+            setReadOnly={setReadOnly}
+          />
+        );
 
       case 'SUPERVISOR':
-        // Contenido de la pestaña supervisor (readOnly ya está en true por handleSelect)
-        // Si aquí también muestras componentes con "AGREGAR", pásales readOnly={readOnly}
-        return <ProgramacionAutoAperturaForm readOnly = {readOnly} setReadOnly = {setReadOnly} />;
+        // Aquí el botón "DEVOLVER" debe hacer setReadOnly(false)
+        return (
+          <ProgramacionAutoAperturaForm
+            readOnly={readOnly}
+            setReadOnly={setReadOnly}
+          />
+        );
 
       case 'REVISIÓN AUDITOR':
         return <AsignacionesVarias tipo="REVISIÓN AUDITOR" />;

@@ -1,5 +1,6 @@
 // src/components/DetalleAutoApertura.tsx
 import React, { useState } from 'react';
+import Swal from 'sweetalert2';
 import {
   Box,
   Grid,
@@ -78,15 +79,50 @@ export const DetalleAutoApertura: React.FC<{
   };
 
 
-  const accionMsg = (m: string) =>{  
-      
+const accionMsg = (m: string) => {
   setToast(m);
-  if(m==='Aprobado' ){
-  setReadOnly(true)
+  if (m === 'Aprobado') {
+    setReadOnly(true);   // esto disparará el cambio a SUPERVISOR vía tu useEffect del Layout
+  } else if (m === 'Devolver') {
+    setReadOnly(false);  // esto disparará el cambio a AUDITOR
   }
+};
 
+// Nueva: confirmación "¿Está seguro?" con Sí / Cancelar
+const confirmarYAccionar = async (m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Editar' | 'Imprimir') => {
+  const textos: Record<string, string> = {
+    Aprobado: 'Pasará a SUPERVISOR y se bloqueará la edición.',
+    Devolver: 'Volverá a AUDITOR y se habilitará la edición.',
+    Guardar: 'Se guardarán los cambios.',
+    Editar: 'Entrará en modo edición.',
+    Imprimir: 'Se generará el documento para imprimir.'
+  };
 
-}
+  const { isConfirmed } = await Swal.fire({
+    title: '¿Está seguro?',
+    text: textos[m] ?? '¿Desea continuar con esta acción?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí',
+    cancelButtonText: 'Cancelar',
+    reverseButtons: true,
+    focusCancel: true
+  });
+
+  if (!isConfirmed) return;
+
+  // Ejecuta tu lógica actual
+  accionMsg(m);
+
+  // Feedback (opcional)
+  await Swal.fire({
+    title: 'Hecho',
+    text: m,
+    icon: 'success',
+    timer: 1200,
+    showConfirmButton: false
+  });
+};
   return (
     <Box mt={3}>
       <Grid container spacing={2}>
@@ -294,9 +330,9 @@ export const DetalleAutoApertura: React.FC<{
                     <TableRow key={d}>
                       <TableCell>{d}</TableCell>
                       <TableCell align="center">
-                        <IconButton onClick={() => handleEliminarDoc(d)}>
+                      {!readOnly &&  <IconButton onClick={() => handleEliminarDoc(d)}>
                           <DeleteOutlineIcon />
-                        </IconButton>
+                        </IconButton>}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -345,34 +381,23 @@ export const DetalleAutoApertura: React.FC<{
         </Grid>
 
         {/* Botonera inferior */}
-      { !readOnly &&
-       (<Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
-          <Button variant="contained" onClick={() => accionMsg('Guardado')}>
-            GUARDAR
-          </Button>
-          <Button variant="contained" onClick={() => accionMsg('Editado')}>
-            EDITAR
-          </Button>
-          <Button variant="contained" onClick={() => accionMsg('Imprimiendo')}>
-            IMPRIMIR
-          </Button>
-          <Button variant="contained" onClick={() => accionMsg('Aprobado')}>
-            APROBAR
-          </Button>
-        </Grid>)}
+   {!readOnly && (
+  <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Guardar')}>GUARDAR</Button>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Editar')}>EDITAR</Button>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
+  </Grid>
+)}
 
-  { readOnly &&     <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
-    
-          <Button variant="contained" onClick={() => accionMsg('Imprimiendo')}>
-            IMPRIMIR
-          </Button>
-          <Button variant="contained" onClick={() => accionMsg('Aprobado')}>
-            APROBAR
-          </Button>
-                 <Button variant="contained" onClick={() => accionMsg('Devolver')}>
-            DEVOLVER
-          </Button>
-        </Grid>}
+{readOnly && (
+  <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
+    <Button variant="contained" onClick={() => confirmarYAccionar('Devolver')}>DEVOLVER</Button>
+  </Grid>
+)}
+
       </Grid>
 
       {/* Snackbar de mensajes (agregar, errores y botones azules) */}
