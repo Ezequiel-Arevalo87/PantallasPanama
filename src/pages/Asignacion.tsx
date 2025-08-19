@@ -174,7 +174,7 @@ export const Asignacion = () => {
         </Grid>
       </Grid>
 
-    {mostrarResultados && <ProgramacionAutoAperturaForm />}
+    {mostrarResultados && <ProgramacionAutoAperturaForm readOnly={undefined} setReadOnly={undefined} />}
 
     </Box>
   );

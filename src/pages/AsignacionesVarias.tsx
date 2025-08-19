@@ -1,4 +1,4 @@
-// src/pages/ProgramacionAutoAperturaForm.tsx
+
 import React, { useState } from 'react';
 import { Box, Grid, TextField, MenuItem, Button, Stack } from '@mui/material';
 import { DetallesAsignacionVarias, TipoRevisionIn } from './DetallesAsignacionVarias';
