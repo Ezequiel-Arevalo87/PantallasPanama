@@ -23,6 +23,7 @@ import {
 } from "@mui/material";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import Swal from "sweetalert2";
 
 // ---------- Catálogos ----------
 const CATEGORIAS = [
@@ -97,6 +98,7 @@ export default function VariacionesIngreso() {
   const [tipo, setTipo] = useState("Persona Jurídica");
   const [actividad, setActividad] = useState(ACTIVIDADES[0]?.label || "");
   const [ruc, setRuc] = useState("");
+    const [toast, setToast] = useState<string>('');
 
   // Criterios (puedes fijarlos si es solo visual)
   const [pctMin, setPctMin] = useState(-15); // 15% en negativo (mostrar en rojo)
@@ -227,6 +229,42 @@ const consultar = () => {
   setRows(out);
 };
 
+const accionMsg = (m: string) => {
+  setToast(m);
+
+};
+const confirmarYAccionar = async (m: 'Aprobado' | 'Rechazar' | 'Descargar') => {
+  const textos: Record<string, string> = {
+    Aprobado: 'Se aprobaron.',
+    Rechazar: 'Se Rechazo.',
+    Descargar: 'Se generará el documento.'
+  };
+
+  const { isConfirmed } = await Swal.fire({
+    title: '¿Está seguro?',
+    text: textos[m] ?? '¿Desea continuar con esta acción?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí',
+    cancelButtonText: 'Cancelar',
+    reverseButtons: true,
+    focusCancel: true
+  });
+
+  if (!isConfirmed) return;
+
+  // Ejecuta tu lógica actual
+  accionMsg(m);
+
+  // Feedback (opcional)
+  await Swal.fire({
+    title: 'Hecho',
+    text: m,
+    icon: 'success',
+    timer: 1200,
+    showConfirmButton: false
+  });
+};
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>
@@ -488,19 +526,11 @@ const consultar = () => {
         </Table>
       </Box>
 
-      {/* <Box sx={{ mt: 2 }}>
-        <Typography variant="subtitle2">
-          Comentarios aplicables a esta consulta
-        </Typography>
-        <Typography variant="body2">
-          Las variaciones del ISR y del ITBMS mayores al {percent(pctMax)} o
-          menores a -{percent(pctMin)} se muestran en rojo.
-        </Typography>
-        <Typography variant="body2">
-          Los contribuyentes con ingresos mayores o iguales a ${" "}
-          {money(ingresoMayorIgual)} se muestran en rojo.
-        </Typography>
-      </Box> */}
+   <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+     <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
+     <Button variant="contained" onClick={() => confirmarYAccionar('Rechazar')}>RECHAZAR</Button>
+     <Button variant="contained" onClick={() => confirmarYAccionar('Descargar')}>DESCARGAR REPORTE</Button>
+   </Grid>
     </Paper>
   );
 }
