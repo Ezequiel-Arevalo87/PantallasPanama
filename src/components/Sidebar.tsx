@@ -60,6 +60,11 @@ const buildPath = (parent: string, label: string) =>
 
 /** Datos del menú (con submenús anidados) */
 const useMenuData = () => {
+  const analisis: MenuNode[] = [
+    { label: 'HISTORIAL CUMPLIMIENTO' },
+    { label: 'ANALISIS FISCAL' },
+  
+  ];
   const fiscalizacion: MenuNode[] = [
     { label: 'VARIACIÓN EN INGRESOS' },
     { label: 'SELECCIÓN DE CASOS' },
@@ -101,18 +106,18 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return { fiscalizacion, auditorias, modulos };
+  return {analisis, fiscalizacion, auditorias, modulos };
 };
 
 export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
   // Para abrir/cerrar submenús por "path"
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const { fiscalizacion, auditorias, modulos } = useMenuData();
+  const { analisis, fiscalizacion, auditorias, modulos } = useMenuData();
 
   /** Comportamiento "acordeón por sección principal":
    * cuando abres una raíz, cierra las otras raíces, pero deja libres los subniveles dentro.
    */
-  const ROOTS = useMemo(() => ['FISCALIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
+  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS', 'FISCALIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
   const toggleRoot = (root: typeof ROOTS[number]) => {
     setOpenMap((prev) => {
       const next: Record<string, boolean> = { ...prev };
@@ -193,6 +198,33 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
           </ListSubheader>
         }
       >
+{/* SELECCIONES DE CASOS (root) */}
+                <ListItemButton
+          onClick={() => toggleRoot('SELECCIONES DE CASOS')}
+          sx={SECTION_STYLE}
+          selected={!!openMap['SELECCIONES DE CASOS']}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
+          >
+            SELECCIONES DE CASOS
+          </Typography>
+
+          {openMap['SELECCIONES DE CASOS'] ? (
+            <ExpandLess fontSize="small" />
+          ) : (
+            <ExpandMore fontSize="small" />
+          )}
+        </ListItemButton>
+            <Collapse in={!!openMap['SELECCIONES DE CASOS']} timeout="auto" unmountOnExit>
+          {renderNodes(analisis, 'SELECCIONES DE CASOS')}
+        </Collapse>
+
+          <Divider sx={{ my: 1.5 }} />
+
+          
+
         {/* FISCALIZACIÓN (root) */}
         <ListItemButton
           onClick={() => toggleRoot('FISCALIZACIÓN')}

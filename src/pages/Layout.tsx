@@ -15,6 +15,8 @@ import { Apertura } from './Apertura';
 import { Priorizacion } from './Priorizacion';
 import { AsignacionesVarias } from './AsignacionesVarias';
 import VariacionesIngreso from './VariacionesIngreso';
+import HistorialCumplimiento from './HistorialCumplimiento';
+import AnalisisFiscal from './AnalisisFiscal';
 
 export const Layout: React.FC = () => {
   const [selectedPath, setSelectedPath] = useState<string>('');
@@ -49,6 +51,11 @@ export const Layout: React.FC = () => {
 
   const renderContent = () => {
     switch (leaf) {
+      case 'HISTORIAL CUMPLIMIENTO':
+        return <HistorialCumplimiento />;
+
+      case 'ANALISIS FISCAL':
+        return <AnalisisFiscal />;
       case 'VARIACIÓN EN INGRESOS':
         return <VariacionesIngreso />;
 

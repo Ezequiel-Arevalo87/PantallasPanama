@@ -49,11 +49,11 @@ const ACTIVIDADES: Actividad[] = [
 // 🔥 Datos quemados (a propósito en any)
 const DATA_EJEMPLO: any[] = [
   { categoria: "Grandes Contribuyentes", tipo: "Persona Jurídica", ruc: "111000", nombre: "Electro Panamá S.A.", codActividad: "9521", impuesto: "ISR", periodos: { 2025: 450000, 2024: 400000, 2023: 350000 } },
-  { categoria: "Fiscalización Masiva",  tipo: "Persona Física y Natural", ruc: "222000", nombre: "Servicios Hogar PF",     codActividad: "9521", impuesto: "ISR", periodos: { 2025:  90000, 2023:  80000, 2022:  75000 } },
-  { categoria: "Auditoría Sectorial",   tipo: "Persona Jurídica",        ruc: "333000", nombre: "TecnoHome S.A.",         codActividad: "9521", impuesto: "ISR", periodos: { 2025: 250000, 2023: 210000, 2022: 200000 } },
-  { categoria: "Grandes Contribuyentes", tipo: "Persona Jurídica", ruc: "654654", nombre: "Compañía xyz",  codActividad: "9609", impuesto: "ISR", periodos: { 2025: 1000000, 2024: 900000, 2023: 850000, 2022: 200000 } },
-  { categoria: "Fiscalización Masiva",   tipo: "Persona Física y Natural", ruc: "789012", nombre: "Juan Pérez", codActividad: "4711", impuesto: "ISR", periodos: { 2025: 120000, 2024: 100000 } },
-  { categoria: "Auditoría Sectorial",    tipo: "Persona Jurídica", ruc: "112233", nombre: "Inversiones ABC", codActividad: "6201", impuesto: "ISR", periodos: { 2025: 800000, 2024: 600000 } },
+  { categoria: "Fiscalización Masiva", tipo: "Persona Física y Natural", ruc: "222000", nombre: "Servicios Hogar PF", codActividad: "9521", impuesto: "ISR", periodos: { 2025: 90000, 2023: 80000, 2022: 75000 } },
+  { categoria: "Auditoría Sectorial", tipo: "Persona Jurídica", ruc: "333000", nombre: "TecnoHome S.A.", codActividad: "9521", impuesto: "ISR", periodos: { 2025: 250000, 2023: 210000, 2022: 200000 } },
+  { categoria: "Grandes Contribuyentes", tipo: "Persona Jurídica", ruc: "654654", nombre: "Compañía xyz", codActividad: "9609", impuesto: "ISR", periodos: { 2025: 1000000, 2024: 900000, 2023: 850000, 2022: 200000 } },
+  { categoria: "Fiscalización Masiva", tipo: "Persona Física y Natural", ruc: "789012", nombre: "Juan Pérez", codActividad: "4711", impuesto: "ISR", periodos: { 2025: 120000, 2024: 100000 } },
+  { categoria: "Auditoría Sectorial", tipo: "Persona Jurídica", ruc: "112233", nombre: "Inversiones ABC", codActividad: "6201", impuesto: "ISR", periodos: { 2025: 800000, 2024: 600000 } },
 ];
 
 // ---------- Tipos ----------
@@ -84,7 +84,7 @@ const money = (n: number | null | undefined): string =>
 
 const percent = (v: number | null | undefined): string =>
   v === undefined || v === null ? "" :
-  (v * 100).toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+    (v * 100).toLocaleString("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
 
 const getActividadCode = (label: string): string => (label ? label.slice(0, 4) : "");
 
@@ -158,9 +158,9 @@ export default function VariacionesIngreso() {
 
     let data = DATA_EJEMPLO.filter((d) => d.impuesto === "ISR");
     if (categoria !== "Todos") data = data.filter((d) => d.categoria === categoria);
-    if (tipo !== "Todos")      data = data.filter((d) => d.tipo === tipo);
-    if (codAct)                data = data.filter((d) => d.codActividad === codAct);
-    if (ruc.trim())            data = data.filter((d) => String(d.ruc).includes(ruc.trim()));
+    if (tipo !== "Todos") data = data.filter((d) => d.tipo === tipo);
+    if (codAct) data = data.filter((d) => d.codActividad === codAct);
+    if (ruc.trim()) data = data.filter((d) => String(d.ruc).includes(ruc.trim()));
 
     const out: Row[] = data.map((d) => {
       const pmap = d.periodos as Record<number, number>;
@@ -171,7 +171,7 @@ export default function VariacionesIngreso() {
       const pares: ParDetalle[] = [];
       for (let i = 0; i < periodos.length - 1; i++) {
         const p1 = periodos[i], p2 = periodos[i + 1];
-        const v1 = pmap?.[p1],  v2 = pmap?.[p2];
+        const v1 = pmap?.[p1], v2 = pmap?.[p2];
         if (typeof v1 === "number" && typeof v2 === "number") {
           const B = v1 - v2;
           const pct = v2 !== 0 ? B / v2 : null;
@@ -230,9 +230,9 @@ export default function VariacionesIngreso() {
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>
+      {/* <Typography variant="h6" sx={{ mb: 1 }}>
         Análisis variaciones Ingresos declarados ISR
-      </Typography>
+      </Typography> */}
 
       {/* filtros */}
       <Grid container spacing={2}>
@@ -258,7 +258,11 @@ export default function VariacionesIngreso() {
             <Grid item xs={6}>
               <TextField fullWidth size="small" value={ruc} onChange={(e) => setRuc(e.target.value)} placeholder="Opcional" />
             </Grid>
-
+            <Grid item xs={6}><Typography>Valor ingresos Mayor igual a $</Typography></Grid>
+            <Grid item xs={6}>
+              <TextField size="small" fullWidth type="number" value={ingresoMayorIgual}
+                onChange={(e) => setIngresoMayorIgual(Number(e.target.value))} />
+            </Grid>
             <Grid item xs={6}><Typography>% Mínimo - Menor igual a (-)</Typography></Grid>
             <Grid item xs={6}>
               <TextField size="small" fullWidth type="number" inputProps={{ step: "0.01" }}
@@ -271,11 +275,7 @@ export default function VariacionesIngreso() {
                 value={pctMax} onChange={(e) => setPctMax(Number(e.target.value))} />
             </Grid>
 
-            <Grid item xs={6}><Typography>Valor ingresos Mayor igual a $</Typography></Grid>
-            <Grid item xs={6}>
-              <TextField size="small" fullWidth type="number" value={ingresoMayorIgual}
-                onChange={(e) => setIngresoMayorIgual(Number(e.target.value))} />
-            </Grid>
+
           </Grid>
         </Grid>
 
@@ -324,76 +324,76 @@ export default function VariacionesIngreso() {
         <Button variant="outlined" color="inherit" onClick={limpiar}>LIMPIAR</Button>
       </Stack>
 
-     {/* Tabla principal */}
-<Box sx={{ mt: 3 }}>
-  <Table size="small">
-    <TableHead>
-      <TableRow>
-        <TableCell align="center" colSpan={3} sx={{ fontWeight: 700 }} />
-        <TableCell align="center" colSpan={periodos.length} sx={{ fontWeight: 700 }} />
-        <TableCell align="center" sx={{ fontWeight: 700 }}>
-          PROMEDIO VARIACIONES
-        </TableCell>
-        <TableCell align="center" sx={{ fontWeight: 700 }}>
-          {/* Columna del botón */}
-        </TableCell>
-        {/* 🔻 Se elimina el grupo “Variación” (B y %) */}
-      </TableRow>
-      <TableRow>
-        <TableCell>RUC</TableCell>
-        <TableCell>Nombre Contribuyente</TableCell>
-        <TableCell>Ingresos declarados</TableCell>
-        {periodos.map((y) => (
-          <TableCell key={`h-${y}`} align="right">
-            {y}
-          </TableCell>
-        ))}
-        <TableCell align="right">$</TableCell>
-        <TableCell align="center">{/* botón */}</TableCell>
-        {/* 🔻 Se quitan cabeceras B y % */}
-      </TableRow>
-    </TableHead>
-
-    <TableBody>
-      {rows.length === 0 ? (
-        <TableRow>
-          {/* 3 fijas + N periodos + 1 promedio + 1 botón = 5 + N */}
-          <TableCell colSpan={5 + periodos.length} align="center">
-            Sin resultados. Ajusta filtros y pulsa <b>Consultar</b>.
-          </TableCell>
-        </TableRow>
-      ) : (
-        rows.map((r) => {
-          const minFrac = pctMin / 100;
-          const maxFrac = pctMax / 100;
-          const excedePct = r.pct !== null && (r.pct >= maxFrac || r.pct <= -Math.abs(minFrac));
-          const excedeIngreso = (r.maxIngreso ?? 0) >= ingresoMayorIgual;
-          const danger = excedePct || excedeIngreso;
-
-          return (
-            <TableRow key={r.ruc} sx={{ bgcolor: danger ? "rgba(255,0,0,0.08)" : "inherit" }}>
-              <TableCell>{r.ruc}</TableCell>
-              <TableCell>{r.nombre}</TableCell>
-              <TableCell>{r.impuesto}</TableCell>
+      {/* Tabla principal */}
+      <Box sx={{ mt: 3 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell align="center" colSpan={3} sx={{ fontWeight: 700 }} />
+              <TableCell align="center" colSpan={periodos.length} sx={{ fontWeight: 700 }} />
+              <TableCell align="center" sx={{ fontWeight: 700 }}>
+                PROMEDIO VARIACIONES
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700 }}>
+                {/* Columna del botón */}
+              </TableCell>
+              {/* 🔻 Se elimina el grupo “Variación” (B y %) */}
+            </TableRow>
+            <TableRow>
+              <TableCell>RUC</TableCell>
+              <TableCell>Nombre Contribuyente</TableCell>
+              <TableCell>Ingresos declarados</TableCell>
               {periodos.map((y) => (
-                <TableCell key={`${r.ruc}-${y}`} align="right">
-                  {money(r.valores[y])}
+                <TableCell key={`h-${y}`} align="right">
+                  {y}
                 </TableCell>
               ))}
-              <TableCell align="right">{money(r.promedioB)}</TableCell>
-              <TableCell align="center">
-                <Button size="small" variant="contained" onClick={() => verVariaciones(r)}>
-                  VER VARIACIONES
-                </Button>
-              </TableCell>
-              {/* 🔻 Ya no se muestran B ni % aquí */}
+              <TableCell align="right">$</TableCell>
+              <TableCell align="center">{/* botón */}</TableCell>
+              {/* 🔻 Se quitan cabeceras B y % */}
             </TableRow>
-          );
-        })
-      )}
-    </TableBody>
-  </Table>
-</Box>
+          </TableHead>
+
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                {/* 3 fijas + N periodos + 1 promedio + 1 botón = 5 + N */}
+                <TableCell colSpan={5 + periodos.length} align="center">
+                  Sin resultados. Ajusta filtros y pulsa <b>Consultar</b>.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r) => {
+                const minFrac = pctMin / 100;
+                const maxFrac = pctMax / 100;
+                const excedePct = r.pct !== null && (r.pct >= maxFrac || r.pct <= -Math.abs(minFrac));
+                const excedeIngreso = (r.maxIngreso ?? 0) >= ingresoMayorIgual;
+                const danger = excedePct || excedeIngreso;
+
+                return (
+                  <TableRow key={r.ruc} sx={{ bgcolor: danger ? "rgba(255,0,0,0.08)" : "inherit" }}>
+                    <TableCell>{r.ruc}</TableCell>
+                    <TableCell>{r.nombre}</TableCell>
+                    <TableCell>{r.impuesto}</TableCell>
+                    {periodos.map((y) => (
+                      <TableCell key={`${r.ruc}-${y}`} align="right">
+                        {money(r.valores[y])}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right">{money(r.promedioB)}</TableCell>
+                    <TableCell align="center">
+                      <Button size="small" variant="contained" onClick={() => verVariaciones(r)}>
+                        VER VARIACIONES
+                      </Button>
+                    </TableCell>
+                    {/* 🔻 Ya no se muestran B ni % aquí */}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </Box>
 
 
       <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
