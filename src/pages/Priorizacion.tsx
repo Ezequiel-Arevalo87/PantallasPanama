@@ -235,29 +235,7 @@ export const Priorizacion: React.FC = () => {
           />
         </Grid>
 
-        {/* Periodo Inicial / Final */}
-        <Grid item xs={6} md={2.5}>
-          <TextField
-            fullWidth
-            type="date"
-            label="Periodo Inicial"
-            name="periodoInicial"
-            value={form.periodoInicial}
-            onChange={handleChange}
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid item xs={6} md={2.5}>
-          <TextField
-            fullWidth
-            type="date"
-            label="Periodo Final"
-            name="periodoFinal"
-            value={form.periodoFinal}
-            onChange={handleChange}
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
+        
 
         {/* Botones */}
         <Grid item xs={12}>

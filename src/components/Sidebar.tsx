@@ -63,12 +63,11 @@ const useMenuData = () => {
   const analisis: MenuNode[] = [
     { label: 'HISTORIAL CUMPLIMIENTO' },
     { label: 'ANALISIS FISCAL' },
-  
+
   ];
   const fiscalizacion: MenuNode[] = [
     { label: 'VARIACIÓN EN INGRESOS' },
-    { label: 'SELECCIÓN DE CASOS' },
-    { label: 'PRIORIZACIÓN' },
+
     { label: 'ASIGNACIÓN' },
   ];
 
@@ -78,9 +77,9 @@ const useMenuData = () => {
       label: 'GESTIÓN DE AUDITORIA',
       children: [
         { label: 'AUDITOR' },
-        
-        {  label: 'SUPERVISOR'},
-        
+
+        { label: 'SUPERVISOR' },
+
         // {
         //   label: 'SUB BLOQUE',
         //   children: [
@@ -91,6 +90,8 @@ const useMenuData = () => {
       ],
     },
     { label: 'REVISIÓN AUDITOR' },
+    { label: 'SELECCIÓN DE CASOS' },
+    { label: 'PRIORIZACIÓN' },
     { label: 'REVISIÓN SUPERVISOR' },
     { label: 'REVISIÓN JEFE DE SECCIÓN' },
     { label: 'PRESENTACIÓN VOLUNTARIA' },
@@ -106,7 +107,7 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return {analisis, fiscalizacion, auditorias, modulos };
+  return { analisis, fiscalizacion, auditorias, modulos };
 };
 
 export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
@@ -198,8 +199,8 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
           </ListSubheader>
         }
       >
-{/* SELECCIONES DE CASOS (root) */}
-                <ListItemButton
+        {/* SELECCIONES DE CASOS (root) */}
+        <ListItemButton
           onClick={() => toggleRoot('SELECCIONES DE CASOS')}
           sx={SECTION_STYLE}
           selected={!!openMap['SELECCIONES DE CASOS']}
@@ -217,13 +218,13 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
             <ExpandMore fontSize="small" />
           )}
         </ListItemButton>
-            <Collapse in={!!openMap['SELECCIONES DE CASOS']} timeout="auto" unmountOnExit>
+        <Collapse in={!!openMap['SELECCIONES DE CASOS']} timeout="auto" unmountOnExit>
           {renderNodes(analisis, 'SELECCIONES DE CASOS')}
         </Collapse>
 
-          <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 1.5 }} />
 
-          
+
 
         {/* FISCALIZACIÓN (root) */}
         <ListItemButton
