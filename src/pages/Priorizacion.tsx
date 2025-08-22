@@ -1,185 +1,282 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Box, Grid, TextField, MenuItem, Typography, Button,
-  Stack
+  Box,
+  Grid,
+  TextField,
+  MenuItem,
+  Button,
+  Stack,
+  Divider,
+  Typography,
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import PriorizacionForm from './PriorizacionForm';
 
-export const Priorizacion = () => {
-  const [formData, setFormData] = useState({
-    red: '659',
+
+// --- Catálogos ---
+const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
+const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
+
+const PROGRAMAS_OMISO = [
+  'Omisos VS Dividendos',
+  'Omisos VS 431 (ITBMS)',
+  'Omisos VS Informes 22, 23, 43, 44',
+  'Omisos VS Renta',
+  'Omisos VS ITBMS',
+];
+
+const PROGRAMAS_INEXACTO = [
+  'Gastos vs anexos',
+  'Ventas vs anexos',
+  'Ingresos vs anexos',
+  'Costos vs anexos',
+  'Gastos vs Reportes ventas de tercer',
+  'Costos vs reportes ventas de tercer',
+];
+
+const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'];
+
+export const Priorizacion: React.FC = () => {
+  const [form, setForm] = useState<any>({
+    periodo: '',
     categoria: 'Fiscalización Masiva',
-    estado: 'Todos',
+    inconsistencia: 'Inexacto',
+    actividadEconomica: '',
+    tipologia: '',
     programa: '',
+    valoresDeclarados: '',
     periodoInicial: '',
     periodoFinal: '',
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
+  const esAS = form.categoria === 'Auditoría Sectorial';
+  const esFM = form.categoria === 'Fiscalización Masiva';
 
-  const opcionesPrograma: Record<string, string[]> = {
-    Todos: [
-      'omisos vs compras',
-      'omisos vs dividendos',
-      'omisos vs 431',
-      'omisos vs renta',
-      'omisos vs ITBMS',
-      'ingresos ITBMS vs Ingresos Renta',
-      'compras ITBMS vs compras',
-      'gastos vs compras',
-      'Fecha de Presentación'
-    ],
-    omiso: [
-      'omisos vs compras',
-      'omisos vs dividendos',
-      'omisos vs 431',
-      'omisos vs renta',
-      'omisos vs ITBMS'
-    ],
-    inexacto: [
-      'ingresos ITBMS vs Ingresos Renta',
-      'compras ITBMS vs compras',
-      'gastos vs compras'
-    ],
-    Extemporáneo: ['Fecha de Presentación']
-  };
-
-const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const { name, value } = e.target;
-  setFormData(prev => ({
-    ...prev,
-    [name]: value,
-    ...(name === 'estado' && { programa: '' })
-  }));
-  setMostrarResultados(false); 
+  // Programas dinámicos según inconsistencia
+  const programasDisponibles = useMemo(() => {
+    switch (form.inconsistencia) {
+      case 'Omiso':
+        return PROGRAMAS_OMISO;
+      case 'Inexacto':
+        return PROGRAMAS_INEXACTO;
+      case 'Extemporáneo':
+        return PROGRAMAS_EXTEMPORANEO;
+      case 'Todos':
+        return [...PROGRAMAS_OMISO, ...PROGRAMAS_INEXACTO, ...PROGRAMAS_EXTEMPORANEO];
+      default:
+        return [];
+    }
+  }, [form.inconsistencia]);
+  const mapEstadoToTabla = (v: string) => {
+  switch (v) {
+    case 'Omiso': return 'omiso';
+    case 'Inexacto': return 'inexacto';
+    case 'Extemporáneo': return 'Extemporáneo'; // así lo espera tu tabla
+    case 'Todos': return 'Todos';
+    default: return v;
+  }
 };
 
-  const programas = opcionesPrograma[formData.estado] || [];
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    if (name === 'categoria') {
+      setForm((prev: any) => ({
+        ...prev,
+        categoria: value,
+        tipologia: value === 'Auditoría Sectorial' ? '' : prev.tipologia,
+        actividadEconomica: value === 'Fiscalización Masiva' ? '' : prev.actividadEconomica,
+      }));
+      setMostrarResultados(false);
+      return;
+    }
+
+    if (name === 'inconsistencia') {
+      setForm((prev: any) => ({
+        ...prev,
+        inconsistencia: value,
+        programa: '',
+      }));
+      setMostrarResultados(false);
+      return;
+    }
+
+    setForm((prev: any) => ({ ...prev, [name]: value }));
+    setMostrarResultados(false);
+  };
+
+  const handleConsultar = () => setMostrarResultados(true);
+
+  const handleLimpiar = () => {
+    setForm({
+      periodo: '',
+      categoria: 'Fiscalización Masiva',
+      inconsistencia: 'Inexacto',
+      actividadEconomica: '',
+      tipologia: '',
+      programa: '',
+      valoresDeclarados: '',
+      periodoInicial: '',
+      periodoFinal: '',
+    });
+    setMostrarResultados(false);
+  };
 
   return (
     <Box>
-     
       <Grid container spacing={2}>
+        {/* 1. PERIODO */}
         <Grid item xs={12} sm={3}>
           <TextField
-            select
             fullWidth
-            label="Red"
-            name="red"
-            value={formData.red}
+            type="date"
+            label="Periodo"
+            name="periodo"
+            value={form.periodo}
             onChange={handleChange}
-          >
-            <MenuItem value="659">659</MenuItem>
-            <MenuItem value="675">675</MenuItem>
-          </TextField>
+            InputLabelProps={{ shrink: true }}
+          />
         </Grid>
 
-        <Grid item xs={12} sm={6}>
+        {/* 2. CATEGORÍA */}
+        <Grid item xs={12} sm={5}>
           <TextField
             select
             fullWidth
             label="Categoría"
             name="categoria"
-            value={formData.categoria}
+            value={form.categoria}
             onChange={handleChange}
           >
-            {['Todos', 'Fiscalización Masiva', 'Grandes Contribuyentes', 'Auditoría Sectorial'].map(cat => (
-              <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+            {CATEGORIAS.map((c) => (
+              <MenuItem key={c} value={c}>
+                {c}
+              </MenuItem>
             ))}
           </TextField>
         </Grid>
 
-        <Grid item xs={12} sm={3}>
+        {/* 3. Tipo de Inconsistencia */}
+        <Grid item xs={12} sm={4}>
           <TextField
             select
             fullWidth
-            label="Estado"
-            name="estado"
-            value={formData.estado}
+            label="Tipo de Inconsistencia"
+            name="inconsistencia"
+            value={form.inconsistencia}
             onChange={handleChange}
           >
-            {['Todos', 'omiso', 'inexacto', 'Extemporáneo'].map(estado => (
-              <MenuItem key={estado} value={estado}>{estado}</MenuItem>
+            {INCONSISTENCIAS.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
             ))}
           </TextField>
         </Grid>
 
-        <Grid item xs={12} sm={6}>
+        {/* Actividad Económica */}
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Actividad Económica"
+            name="actividadEconomica"
+            value={form.actividadEconomica}
+            onChange={handleChange}
+            disabled={!esAS}
+            placeholder="Escriba aquí..."
+          />
+        </Grid>
+
+        {/* Tipología */}
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Tipología"
+            name="tipologia"
+            value={form.tipologia}
+            onChange={handleChange}
+            disabled={!esFM}
+            placeholder="Escriba aquí..."
+          />
+        </Grid>
+
+        {/* Programa dinámico */}
+        <Grid item xs={12}>
+          <Divider sx={{ my: 1 }} />
           <TextField
             select
             fullWidth
             label="Programa"
             name="programa"
-            value={formData.programa}
+            value={form.programa}
             onChange={handleChange}
-            disabled={programas.length === 0}
+            disabled={programasDisponibles.length === 0}
           >
-            {programas.map(p => (
-              <MenuItem key={p} value={p}>{p}</MenuItem>
+            {programasDisponibles.map((p) => (
+              <MenuItem key={p} value={p}>
+                {p}
+              </MenuItem>
             ))}
           </TextField>
         </Grid>
 
-    <Grid item xs={6} sm={3}>
-  <TextField
-    label="Periodo Inicial"
-    name="periodoInicial"
-    type="date"
-    value={formData.periodoInicial}
-    onChange={handleChange}
-    fullWidth
-    InputLabelProps={{ shrink: true }}
-  />
-</Grid>
+        {/* Valores declarados */}
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="Valores Declarados"
+            name="valoresDeclarados"
+            type="number"
+            value={form.valoresDeclarados}
+            onChange={handleChange}
+          />
+        </Grid>
 
-<Grid item xs={6} sm={3}>
-  <TextField
-    label="Periodo Final"
-    name="periodoFinal"
-    type="date"
-    value={formData.periodoFinal}
-    onChange={handleChange}
-    fullWidth
-    InputLabelProps={{ shrink: true }}
-  />
-</Grid>
+        {/* Periodo Inicial / Final */}
+        <Grid item xs={6} md={2.5}>
+          <TextField
+            fullWidth
+            type="date"
+            label="Periodo Inicial"
+            name="periodoInicial"
+            value={form.periodoInicial}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+          />
+        </Grid>
+        <Grid item xs={6} md={2.5}>
+          <TextField
+            fullWidth
+            type="date"
+            label="Periodo Final"
+            name="periodoFinal"
+            value={form.periodoFinal}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+          />
+        </Grid>
 
-<Grid item xs={12}>
-  <Stack direction="row" justifyContent="flex-end" spacing={2}>
-   <Button variant="contained" color="primary" onClick={() => setMostrarResultados(true)}>
-  Consultar
-</Button>
-
-    <Button
-      variant="contained"
-      color="primary"
-      onClick={() =>
-        setFormData({
-          red: '',
-          categoria: '',
-          estado: '',
-          programa: '',
-          periodoInicial: '',
-          periodoFinal: '',
-        })
-      }
-    >
-      Limpiar
-    </Button>
-  </Stack>
-</Grid>
-
-       
+        {/* Botones */}
+        <Grid item xs={12}>
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button variant="contained" onClick={handleConsultar}>
+              CONSULTAR
+            </Button>
+            <Button variant="contained" color="inherit" onClick={handleLimpiar}>
+              LIMPIAR
+            </Button>
+          </Stack>
+        </Grid>
       </Grid>
-     {mostrarResultados && (
-  <PriorizacionForm
-   
-  />
-)}
 
-
+  {mostrarResultados && (
+        <PriorizacionForm
+    
+        />
+      )}
     </Box>
   );
 };

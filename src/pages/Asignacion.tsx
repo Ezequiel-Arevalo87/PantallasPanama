@@ -3,10 +3,7 @@ import React, { useState } from 'react';
 import {
   Box, Grid, TextField, MenuItem, Typography, Button, Stack
 } from '@mui/material';
-import { TablasResultadosSelector } from './TablasResultadosSelector';
-import { TablaAutoApertura } from './TablaAutoApertura';
-import { FormularioAsignacionDetalle } from './FormularioAsignacionDetalle';
-import { AutoApertura } from './AutoApertura';
+
 import { ProgramacionAutoAperturaForm } from './ProgramacionAutoAperturaForm';
 
 export const Asignacion = () => {
