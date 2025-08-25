@@ -52,6 +52,7 @@ export const DetalleAutoApertura: React.FC<{
   const [docOtro, setDocOtro] = useState<string>('');
   const [docs, setDocs] = useState<string[]>([]);
   const [toast, setToast] = useState<string>('');
+  const [obsDevolucion, setObsDevolucion] = useState<string>('');
 
   const esOtros = docSel === 'Otros Documentos';
 
@@ -88,8 +89,9 @@ const accionMsg = (m: string) => {
   }
 };
 
-// Nueva: confirmación "¿Está seguro?" con Sí / Cancelar
-const confirmarYAccionar = async (m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Editar' | 'Imprimir') => {
+const confirmarYAccionar = async (
+  m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Editar' | 'Imprimir'
+) => {
   const textos: Record<string, string> = {
     Aprobado: 'Pasará a SUPERVISOR y se bloqueará la edición.',
     Devolver: 'Volverá a AUDITOR y se habilitará la edición.',
@@ -98,6 +100,49 @@ const confirmarYAccionar = async (m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Edit
     Imprimir: 'Se generará el documento para imprimir.'
   };
 
+  // Caso especial: DEVOLVER con observación obligatoria
+  if (m === 'Devolver') {
+    const { value, isConfirmed } = await Swal.fire({
+      title: 'Devolver a AUDITOR',
+      text: 'Indique el motivo de la devolución.',
+      input: 'textarea',
+      inputLabel: 'Observación',
+      inputPlaceholder: 'Explique brevemente el motivo...',
+      inputAttributes: {
+        'aria-label': 'Observación de devolución'
+      },
+      inputValidator: (v) => {
+        if (!v || !v.trim()) return 'La observación es obligatoria';
+        if (v.trim().length > 500) return 'Máximo 500 caracteres';
+        return undefined;
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Devolver',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+      focusCancel: true
+    });
+
+    if (!isConfirmed) return;
+
+    // Ejecuta tu lógica de devolución
+    accionMsg('Devolver');
+
+    // Mensaje de confirmación
+    await Swal.fire({
+      title: 'Hecho',
+      text: 'Devolución registrada',
+      icon: 'success',
+      timer: 1200,
+      showConfirmButton: false
+    });
+
+    // Toast con la observación escrita
+    setToast(`Devolución registrada: ${value.trim()}`);
+    return;
+  }
+
+  // Flujo normal para los otros botones
   const { isConfirmed } = await Swal.fire({
     title: '¿Está seguro?',
     text: textos[m] ?? '¿Desea continuar con esta acción?',
@@ -111,10 +156,8 @@ const confirmarYAccionar = async (m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Edit
 
   if (!isConfirmed) return;
 
-  // Ejecuta tu lógica actual
   accionMsg(m);
 
-  // Feedback (opcional)
   await Swal.fire({
     title: 'Hecho',
     text: m,
@@ -123,6 +166,7 @@ const confirmarYAccionar = async (m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Edit
     showConfirmButton: false
   });
 };
+
   return (
     <Box mt={3}>
       <Grid container spacing={2}>
