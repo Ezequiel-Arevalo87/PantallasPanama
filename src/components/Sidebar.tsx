@@ -92,10 +92,11 @@ const useMenuData = () => {
       ],
     },
     { label: 'REVISIÓN AUDITOR' },
-     { label: 'VARIACIÓN EN INGRESOS' },
-       { label: 'HISTORIAL CUMPLIMIENTO' },
+    { label: 'VARIACIÓN EN INGRESOS' },
+    { label: 'HISTORIAL CUMPLIMIENTO' },
     { label: 'ANALISIS FISCAL' },
     // { label: 'PRIORIZACIÓN' },
+    
     { label: 'REVISIÓN SUPERVISOR' },
     { label: 'REVISIÓN JEFE DE SECCIÓN' },
     { label: 'PRESENTACIÓN VOLUNTARIA' },
@@ -111,16 +112,16 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return {   auditorias, modulos, selectorCaso, priorizacion, asignacion };
+  return { auditorias, modulos, selectorCaso, priorizacion, asignacion };
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const {   auditorias, modulos, selectorCaso, priorizacion, asignacion } = useMenuData();
+  const { auditorias, modulos, selectorCaso, priorizacion, asignacion } = useMenuData();
 
 
-  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS',  'PROCESOS DE AUDITORIAS'] as const, []);
+  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS', 'PROCESOS DE AUDITORIAS'] as const, []);
   const toggleRoot = (root: typeof ROOTS[number]) => {
     setOpenMap((prev) => {
       const next: Record<string, boolean> = { ...prev };
@@ -213,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
           );
         })}
 
-        
+
         <Divider sx={{ my: 1.5 }} />
 
         {asignacion.map((a) => {

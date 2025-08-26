@@ -8,6 +8,7 @@ import {
   Stack,
   Divider,
   Typography,
+  Paper,
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 
@@ -35,16 +36,16 @@ const PROGRAMAS_INEXACTO = [
 const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'];
 
 export const InicioSelectorForm: React.FC = () => {
+  // Estado unificado y con nombres consistentes
   const [form, setForm] = useState<any>({
-    periodo: '',
+    periodoInicial: '',
+    periodoFinal: '',
     categoria: 'Fiscalización Masiva',
     inconsistencia: 'Inexacto',
     actividadEconomica: '',
     tipologia: '',
     programa: '',
     valoresDeclarados: '',
-    periodoInicial: '',
-    periodoFinal: '',
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -67,16 +68,16 @@ export const InicioSelectorForm: React.FC = () => {
         return [];
     }
   }, [form.inconsistencia]);
-  const mapEstadoToTabla = (v: string) => {
-  switch (v) {
-    case 'Omiso': return 'omiso';
-    case 'Inexacto': return 'inexacto';
-    case 'Extemporáneo': return 'Extemporáneo'; // así lo espera tu tabla
-    case 'Todos': return 'Todos';
-    default: return v;
-  }
-};
 
+  const mapEstadoToTabla = (v: string) => {
+    switch (v) {
+      case 'Omiso': return 'omiso';
+      case 'Inexacto': return 'inexacto';
+      case 'Extemporáneo': return 'Extemporáneo'; // así lo espera tu tabla
+      case 'Todos': return 'Todos';
+      default: return v;
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -85,8 +86,9 @@ export const InicioSelectorForm: React.FC = () => {
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
-        tipologia: value === 'Auditoría Sectorial' ? '' : prev.tipologia,
-        actividadEconomica: value === 'Fiscalización Masiva' ? '' : prev.actividadEconomica,
+        // cuando cambia categoría, resetea lo que no aplica
+        tipologia: value === 'Auditoría Sectorial' ? prev.tipologia : '',
+        actividadEconomica: value === 'Fiscalización Masiva' ? prev.actividadEconomica : '',
       }));
       setMostrarResultados(false);
       return;
@@ -110,152 +112,163 @@ export const InicioSelectorForm: React.FC = () => {
 
   const handleLimpiar = () => {
     setForm({
-      periodo: '',
+      periodoInicial: '',
+      periodoFinal: '',
       categoria: 'Fiscalización Masiva',
       inconsistencia: 'Inexacto',
       actividadEconomica: '',
       tipologia: '',
       programa: '',
       valoresDeclarados: '',
-      periodoInicial: '',
-      periodoFinal: '',
     });
     setMostrarResultados(false);
   };
 
   return (
     <Box>
-      <Grid container spacing={2}>
-        {/* 1. PERIODO */}
-        <Grid item xs={12} sm={3}>
-          <TextField
-            fullWidth
-            type="date"
-            label="Periodo"
-            name="periodo"
-            value={form.periodo}
-            onChange={handleChange}
-            InputLabelProps={{ shrink: true }}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+          DGI - Dirección General de Ingresos
+        </Typography>
+
+        {/* Grid estable: 12 columnas, con 3 cols en desktop */}
+        <Grid container columnSpacing={2} rowSpacing={2}>
+          {/* Fila 1 */}
+          <Grid item xs={12} md={3}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Periodo Inicial"
+              name="periodoInicial"
+              value={form.periodoInicial}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Periodo Final"
+              name="periodoFinal"
+              value={form.periodoFinal}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              select
+              fullWidth
+              label="Categoría"
+              name="categoria"
+              value={form.categoria}
+              onChange={handleChange}
+            >
+              {CATEGORIAS.map((c) => (
+                <MenuItem key={c} value={c}>
+                  {c}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          {/* Fila 2 */}
+          <Grid item xs={12} md={4}>
+            <TextField
+              select
+              fullWidth
+              label="Tipo de Inconsistencia"
+              name="inconsistencia"
+              value={form.inconsistencia}
+              onChange={handleChange}
+            >
+              {INCONSISTENCIAS.map((t) => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Actividad Económica"
+              name="actividadEconomica"
+              value={form.actividadEconomica}
+              onChange={handleChange}
+              disabled={!esAS}
+              placeholder="Escriba aquí..."
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Tipología"
+              name="tipologia"
+              value={form.tipologia}
+              onChange={handleChange}
+              disabled={!esFM}
+              placeholder="Escriba aquí..."
+            />
+          </Grid>
+
+          {/* Fila 3 */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }} />
+            <TextField
+              select
+              fullWidth
+              label="Programa"
+              name="programa"
+              value={form.programa}
+              onChange={handleChange}
+              disabled={programasDisponibles.length === 0}
+            >
+              {programasDisponibles.map((p) => (
+                <MenuItem key={p} value={p}>
+                  {p}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          {/* Fila 4 */}
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Valores Declarados"
+              name="valoresDeclarados"
+              type="number"
+              value={form.valoresDeclarados}
+              onChange={handleChange}
+            />
+          </Grid>
+          {/* espacios para mantener cuadrícula */}
+          <Grid item xs={12} md={8} />
+
+          {/* Botones */}
+          <Grid item xs={12}>
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button variant="contained" onClick={handleConsultar}>
+                CONSULTAR
+              </Button>
+              <Button variant="contained" color="inherit" onClick={handleLimpiar}>
+                LIMPIAR
+              </Button>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {mostrarResultados && (
+        <Box mt={2}>
+          <TablasResultadosSelector
+            estado={mapEstadoToTabla(form.inconsistencia)}
+            categoria={form.categoria}
           />
-        </Grid>
-
-        {/* 2. CATEGORÍA */}
-        <Grid item xs={12} sm={5}>
-          <TextField
-            select
-            fullWidth
-            label="Categoría"
-            name="categoria"
-            value={form.categoria}
-            onChange={handleChange}
-          >
-            {CATEGORIAS.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* 3. Tipo de Inconsistencia */}
-        <Grid item xs={12} sm={4}>
-          <TextField
-            select
-            fullWidth
-            label="Tipo de Inconsistencia"
-            name="inconsistencia"
-            value={form.inconsistencia}
-            onChange={handleChange}
-          >
-            {INCONSISTENCIAS.map((t) => (
-              <MenuItem key={t} value={t}>
-                {t}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Actividad Económica */}
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Actividad Económica"
-            name="actividadEconomica"
-            value={form.actividadEconomica}
-            onChange={handleChange}
-            disabled={!esAS}
-            placeholder="Escriba aquí..."
-          />
-        </Grid>
-
-        {/* Tipología */}
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Tipología"
-            name="tipologia"
-            value={form.tipologia}
-            onChange={handleChange}
-            disabled={!esFM}
-            placeholder="Escriba aquí..."
-          />
-        </Grid>
-
-        {/* Programa dinámico */}
-        <Grid item xs={12}>
-          <Divider sx={{ my: 1 }} />
-          <TextField
-            select
-            fullWidth
-            label="Programa"
-            name="programa"
-            value={form.programa}
-            onChange={handleChange}
-            disabled={programasDisponibles.length === 0}
-          >
-            {programasDisponibles.map((p) => (
-              <MenuItem key={p} value={p}>
-                {p}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Valores declarados */}
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Valores Declarados"
-            name="valoresDeclarados"
-            type="number"
-            value={form.valoresDeclarados}
-            onChange={handleChange}
-          />
-        </Grid>
-
-  
-
-        {/* Botones */}
-        <Grid item xs={12}>
-          <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button variant="contained" onClick={handleConsultar}>
-              CONSULTAR
-            </Button>
-            <Button variant="contained" color="inherit" onClick={handleLimpiar}>
-              LIMPIAR
-            </Button>
-          </Stack>
-        </Grid>
-      </Grid>
-
- {mostrarResultados && (
-  <Box mt={2}>
-    <TablasResultadosSelector
-      estado={mapEstadoToTabla(form.inconsistencia)}
-      categoria={form.categoria}
-    />
-  </Box>
-)}
+        </Box>
+      )}
     </Box>
   );
 };

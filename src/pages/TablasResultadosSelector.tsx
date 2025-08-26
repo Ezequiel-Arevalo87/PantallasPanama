@@ -62,22 +62,38 @@ const TablaOmisos: React.FC<TablaProps> = ({ categoria, onExport }) => {
       Categoria: categoria,
       RUC: 'Individual',
       Nombre: 'individual',
-      Periodo: 'mm/aa',
+      Periodo: '3',
+      Periodos: ['2023','2024','2025'],
     },
   ];
 
-  const columnas = ['Categoria', 'RUC', 'Nombre', 'Periodo'];
+ 
+const handleExport = () => {
+  const max = Math.max(...datos.map(d => d.Periodos?.length ?? 0));
+  const columnas = [
+    'Categoria', 'RUC', 'Nombre', 'Periodo',
+    ...Array.from({ length: max }, (_, i) => `Periodo ${i+1}`)
+  ];
+
+  const datosExcel = datos.map(d => ({
+    Categoria: d.Categoria,
+    RUC: d.RUC,
+    Nombre: d.Nombre,
+    Periodo: d.Periodo,
+    ...Object.fromEntries(d.Periodos.map((p, i) => [`Periodo ${i+1}`, p]))
+  }));
+
+  onExport('Omisos', datosExcel, columnas);
+};
+
 
   return (
     <Box>
-  <Box display="flex" justifyContent="flex-end" mb={1}>
-  <Button
-    variant="outlined"
-    onClick={() => onExport('Omisos', datos, columnas)}
-  >
-    DESCARGAR EXCEL
-  </Button>
-</Box>
+      <Box display="flex" justifyContent="flex-end" mb={1}>
+        <Button variant="outlined" onClick={handleExport}>
+          DESCARGAR EXCEL
+        </Button>
+      </Box>
 
       <TableContainer component={Paper}>
         <Table size="small">
@@ -86,7 +102,7 @@ const TablaOmisos: React.FC<TablaProps> = ({ categoria, onExport }) => {
               <TableCell>Categoría</TableCell>
               <TableCell>RUC</TableCell>
               <TableCell>Nombre o Razón Social</TableCell>
-              <TableCell>Periodos no presentados</TableCell>
+              <TableCell>Cantidad Periodos no declarados</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -94,7 +110,7 @@ const TablaOmisos: React.FC<TablaProps> = ({ categoria, onExport }) => {
               <TableCell>{categoria}</TableCell>
               <TableCell>Individual</TableCell>
               <TableCell>individual</TableCell>
-              <TableCell>mm/aa</TableCell>
+              <TableCell>3</TableCell>
             </TableRow>
           </TableBody>
         </Table>
