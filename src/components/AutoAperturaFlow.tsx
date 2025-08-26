@@ -1,21 +1,59 @@
-import React, { useState } from 'react';
+// src/components/AutoAperturaFlow.tsx
+import React, { useEffect, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { Alcance, FichaContribuyente, ObjeticoInvestigacion, ObjeticoInvestigacionDos } from '../helpers/types';
-import { withDefaults, withDefaultsCuatro, withDefaultsDos, withDefaultsTres } from '../helpers/withDefaults';
+import {
+  Alcance,
+  FichaContribuyente,
+  ObjeticoInvestigacion,
+  ObjeticoInvestigacionDos,
+} from '../helpers/types';
+import {
+  withDefaults,
+  withDefaultsCuatro,
+  withDefaultsDos,
+  withDefaultsTres,
+} from '../helpers/withDefaults';
 import { TablaCasosAsignados } from './TablaCasosAsignados';
 import { FormAutoApertura } from './FormAutoApertura';
 import { DetalleAutoApertura } from './DetalleAutoApertura';
-import { ALCANCE, FICHAS, INVESTIGACIONOBJETO, INVESTIGACIONOBJETODOS } from '../helpers/data'; // 👈 importa aquí
+import {
+  ALCANCE,
+  FICHAS,
+  INVESTIGACIONOBJETO,
+  INVESTIGACIONOBJETODOS,
+} from '../helpers/data';
 
 type Paso = 'inicio' | 'tabla' | 'form' | 'detalle';
+type Nivel = 'AUDITOR' | 'SUPERVISOR' | 'DIRECTOR';
 
-export default function AutoAperturaFlow({readOnly, setReadOnly}:{readOnly:any; setReadOnly:any}) {
+export default function AutoAperturaFlow({
+  readOnly,
+  setReadOnly,
+}: {
+  readOnly: any;
+  setReadOnly: any;
+}) {
   const [paso, setPaso] = useState<Paso>('inicio');
   const [rucSeleccionado, setRucSeleccionado] = useState<string>('');
-  const [ficha, setFicha] = useState<Required<FichaContribuyente> | null>(null);
-  const [investigacionObtejo, setInvestigacionObtejo] = useState<Required<ObjeticoInvestigacion> | null>(null);
-  const [investigacionObtejoDos, setInvestigacionObtejoDos] = useState<Required<ObjeticoInvestigacionDos> | null>(null);
-  const [alcance, setAlcance] = useState<Required<Alcance> | null>(null);
+
+  const [ficha, setFicha] =
+    useState<Required<FichaContribuyente> | null>(null);
+  const [investigacionObtejo, setInvestigacionObtejo] =
+    useState<Required<ObjeticoInvestigacion> | null>(null);
+  const [investigacionObtejoDos, setInvestigacionObtejoDos] =
+    useState<Required<ObjeticoInvestigacionDos> | null>(null);
+  const [alcance, setAlcance] =
+    useState<Required<Alcance> | null>(null);
+
+  // Nuevo: nivel del flujo
+  const [nivel, setNivel] = useState<Nivel>('AUDITOR');
+
+  // (Opcional) sincroniza con tus props legacy readOnly/setReadOnly
+  useEffect(() => {
+    if (typeof setReadOnly === 'function') {
+      setReadOnly(nivel !== 'AUDITOR');
+    }
+  }, [nivel, setReadOnly]);
 
   const handleCasosAsignados = () => setPaso('tabla');
 
@@ -30,22 +68,23 @@ export default function AutoAperturaFlow({readOnly, setReadOnly}:{readOnly:any; 
     const fichaCompleta = withDefaults(baseFicha, ruc);
     setFicha(fichaCompleta);
 
-    // 2) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
+    // 2) Objeto de la investigación
     const baseObj = INVESTIGACIONOBJETO[ruc] ?? {};
     const objCompleto = withDefaultsDos(baseObj, ruc);
-
     setInvestigacionObtejo(objCompleto);
-    
-    // 2) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
+
+    // 3) Alcance / objeto 2
     const baseObjDos = INVESTIGACIONOBJETODOS[ruc] ?? {};
     const objCompletoDos = withDefaultsCuatro(baseObjDos, ruc);
     setInvestigacionObtejoDos(objCompletoDos);
 
-    // 3) Objeto de la investigación (👈 AHORA sí desde INVESTIGACIONOBJETO)
+    // 4) Alcance (tabla de documentos y demás si aplica)
     const baseAlcance = ALCANCE[ruc] ?? {};
     const alcanceCompleto = withDefaultsTres(baseAlcance, ruc);
     setAlcance(alcanceCompleto);
 
+    // Entrar al detalle siempre como AUDITOR
+    setNivel('AUDITOR');
     setPaso('detalle');
   };
 
@@ -85,12 +124,17 @@ export default function AutoAperturaFlow({readOnly, setReadOnly}:{readOnly:any; 
         <>
           <DetalleAutoApertura
             ficha={ficha}
-            investigacionObtejo={investigacionObtejo} 
-            investigacionObtejoDos={investigacionObtejoDos} 
-            readOnly = {readOnly}
-            setReadOnly = {setReadOnly}
-         
+            investigacionObtejo={investigacionObtejo}
+            investigacionObtejoDos={investigacionObtejoDos}
+            alcance={alcance}
+            // Control de flujo por nivel
+            nivel={nivel}
+            setNivel={setNivel}
+            // Compatibilidad legacy (si aún los usas en el hijo)
+            readOnly={nivel !== 'AUDITOR'}
+            setReadOnly={(ro: boolean) => setNivel(ro ? 'SUPERVISOR' : 'AUDITOR')}
           />
+
           <Box mt={2} display="flex" justifyContent="space-between">
             <Button onClick={() => setPaso('form')}>Volver</Button>
           </Box>

@@ -1,4 +1,24 @@
+
+
+
+/* evita desbordes por 100vw + scroll vertical */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* sin scroll horizontal */
+}
+
+* { box-sizing: border-box; }
+
+/* reserva espacio para la barra de scroll y evita saltos/“cortes” */
 :root {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -11,7 +31,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
+} */
 
 a {
   font-weight: 500;

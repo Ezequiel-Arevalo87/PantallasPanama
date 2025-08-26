@@ -1,23 +1,9 @@
 // src/components/DetalleAutoApertura.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
 import {
-  Box,
-  Grid,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  TextField,
-  MenuItem,
-  Button,
-  IconButton,
-  Snackbar,
-  Alert,
+  Box, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
+  TableRow, Typography, TextField, MenuItem, Button, IconButton, Snackbar, Alert,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
@@ -27,6 +13,8 @@ import { PeriodosInvestigacion } from './PeriodosInvestigacion';
 import { ObjetoInvestigacion } from './ObjetoInvestigacion';
 import { Alcance, FichaContribuyente, ObjeticoInvestigacion, ObjeticoInvestigacionDos } from '../helpers/types';
 
+type Nivel = 'AUDITOR' | 'SUPERVISOR' | 'DIRECTOR';
+
 // catálogo de documentos
 const DOC_OPCIONES = [
   'Registros Contables',
@@ -34,42 +22,61 @@ const DOC_OPCIONES = [
   'Libros de Contabilidad',
   'Facturas',
   'Contratos',
-  'Otros Documentos', // si se elige, aparece el campo OTRO
+  'Otros Documentos',
 ] as const;
 
 export const DetalleAutoApertura: React.FC<{
   ficha: Required<FichaContribuyente>;
   investigacionObtejo: Required<ObjeticoInvestigacion> | null;
-  alcance?: Required<Alcance> | null; // opcional
+  alcance?: Required<Alcance> | null;
   investigacionObtejoDos: Required<ObjeticoInvestigacionDos> | null;
   onVolver?: () => void;
-  readOnly:any;
-  setReadOnly:any;
-}> = ({ ficha, investigacionObtejo, alcance, investigacionObtejoDos,  readOnly,
-  setReadOnly }) => {
+
+  /** Soporte legacy: si ya usabas readOnly/setReadOnly, siguen funcionando */
+  readOnly?: boolean;
+  setReadOnly?: (v: boolean) => void;
+
+  /** Nuevo (opcional pero recomendado): nivel y setter para controlar el flujo AUDITOR→SUPERVISOR→DIRECTOR */
+  nivel?: Nivel;
+  setNivel?: (n: Nivel) => void;
+}> = ({
+  ficha,
+  investigacionObtejo,
+  alcance,
+  investigacionObtejoDos,
+  onVolver,
+
+  readOnly: readOnlyProp,
+  setReadOnly,
+
+  nivel: nivelProp,
+  setNivel: setNivelProp,
+}) => {
+  // Estado interno si no te pasan nivel desde arriba
+  const [nivelLocal, setNivelLocal] = useState<Nivel>(nivelProp ?? 'AUDITOR');
+  const nivel = nivelProp ?? nivelLocal;
+  const setNivel = setNivelProp ?? setNivelLocal;
+
+  // Derivar modo lectura:
+  // - Si te pasan readOnly explícito, lo respeto.
+  // - Si no, lo infiero del nivel (solo AUDITOR edita).
+  const isLectura = typeof readOnlyProp === 'boolean'
+    ? readOnlyProp
+    : nivel !== 'AUDITOR';
+
   // --- Estado local para "Alcance / Documentos"
   const [docSel, setDocSel] = useState<string>('');
   const [docOtro, setDocOtro] = useState<string>('');
   const [docs, setDocs] = useState<string[]>([]);
   const [toast, setToast] = useState<string>('');
-  const [obsDevolucion, setObsDevolucion] = useState<string>('');
 
   const esOtros = docSel === 'Otros Documentos';
 
   const handleAgregarDoc = () => {
-    if (!docSel) {
-      setToast('Seleccione un tipo de documento.');
-      return;
-    }
-    if (esOtros && !docOtro.trim()) {
-      setToast('Indique el documento en el campo OTRO.');
-      return;
-    }
+    if (!docSel) return setToast('Seleccione un tipo de documento.');
+    if (esOtros && !docOtro.trim()) return setToast('Indique el documento en el campo OTRO.');
     const etiqueta = esOtros ? docOtro.trim() : docSel;
-    if (docs.includes(etiqueta)) {
-      setToast('Ese documento ya fue agregado.');
-      return;
-    }
+    if (docs.includes(etiqueta)) return setToast('Ese documento ya fue agregado.');
     setDocs((prev) => [...prev, etiqueta]);
     setDocSel('');
     setDocOtro('');
@@ -79,98 +86,109 @@ export const DetalleAutoApertura: React.FC<{
     setDocs((prev) => prev.filter((d) => d !== label));
   };
 
-
-const accionMsg = (m: string) => {
-  setToast(m);
-  if (m === 'Aprobado') {
-    setReadOnly(true);   // esto disparará el cambio a SUPERVISOR vía tu useEffect del Layout
-  } else if (m === 'Devolver') {
-    setReadOnly(false);  // esto disparará el cambio a AUDITOR
-  }
-};
-
-const confirmarYAccionar = async (
-  m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Editar' | 'Imprimir'
-) => {
-  const textos: Record<string, string> = {
-    Aprobado: 'Pasará a SUPERVISOR y se bloqueará la edición.',
-    Devolver: 'Volverá a AUDITOR y se habilitará la edición.',
-    Guardar: 'Se guardarán los cambios.',
-    Editar: 'Entrará en modo edición.',
-    Imprimir: 'Se generará el documento para imprimir.'
+  /** Cambia nivel y sincroniza readOnly legacy si te lo pasaron */
+  const moverANivel = (destino: Nivel) => {
+    setNivel(destino);
+    if (setReadOnly) setReadOnly(destino !== 'AUDITOR');
   };
 
-  // Caso especial: DEVOLVER con observación obligatoria
-  if (m === 'Devolver') {
-    const { value, isConfirmed } = await Swal.fire({
-      title: 'Devolver a AUDITOR',
-      text: 'Indique el motivo de la devolución.',
-      input: 'textarea',
-      inputLabel: 'Observación',
-      inputPlaceholder: 'Explique brevemente el motivo...',
-      inputAttributes: {
-        'aria-label': 'Observación de devolución'
-      },
-      inputValidator: (v) => {
-        if (!v || !v.trim()) return 'La observación es obligatoria';
-        if (v.trim().length > 500) return 'Máximo 500 caracteres';
-        return undefined;
-      },
+  const siguienteTrasAprobar: Nivel | null = useMemo(() => {
+    if (nivel === 'AUDITOR') return 'SUPERVISOR';
+    if (nivel === 'SUPERVISOR') return 'DIRECTOR';
+    return null; // DIRECTOR es el último
+  }, [nivel]);
+
+  const textos = useMemo<Record<string, string>>(() => {
+    const next = siguienteTrasAprobar;
+    const aprobarTxt = next
+      ? `Pasará a ${next} y se bloqueará la edición.`
+      : `Se mantendrá en DIRECTOR.`;
+    return {
+      Aprobado: aprobarTxt,
+      Devolver: 'Volverá a AUDITOR y se habilitará la edición.',
+      Guardar: 'Se guardarán los cambios.',
+      Editar: 'Entrará en modo edición.',
+      Imprimir: 'Se generará el documento para imprimir.',
+    };
+  }, [siguienteTrasAprobar]);
+
+  const confirmarYAccionar = async (
+    m: 'Aprobado' | 'Devolver' | 'Guardar' | 'Editar' | 'Imprimir'
+  ) => {
+    // Caso especial: DEVOLVER (siempre a AUDITOR)
+    if (m === 'Devolver') {
+      const { value, isConfirmed } = await Swal.fire({
+        title: 'Devolver a AUDITOR',
+        text: 'Indique el motivo de la devolución.',
+        input: 'textarea',
+        inputLabel: 'Observación',
+        inputPlaceholder: 'Explique brevemente el motivo...',
+        inputAttributes: { 'aria-label': 'Observación de devolución' },
+        inputValidator: (v) => {
+          if (!v || !v.trim()) return 'La observación es obligatoria';
+          if (v.trim().length > 500) return 'Máximo 500 caracteres';
+          return undefined;
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Devolver',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        focusCancel: true,
+      });
+      if (!isConfirmed) return;
+
+      moverANivel('AUDITOR');
+      setToast(`Devolución registrada: ${String(value).trim()}`);
+
+      await Swal.fire({
+        title: 'Hecho',
+        text: 'Devolución registrada',
+        icon: 'success',
+        timer: 1200,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    // Confirmación general
+    const { isConfirmed } = await Swal.fire({
+      title: '¿Está seguro?',
+      text: textos[m] ?? '¿Desea continuar con esta acción?',
+      icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Devolver',
+      confirmButtonText: 'Sí',
       cancelButtonText: 'Cancelar',
       reverseButtons: true,
-      focusCancel: true
+      focusCancel: true,
     });
-
     if (!isConfirmed) return;
 
-    // Ejecuta tu lógica de devolución
-    accionMsg('Devolver');
+    // Acción
+    if (m === 'Aprobado') {
+      if (siguienteTrasAprobar) moverANivel(siguienteTrasAprobar);
+      setToast('Aprobado');
+    } else if (m === 'Editar') {
+      // Sólo permitirá editar si estás en AUDITOR
+      if (nivel !== 'AUDITOR') return setToast('Solo AUDITOR puede editar.');
+      if (setReadOnly) setReadOnly(false);
+      setToast('Editar');
+    } else {
+      setToast(m);
+    }
 
-    // Mensaje de confirmación
     await Swal.fire({
       title: 'Hecho',
-      text: 'Devolución registrada',
+      text: m,
       icon: 'success',
       timer: 1200,
-      showConfirmButton: false
+      showConfirmButton: false,
     });
-
-    // Toast con la observación escrita
-    setToast(`Devolución registrada: ${value.trim()}`);
-    return;
-  }
-
-  // Flujo normal para los otros botones
-  const { isConfirmed } = await Swal.fire({
-    title: '¿Está seguro?',
-    text: textos[m] ?? '¿Desea continuar con esta acción?',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Sí',
-    cancelButtonText: 'Cancelar',
-    reverseButtons: true,
-    focusCancel: true
-  });
-
-  if (!isConfirmed) return;
-
-  accionMsg(m);
-
-  await Swal.fire({
-    title: 'Hecho',
-    text: m,
-    icon: 'success',
-    timer: 1200,
-    showConfirmButton: false
-  });
-};
+  };
 
   return (
     <Box mt={3}>
       <Grid container spacing={2}>
-        {/* Datos del contribuyente (columna izquierda) */}
+        {/* Cabeceras */}
         <Grid item xs={12} md={6}>
           <TableContainer component={Paper}>
             <Table size="small">
@@ -192,7 +210,6 @@ const confirmarYAccionar = async (
           </TableContainer>
         </Grid>
 
-        {/* Datos del auto (columna derecha) */}
         <Grid item xs={12} md={6}>
           <TableContainer component={Paper}>
             <Table size="small">
@@ -258,53 +275,51 @@ const confirmarYAccionar = async (
           </Box>
         </Grid>
 
-      
-
         {/* Normas relacionadas */}
         <Grid item xs={12} mt={2}>
           <Typography variant="h6" fontWeight={700} mb={2}>
             Normas Relacionadas
           </Typography>
-          <NormasRelacionadas readOnly = {readOnly} />
+          <NormasRelacionadas readOnly={isLectura} />
         </Grid>
 
-        {/* Períodos Fiscales */}
+        {/* 3. OBJETO + Períodos */}
         <Grid item xs={12} mt={2}>
-           {/* 3. OBJETO DE LA INVESTIGACIÓN */}
-        <Grid item xs={12}>
-          <Box sx={{ bgcolor: '#E3F2FD', p: 1 }}>
-            <Typography align="center" fontWeight={700}>
-              3. OBJETO DE LA INVESTIGACIÓN
-            </Typography>
-          </Box>
-          <Box mt={2}>
-            <ObjetoInvestigacion
-              texto={investigacionObtejo?.investigacion}
-              ayuda={investigacionObtejo?.fundamentos}
-            />
-          </Box>
-        </Grid>
+          <Grid item xs={12}>
+            <Box sx={{ bgcolor: '#E3F2FD', p: 1 }}>
+              <Typography align="center" fontWeight={700}>
+                3. OBJETO DE LA INVESTIGACIÓN
+              </Typography>
+            </Box>
+            <Box mt={2}>
+              <ObjetoInvestigacion
+                texto={investigacionObtejo?.investigacion}
+                ayuda={investigacionObtejo?.fundamentos}
+              />
+            </Box>
+          </Grid>
           <Typography variant="h6" fontWeight={700} mb={1}>
             Períodos Fiscales
           </Typography>
-          <PeriodosInvestigacion  readOnly = {readOnly} />
+          <PeriodosInvestigacion readOnly={isLectura} />
         </Grid>
 
-           {/* 4. ALCANCE DE LA INVESTIGACIÓN */}
+        {/* 4. ALCANCE */}
         <Grid item xs={12}>
           <Box sx={{ bgcolor: '#E3F2FD', p: 1 }}>
             <Typography align="center" fontWeight={700}>
               4. ALCANCE DE LA INVESTIGACIÓN
             </Typography>
           </Box>
-              <Box mt={2}>
+
+          <Box mt={2}>
             <ObjetoInvestigacion
               texto={investigacionObtejoDos?.investigacionDos}
               ayuda={investigacionObtejoDos?.fundamentos}
             />
           </Box>
 
-          {/* Formulario Documentos + OTRO + AGREGAR */}
+          {/* Documentos + OTRO + AGREGAR */}
           <Grid container spacing={2} alignItems="center" sx={{ mt: 2 }}>
             <Grid item xs="auto">
               <TableContainer component={Paper}>
@@ -319,6 +334,7 @@ const confirmarYAccionar = async (
                           value={docSel}
                           onChange={(e) => setDocSel(e.target.value)}
                           sx={{ minWidth: 240 }}
+                          disabled={isLectura}
                         >
                           {DOC_OPCIONES.map((o) => (
                             <MenuItem key={o} value={o}>
@@ -336,7 +352,7 @@ const confirmarYAccionar = async (
                           placeholder="Especifique"
                           value={docOtro}
                           onChange={(e) => setDocOtro(e.target.value)}
-                          disabled={!esOtros}
+                          disabled={! (docSel === 'Otros Documentos') || isLectura}
                           sx={{ minWidth: 240 }}
                         />
                       </TableCell>
@@ -346,15 +362,17 @@ const confirmarYAccionar = async (
               </TableContainer>
             </Grid>
 
-           { !readOnly && <Grid item xs="auto">
-              <Button
-                variant="contained"
-                sx={{ bgcolor: '#2E3A47', '&:hover': { bgcolor: '#26313B' }, height: '100%' }}
-                onClick={handleAgregarDoc}
-              >
-                AGREGAR
-              </Button>
-            </Grid>}
+            {!isLectura && (
+              <Grid item xs="auto">
+                <Button
+                  variant="contained"
+                  sx={{ bgcolor: '#2E3A47', '&:hover': { bgcolor: '#26313B' }, height: '100%' }}
+                  onClick={handleAgregarDoc}
+                >
+                  AGREGAR
+                </Button>
+              </Grid>
+            )}
           </Grid>
 
           {/* Tabla de documentos agregados */}
@@ -374,20 +392,18 @@ const confirmarYAccionar = async (
                     <TableRow key={d}>
                       <TableCell>{d}</TableCell>
                       <TableCell align="center">
-                      {!readOnly &&  <IconButton onClick={() => handleEliminarDoc(d)}>
-                          <DeleteOutlineIcon />
-                        </IconButton>}
+                        {!isLectura && (
+                          <IconButton onClick={() => handleEliminarDoc(d)}>
+                            <DeleteOutlineIcon />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                   {docs.length === 0 && (
                     <>
-                      <TableRow>
-                        <TableCell colSpan={2}>&nbsp;</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell colSpan={2}>&nbsp;</TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={2}>&nbsp;</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={2}>&nbsp;</TableCell></TableRow>
                     </>
                   )}
                 </TableBody>
@@ -396,15 +412,13 @@ const confirmarYAccionar = async (
           </Box>
         </Grid>
 
-                {/* 5. PLAZO PARA LA INVESTIGACIÓN O AUDITORÍA */}
+        {/* 5. PLAZO */}
         <Grid item xs={12}>
           <Box sx={{ bgcolor: '#E3F2FD', p: 1 }}>
             <Typography align="center" fontWeight={700}>
               5. PLAZO PARA LA INVESTIGACIÓN O AUDITORÍA
             </Typography>
           </Box>
-
-          {/* Banda de texto + ayuda */}
           <Grid container alignItems="center" spacing={2} sx={{ mt: 1 }}>
             <Grid item xs>
               <Box sx={{ border: '1px solid #B0BEC5', borderRadius: 1, p: 2 }}>
@@ -425,26 +439,25 @@ const confirmarYAccionar = async (
         </Grid>
 
         {/* Botonera inferior */}
-   {!readOnly && (
-  <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Guardar')}>GUARDAR</Button>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Editar')}>EDITAR</Button>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
-  </Grid>
-)}
+        {!isLectura && (
+          <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Guardar')}>GUARDAR</Button>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Editar')}>EDITAR</Button>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
+          </Grid>
+        )}
 
-{readOnly && (
-  <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
-    <Button variant="contained" onClick={() => confirmarYAccionar('Devolver')}>DEVOLVER</Button>
-  </Grid>
-)}
-
+        {isLectura && (
+          <Grid item xs={12} display="flex" gap={2} justifyContent="center" mt={3} mb={1}>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Imprimir')}>IMPRIMIR</Button>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Aprobado')}>APROBAR</Button>
+            <Button variant="contained" onClick={() => confirmarYAccionar('Devolver')}>DEVOLVER</Button>
+          </Grid>
+        )}
       </Grid>
 
-      {/* Snackbar de mensajes (agregar, errores y botones azules) */}
+      {/* Snackbar */}
       <Snackbar
         open={!!toast}
         autoHideDuration={2500}
@@ -458,5 +471,3 @@ const confirmarYAccionar = async (
     </Box>
   );
 };
-
-

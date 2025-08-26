@@ -12,22 +12,23 @@ import {
   ListItemIcon,
 } from '@mui/material';
 import { ExpandLess, ExpandMore, ChevronRight } from '@mui/icons-material';
+import { Asignacion } from '../pages/Asignacion';
 
-type Props = {
+export type SidebarProps = {
   onSelect: (path: string) => void;  // e.g. "PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/XXXXX"
   selected?: string;
 };
 
 /** ----- Estilos ----- */
 const SECTION_STYLE = {
-  borderRadius: 1.5,
+  borderRadius: 12,
   px: 1,
   py: 0.5,
   '&:hover': { bgcolor: 'action.hover' },
-};
+} as const;
 
 const ITEM_STYLE = {
-  borderRadius: 1,
+  borderRadius: 8,
   mx: 1,
   my: 0.25,
   '& .MuiListItemText-primary': { fontSize: 14 },
@@ -46,7 +47,7 @@ const ITEM_STYLE = {
     },
   },
   '&.Mui-selected:hover': { bgcolor: 'action.selected' },
-};
+} as const;
 
 /** ----- Tipos del árbol ----- */
 type MenuNode = {
@@ -60,16 +61,25 @@ const buildPath = (parent: string, label: string) =>
 
 /** Datos del menú (con submenús anidados) */
 const useMenuData = () => {
-  const analisis: MenuNode[] = [
-    { label: 'HISTORIAL CUMPLIMIENTO' },
-    { label: 'ANALISIS FISCAL' },
-
+  const selectorCaso: MenuNode[] = [
+    { label: 'SELECTOR DE CASOS' },
   ];
-  const fiscalizacion: MenuNode[] = [
-    { label: 'VARIACIÓN EN INGRESOS' },
-
+  const priorizacion: MenuNode[] = [
+    { label: 'PRIORIZACIÓN' },
+  ];
+  const asignacion: MenuNode[] = [
     { label: 'ASIGNACIÓN' },
   ];
+
+  // const analisis: MenuNode[] = [
+  //   { label: 'HISTORIAL CUMPLIMIENTO' },
+  //   { label: 'ANALISIS FISCAL' },
+  // ];
+
+  // const fiscalizacion: MenuNode[] = [
+  //   { label: 'VARIACIÓN EN INGRESOS' },
+  //   { label: 'ASIGNACIÓN' },
+  // ];
 
   const auditorias: MenuNode[] = [
     { label: 'INICIO DE AUDITORIA' },
@@ -77,21 +87,15 @@ const useMenuData = () => {
       label: 'GESTIÓN DE AUDITORIA',
       children: [
         { label: 'AUDITOR' },
-
         { label: 'SUPERVISOR' },
-
-        // {
-        //   label: 'SUB BLOQUE',
-        //   children: [
-        //     { label: 'Detalle A' },
-        //     { label: 'Detalle B' },
-        //   ],
-        // },
+        { label: 'DIRECTOR' },
       ],
     },
     { label: 'REVISIÓN AUDITOR' },
-    { label: 'SELECCIÓN DE CASOS' },
-    { label: 'PRIORIZACIÓN' },
+     { label: 'VARIACIÓN EN INGRESOS' },
+       { label: 'HISTORIAL CUMPLIMIENTO' },
+    { label: 'ANALISIS FISCAL' },
+    // { label: 'PRIORIZACIÓN' },
     { label: 'REVISIÓN SUPERVISOR' },
     { label: 'REVISIÓN JEFE DE SECCIÓN' },
     { label: 'PRESENTACIÓN VOLUNTARIA' },
@@ -107,23 +111,20 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return { analisis, fiscalizacion, auditorias, modulos };
+  return {   auditorias, modulos, selectorCaso, priorizacion, asignacion };
 };
 
-export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
-  // Para abrir/cerrar submenús por "path"
-  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const { analisis, fiscalizacion, auditorias, modulos } = useMenuData();
+export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
 
-  /** Comportamiento "acordeón por sección principal":
-   * cuando abres una raíz, cierra las otras raíces, pero deja libres los subniveles dentro.
-   */
-  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS', 'FISCALIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  const {   auditorias, modulos, selectorCaso, priorizacion, asignacion } = useMenuData();
+
+
+  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS',  'PROCESOS DE AUDITORIAS'] as const, []);
   const toggleRoot = (root: typeof ROOTS[number]) => {
     setOpenMap((prev) => {
       const next: Record<string, boolean> = { ...prev };
       ROOTS.forEach((r) => {
-        // La clave del root es exactamente su nombre
         next[r] = r === root ? !prev[r] : false;
       });
       return next;
@@ -131,8 +132,7 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
   };
 
   /** Toggle genérico para cualquier nodo con children (por path) */
-  const togglePath = (path: string) =>
-    setOpenMap((prev) => ({ ...prev, [path]: !prev[path] }));
+  const togglePath = (path: string) => setOpenMap((prev) => ({ ...prev, [path]: !prev[path] }));
 
   /** Render recursivo de nodos */
   const renderNodes = (nodes: MenuNode[], parentPath: string) => (
@@ -163,11 +163,7 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
         // Hoja (item clickeable)
         return (
           <ListItem key={thisPath} disablePadding>
-            <ListItemButton
-              onClick={() => onSelect(thisPath)}
-              selected={selected === thisPath}
-              sx={ITEM_STYLE}
-            >
+            <ListItemButton onClick={() => onSelect(thisPath)} selected={selected === thisPath} sx={ITEM_STYLE}>
               <ListItemIcon sx={{ minWidth: 28 }}>
                 <ChevronRight fontSize="small" />
               </ListItemIcon>
@@ -180,93 +176,91 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
   );
 
   return (
-    <Box sx={{ width: 280, p: 1.5, pt: 0.5, color: 'text.primary' }}>
+    <Box sx={{ width: 280, p: 1.5, pt: 0.5, color: 'text.primary', height: '100%', overflowY: 'auto', minHeight: 0 }}>
       <List
         subheader={
           <ListSubheader
             component="div"
             disableSticky
-            sx={{
-              bgcolor: 'transparent',
-              px: 0,
-              py: 1,
-              fontWeight: 800,
-              fontSize: 12,
-              color: 'text.disabled',
-            }}
+            sx={{ bgcolor: 'transparent', px: 0, py: 1, fontWeight: 800, fontSize: 12, color: 'text.disabled' }}
           >
             MENÚ PRINCIPAL
           </ListSubheader>
         }
       >
-        {/* SELECCIONES DE CASOS (root) */}
-        <ListItemButton
-          onClick={() => toggleRoot('SELECCIONES DE CASOS')}
-          sx={SECTION_STYLE}
-          selected={!!openMap['SELECCIONES DE CASOS']}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
-          >
+        {/* Selector de Casos simple al tope */}
+        {selectorCaso.map((s) => {
+          const path = s.label;
+          return (
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {s.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
+
+        <Divider sx={{ my: 1.5 }} />
+
+        {priorizacion.map((p) => {
+          const path = p.label;
+          return (
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {p.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
+
+        
+        <Divider sx={{ my: 1.5 }} />
+
+        {asignacion.map((a) => {
+          const path = a.label;
+          return (
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {a.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
+
+        <Divider sx={{ my: 1.5 }} />
+
+        {/* SELECCIONES DE CASOS (root)
+        <ListItemButton onClick={() => toggleRoot('SELECCIONES DE CASOS')} sx={SECTION_STYLE} selected={!!openMap['SELECCIONES DE CASOS']}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}>
             SELECCIONES DE CASOS
           </Typography>
-
-          {openMap['SELECCIONES DE CASOS'] ? (
-            <ExpandLess fontSize="small" />
-          ) : (
-            <ExpandMore fontSize="small" />
-          )}
+          {openMap['SELECCIONES DE CASOS'] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
         </ListItemButton>
         <Collapse in={!!openMap['SELECCIONES DE CASOS']} timeout="auto" unmountOnExit>
           {renderNodes(analisis, 'SELECCIONES DE CASOS')}
         </Collapse>
 
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 1.5 }} /> */}
 
-
-
-        {/* FISCALIZACIÓN (root) */}
-        <ListItemButton
-          onClick={() => toggleRoot('FISCALIZACIÓN')}
-          sx={SECTION_STYLE}
-          selected={!!openMap['FISCALIZACIÓN']}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
-          >
+        {/* FISCALIZACIÓN (root)
+        <ListItemButton onClick={() => toggleRoot('FISCALIZACIÓN')} sx={SECTION_STYLE} selected={!!openMap['FISCALIZACIÓN']}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}>
             FISCALIZACIÓN
           </Typography>
-          {openMap['FISCALIZACIÓN'] ? (
-            <ExpandLess fontSize="small" />
-          ) : (
-            <ExpandMore fontSize="small" />
-          )}
+          {openMap['FISCALIZACIÓN'] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
         </ListItemButton>
         <Collapse in={!!openMap['FISCALIZACIÓN']} timeout="auto" unmountOnExit>
           {renderNodes(fiscalizacion, 'FISCALIZACIÓN')}
         </Collapse>
 
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 1.5 }} /> */}
 
         {/* PROCESOS DE AUDITORIAS (root) */}
-        <ListItemButton
-          onClick={() => toggleRoot('PROCESOS DE AUDITORIAS')}
-          sx={SECTION_STYLE}
-          selected={!!openMap['PROCESOS DE AUDITORIAS']}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}
-          >
+        <ListItemButton onClick={() => toggleRoot('PROCESOS DE AUDITORIAS')} sx={SECTION_STYLE} selected={!!openMap['PROCESOS DE AUDITORIAS']}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, flexGrow: 1, letterSpacing: 0.3, color: 'text.secondary' }}>
             PROCESOS DE AUDITORIAS
           </Typography>
-          {openMap['PROCESOS DE AUDITORIAS'] ? (
-            <ExpandLess fontSize="small" />
-          ) : (
-            <ExpandMore fontSize="small" />
-          )}
+          {openMap['PROCESOS DE AUDITORIAS'] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
         </ListItemButton>
         <Collapse in={!!openMap['PROCESOS DE AUDITORIAS']} timeout="auto" unmountOnExit>
           {renderNodes(auditorias, 'PROCESOS DE AUDITORIAS')}
@@ -276,14 +270,9 @@ export const Sidebar: React.FC<Props> = ({ onSelect, selected }) => {
 
         {/* Módulos simples */}
         {modulos.map((m) => {
-          const path = m.label; // si quieres, ponlos también como path raíz
+          const path = m.label;
           return (
-            <ListItemButton
-              key={path}
-              sx={{ ...SECTION_STYLE, py: 1 }}
-              onClick={() => onSelect(path)}
-              selected={selected === path}
-            >
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
                 {m.label}
               </Typography>
