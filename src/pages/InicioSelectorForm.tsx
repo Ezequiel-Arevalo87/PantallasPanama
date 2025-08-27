@@ -134,28 +134,7 @@ export const InicioSelectorForm: React.FC = () => {
         {/* Grid estable: 12 columnas, con 3 cols en desktop */}
         <Grid container columnSpacing={2} rowSpacing={2}>
           {/* Fila 1 */}
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              type="date"
-              label="Periodo Inicial"
-              name="periodoInicial"
-              value={form.periodoInicial}
-              onChange={handleChange}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              type="date"
-              label="Periodo Final"
-              name="periodoFinal"
-              value={form.periodoFinal}
-              onChange={handleChange}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
+
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -174,7 +153,7 @@ export const InicioSelectorForm: React.FC = () => {
           </Grid>
 
           {/* Fila 2 */}
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <TextField
               select
               fullWidth
@@ -190,7 +169,7 @@ export const InicioSelectorForm: React.FC = () => {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <TextField
               fullWidth
               label="Actividad Económica"
@@ -201,7 +180,7 @@ export const InicioSelectorForm: React.FC = () => {
               placeholder="Escriba aquí..."
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <TextField
               fullWidth
               label="Tipología"
@@ -215,7 +194,7 @@ export const InicioSelectorForm: React.FC = () => {
 
           {/* Fila 3 */}
           <Grid item xs={12}>
-            <Divider sx={{ my: 1 }} />
+            
             <TextField
               select
               fullWidth
@@ -244,6 +223,28 @@ export const InicioSelectorForm: React.FC = () => {
               onChange={handleChange}
             />
           </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Periodo Inicial"
+              name="periodoInicial"
+              value={form.periodoInicial}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Periodo Final"
+              name="periodoFinal"
+              value={form.periodoFinal}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
           {/* espacios para mantener cuadrícula */}
           <Grid item xs={12} md={8} />
 
@@ -261,14 +262,17 @@ export const InicioSelectorForm: React.FC = () => {
         </Grid>
       </Paper>
 
-      {mostrarResultados && (
-        <Box mt={2}>
-          <TablasResultadosSelector
-            estado={mapEstadoToTabla(form.inconsistencia)}
-            categoria={form.categoria}
-          />
-        </Box>
-      )}
+     {/* ...dentro del return, donde renderizas resultados */}
+{mostrarResultados && (
+  <Box mt={2}>
+    <TablasResultadosSelector
+      estado={mapEstadoToTabla(form.inconsistencia)}
+      categoria={form.categoria}
+      programa={form.programa}   // 👈 NUEVO
+    />
+  </Box>
+)}
+
     </Box>
   );
 };

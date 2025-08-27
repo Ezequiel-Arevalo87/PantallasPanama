@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Box, Typography, Button,
-  Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Paper
+  Box, Typography, Button, Dialog, DialogTitle, DialogContent,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Grid, Divider
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -10,9 +9,10 @@ import { saveAs } from 'file-saver';
 type Props = {
   estado: string;
   categoria: string;
+  programa?: string; // 👈 NUEVO (para el encabezado del detalle)
 };
 
-export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria }) => {
+export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria, programa }) => {
   const mostrarOmiso = estado === 'omiso' || estado === 'Todos';
   const mostrarInexacto = estado === 'inexacto' || estado === 'Todos';
   const mostrarExtemporaneo = estado === 'Extemporáneo' || estado === 'Todos';
@@ -30,19 +30,21 @@ export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria })
     <Box mt={4}>
       {mostrarOmiso && (
         <Box mb={4}>
-          <Typography variant="h6" color="error"> OMISOS</Typography>
-          <TablaOmisos categoria={categoria} onExport={exportarExcel} />
+          <Typography variant="h6" color="error">OMISOS</Typography>
+          <TablaOmisos categoria={categoria} programa={programa} onExport={exportarExcel} />
         </Box>
       )}
+
       {mostrarInexacto && (
         <Box mb={4}>
-          <Typography variant="h6" color="success.main"> INEXACTOS</Typography>
+          <Typography variant="h6" color="success.main">INEXACTOS</Typography>
           <TablaInexactos categoria={categoria} onExport={exportarExcel} />
         </Box>
       )}
+
       {mostrarExtemporaneo && (
         <Box mb={4}>
-          <Typography variant="h6" color="warning.main"> EXTEMPORÁNEO</Typography>
+          <Typography variant="h6" color="warning.main">EXTEMPORÁNEO</Typography>
           <TablaExtemporaneo categoria={categoria} onExport={exportarExcel} />
         </Box>
       )}
@@ -50,104 +52,233 @@ export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria })
   );
 };
 
+/* --------------------- OMISOS --------------------- */
 
-type TablaProps = {
+type TablaPropsBase = {
   categoria: string;
   onExport: (nombre: string, data: any[], columns: string[]) => void;
 };
+type TablaOmisosProps = TablaPropsBase & { programa?: string };
 
-const TablaOmisos: React.FC<TablaProps> = ({ categoria, onExport }) => {
-  const datos = [
-    {
-      Categoria: categoria,
-      RUC: 'Individual',
-      Nombre: 'individual',
-      Periodo: '3',
-      Periodos: ['2023','2024','2025'],
-    },
-  ];
-
- 
-const handleExport = () => {
-  const max = Math.max(...datos.map(d => d.Periodos?.length ?? 0));
-  const columnas = [
-    'Categoria', 'RUC', 'Nombre', 'Periodo',
-    ...Array.from({ length: max }, (_, i) => `Periodo ${i+1}`)
-  ];
-
-  const datosExcel = datos.map(d => ({
-    Categoria: d.Categoria,
-    RUC: d.RUC,
-    Nombre: d.Nombre,
-    Periodo: d.Periodo,
-    ...Object.fromEntries(d.Periodos.map((p, i) => [`Periodo ${i+1}`, p]))
-  }));
-
-  onExport('Omisos', datosExcel, columnas);
+type OmisoFila = {
+  ruc: string;
+  nombre: string;
+  valoresPorPeriodo: Record<string, number>; // ej: { 'ene-23': 120000, ... }
 };
 
+const MONEDA = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0 });
+
+const OMISOS_MOCK: OmisoFila[] = [
+  {
+    ruc: '123-456-789',
+    nombre: 'xyz',
+    valoresPorPeriodo: { 'ene-23': 120000, 'feb-23': 80000, 'mar-23': 50000, 'abr-23': 25000, 'may-23': 35000, 'jun-23': 190000 }
+  },
+  {
+    ruc: '789-456-123',
+    nombre: 'abc',
+    valoresPorPeriodo: { 'ene-23': 100000, 'feb-23': 90000, 'mar-23': 80000, 'abr-23': 70000, 'may-23': 60000 }
+  },
+  {
+    ruc: '456-456-123',
+    nombre: 'def',
+    valoresPorPeriodo: { 'mar-23': 150000, 'abr-23': 120000, 'may-23': 80000, 'jun-23': 0 }
+  },
+  {
+    ruc: '789-012-345',
+    nombre: 'klm',
+    valoresPorPeriodo: { 'ene-23': 40000, 'feb-23': 50000, 'may-23': 60000, 'jun-23': 100000, 'jul-23': 0, 'ago-23': 0, 'sep-23': 0, 'oct-23': 0 }
+  }
+];
+
+const totalDeFila = (f: OmisoFila) =>
+  Object.values(f.valoresPorPeriodo).reduce((acc, v) => acc + (Number(v) || 0), 0);
+
+const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, onExport }) => {
+  const filas = OMISOS_MOCK.map(f => ({
+    ...f,
+    cantidad: Object.entries(f.valoresPorPeriodo).filter(([_, v]) => (Number(v) || 0) > 0).length,
+    total: totalDeFila(f)
+  }));
+
+  const [abierto, setAbierto] = useState(false);
+  const [seleccion, setSeleccion] = useState<OmisoFila | null>(null);
+
+  const abrirDetalle = (f: OmisoFila) => {
+    setSeleccion(f);
+    setAbierto(true);
+  };
+
+  const handleExport = () => {
+    const columnas = ['RUC', 'Nombre', 'Cantidad periodos omitidos', 'Valor total periodos omitidos'];
+    const data = filas.map(f => ({
+      RUC: f.ruc,
+      Nombre: f.nombre,
+      'Cantidad periodos omitidos': f.cantidad,
+      'Valor total periodos omitidos': f.total
+    }));
+    onExport('Omisos', data, columnas);
+  };
 
   return (
     <Box>
       <Box display="flex" justifyContent="flex-end" mb={1}>
-        <Button variant="outlined" onClick={handleExport}>
-          DESCARGAR EXCEL
-        </Button>
+        <Button variant="outlined" onClick={handleExport}>DESCARGAR EXCEL</Button>
       </Box>
 
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Categoría</TableCell>
               <TableCell>RUC</TableCell>
-              <TableCell>Nombre o Razón Social</TableCell>
-              <TableCell>Cantidad Periodos no declarados</TableCell>
+              <TableCell>Nombre</TableCell>
+              <TableCell align="right">Cantidad períodos omitidos</TableCell>
+              <TableCell align="right">Valor total períodos omitidos</TableCell>
+              <TableCell align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            <TableRow>
-              <TableCell>{categoria}</TableCell>
-              <TableCell>Individual</TableCell>
-              <TableCell>individual</TableCell>
-              <TableCell>3</TableCell>
-            </TableRow>
+            {filas.map((f) => (
+              <TableRow key={f.ruc} hover>
+                <TableCell>{f.ruc}</TableCell>
+                <TableCell>{f.nombre}</TableCell>
+                <TableCell align="right">{f.cantidad}</TableCell>
+                <TableCell align="right">{MONEDA.format(f.total)}</TableCell>
+                <TableCell align="center">
+                  <Button size="small" variant="contained" onClick={() => abrirDetalle(f)}>Detalle</Button>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <DetalleOmisosModal
+        open={abierto}
+        onClose={() => setAbierto(false)}
+        categoria={categoria}
+        programa={programa}
+        fila={seleccion}
+      />
     </Box>
   );
 };
 
-const TablaInexactos: React.FC<TablaProps> = ({ categoria, onExport }) => {
-  const datos = [
-    {
-      Categoria: categoria,
-      RUC: 'Individual',
-      Nombre: 'individual',
-      TipoImpuesto: '',
-      ValorImpuesto: '$',
-      Inconsistencias: 'Observación',
-      ValorInconsistencia: '',
-    },
-  ];
+type DetalleProps = {
+  open: boolean;
+  onClose: () => void;
+  categoria: string;
+  programa?: string;
+  fila: OmisoFila | null;
+};
 
-  const columnas = [
-    'Categoria', 'RUC', 'Nombre',
-    'TipoImpuesto', 'ValorImpuesto',
-    'Inconsistencias', 'ValorInconsistencia'
-  ];
+const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, programa, fila }) => {
+  const periodosOrdenados = useMemo(() => {
+    if (!fila) return [];
+    // Mantén el orden tal cual llega (o ajusta si quieres ordenar por fecha)
+    return Object.keys(fila.valoresPorPeriodo);
+  }, [fila]);
+
+  const total = useMemo(() => (fila ? totalDeFila(fila) : 0), [fila]);
+
+  return (
+    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose}>
+      <DialogTitle>Detalle de períodos omitidos</DialogTitle>
+      <DialogContent dividers>
+        {fila && (
+          <>
+            {/* Encabezado con tres “cajas” como en tu ejemplo */}
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>Categoría</Typography>
+                  <Typography>{categoria}</Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>Inconsistencia</Typography>
+                  <Typography>Omisos</Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                    {programa ? 'Programa' : 'Tipología'}
+                  </Typography>
+                  <Typography>{programa || '—'}</Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>RUC</Typography>
+                  <Typography>{fila.ruc}</Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>Nombre</Typography>
+                  <Typography>{fila.nombre}</Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Typography sx={{ fontWeight: 700, mb: 1 }}>Cantidad periodos omitidos</Typography>
+
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {periodosOrdenados.map((p) => (
+                      <TableCell key={p} align="right">{p}</TableCell>
+                    ))}
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    {periodosOrdenados.map((p) => (
+                      <TableCell key={p} align="right">
+                        {MONEDA.format(fila.valoresPorPeriodo[p] || 0)}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      {MONEDA.format(total)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Divider sx={{ my: 2 }} />
+            <Box display="flex" justifyContent="flex-end">
+              <Button onClick={onClose} variant="contained">Cerrar</Button>
+            </Box>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/* ---------------- Inexactos & Extemporáneo (sin cambios de UI) ---------------- */
+
+const TablaInexactos: React.FC<TablaPropsBase> = ({ categoria, onExport }) => {
+  const datos = [{
+    Categoria: categoria, RUC: 'Individual', Nombre: 'individual',
+    TipoImpuesto: '', ValorImpuesto: '$', Inconsistencias: 'Observación', ValorInconsistencia: ''
+  }];
+  const columnas = ['Categoria', 'RUC', 'Nombre', 'TipoImpuesto', 'ValorImpuesto', 'Inconsistencias', 'ValorInconsistencia'];
 
   return (
     <Box>
       <Box display="flex" justifyContent="flex-end" mb={1}>
-      <Button
-        variant="outlined"
-        sx={{ mb: 1 }}
-        onClick={() => onExport('Inexactos', datos, columnas)}
-      >
-        DESCARGAR EXCEL
-      </Button>
+        <Button variant="outlined" sx={{ mb: 1 }} onClick={() => onExport('Inexactos', datos, columnas)}>
+          DESCARGAR EXCEL
+        </Button>
       </Box>
 
       <TableContainer component={Paper}>
@@ -180,29 +311,18 @@ const TablaInexactos: React.FC<TablaProps> = ({ categoria, onExport }) => {
   );
 };
 
-const TablaExtemporaneo: React.FC<TablaProps> = ({ categoria, onExport }) => {
-  const datos = [
-    {
-      Categoria: categoria,
-      RUC: 'Individual',
-      Nombre: 'individual',
-      Dias: '-1',
-    },
-  ];
-
+const TablaExtemporaneo: React.FC<TablaPropsBase> = ({ categoria, onExport }) => {
+  const datos = [{ Categoria: categoria, RUC: 'Individual', Nombre: 'individual', Dias: '-1' }];
   const columnas = ['Categoria', 'RUC', 'Nombre', 'Dias'];
 
   return (
     <Box>
       <Box display="flex" justifyContent="flex-end" mb={1}>
-      <Button
-        variant="outlined"
-        sx={{ mb: 1 }}
-        onClick={() => onExport('Extemporaneo', datos, columnas)}
-      >
-        DESCARGAR EXCEL
-      </Button>
-</Box>
+        <Button variant="outlined" sx={{ mb: 1 }} onClick={() => onExport('Extemporaneo', datos, columnas)}>
+          DESCARGAR EXCEL
+        </Button>
+      </Box>
+
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
