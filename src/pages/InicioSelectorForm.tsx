@@ -11,6 +11,7 @@ import {
   Paper,
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
+import Swal from 'sweetalert2';
 
 // --- Catálogos ---
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
@@ -107,8 +108,72 @@ export const InicioSelectorForm: React.FC = () => {
     setForm((prev: any) => ({ ...prev, [name]: value }));
     setMostrarResultados(false);
   };
+  const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
 
-  const handleConsultar = () => setMostrarResultados(true);
+const hoyYMD = () => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
+
+// Diferencia en años (aprox) usando milisegundos
+const diffYears = (a: Date, b: Date) => Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+
+ const handleConsultar = async () => {
+  const dIni = parseISO(form.periodoInicial);
+  const dFin = parseISO(form.periodoFinal);
+  const hoy = parseISO(hoyYMD());
+
+  // Si alguna fecha falta, simplemente consultar (no cambiamos tu flujo)
+  if (!dIni || !dFin) {
+    setMostrarResultados(true);
+    return;
+  }
+
+  // 1) Inicial < Final (no iguales)
+  if (!(dIni < dFin)) {
+    await Swal.fire({
+      title: 'Rango inválido',
+      text: 'El periodo inicial debe ser estrictamente menor que el periodo final.',
+      icon: 'error',
+      confirmButtonText: 'Entendido',
+    });
+    return;
+  }
+
+  // 2) Final <= Hoy
+  if (hoy && dFin.getTime() > hoy.getTime()) {
+    await Swal.fire({
+      title: 'Fecha final no permitida',
+      text: 'El periodo final no puede ser posterior a la fecha actual del sistema.',
+      icon: 'error',
+      confirmButtonText: 'Ok',
+    });
+    return;
+  }
+
+  // 3) Más de 5 años de diferencia -> advertencia con Continuar / Cancelar
+  const years = diffYears(dIni, dFin);
+  if (years > 5) {
+    const { isConfirmed } = await Swal.fire({
+      title: 'Rango mayor a 5 años',
+      text: 'No está permitido, pero puedes continuar bajo tu responsabilidad.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+      focusCancel: true,
+    });
+    if (!isConfirmed) return; // cancelar
+  }
+
+  // Si pasa las validaciones (o el usuario continuó), mostrar resultados
+  setMostrarResultados(true);
+};
+
 
   const handleLimpiar = () => {
     setForm({

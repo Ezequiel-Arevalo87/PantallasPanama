@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Grid, Divider
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Grid, Divider,
+  Stack
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -52,7 +53,6 @@ export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria, p
   );
 };
 
-/* --------------------- OMISOS --------------------- */
 
 type TablaPropsBase = {
   categoria: string;
@@ -175,11 +175,52 @@ type DetalleProps = {
 const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, programa, fila }) => {
   const periodosOrdenados = useMemo(() => {
     if (!fila) return [];
-    // Mantén el orden tal cual llega (o ajusta si quieres ordenar por fecha)
-    return Object.keys(fila.valoresPorPeriodo);
+    return Object.keys(fila.valoresPorPeriodo); // mantener orden recibido
   }, [fila]);
 
   const total = useMemo(() => (fila ? totalDeFila(fila) : 0), [fila]);
+
+  const handleExportExcel = () => {
+    if (!fila) return;
+
+    // Encabezado informativo
+    const meta = [
+      ['Detalle de períodos omitidos'],
+      [],
+      ['Categoría', categoria],
+      ['Inconsistencia', 'Omisos'],
+      [programa ? 'Programa' : 'Tipología', programa || '—'],
+      ['RUC', fila.ruc],
+      ['Nombre', fila.nombre],
+      [],
+      ['Cantidad periodos omitidos'],
+    ];
+
+    // Tabla (periodos + total) con valores numéricos crudos
+    const headers = [...periodosOrdenados, 'Total'];
+    const row = [
+      ...periodosOrdenados.map(p => Number(fila.valoresPorPeriodo[p] ?? 0)),
+      Number(total),
+    ];
+
+    const aoa = [...meta, headers, row];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Ancho de columnas aproximado
+    const colCount = Math.max(...aoa.map(r => r.length));
+    ws['!cols'] = Array.from({ length: colCount }, (_, i) => {
+      const maxLen = aoa.reduce((m, r) => Math.max(m, (r[i]?.toString()?.length ?? 0)), 0);
+      return { wch: Math.min(Math.max(12, maxLen + 2), 40) };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
+
+    const ts = new Date().toISOString().slice(0, 16).replace(':', '').replace('T', '_');
+    const fileName = `Detalle_omisiones_${fila.ruc}_${ts}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   return (
     <Dialog fullWidth maxWidth="md" open={open} onClose={onClose}>
@@ -187,7 +228,7 @@ const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, 
       <DialogContent dividers>
         {fila && (
           <>
-            {/* Encabezado con tres “cajas” como en tu ejemplo */}
+            {/* Encabezado */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12} md={4}>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -254,8 +295,16 @@ const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, 
             </TableContainer>
 
             <Divider sx={{ my: 2 }} />
-            <Box display="flex" justifyContent="flex-end">
-              <Button onClick={onClose} variant="contained">Cerrar</Button>
+
+            <Box>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button onClick={handleExportExcel} variant="outlined">
+                  Descargar Excel
+                </Button>
+                <Button onClick={onClose} variant="contained">
+                  Cerrar
+                </Button>
+              </Stack>
             </Box>
           </>
         )}
@@ -263,6 +312,7 @@ const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, 
     </Dialog>
   );
 };
+
 
 /* ---------------- Inexactos & Extemporáneo (sin cambios de UI) ---------------- */
 
