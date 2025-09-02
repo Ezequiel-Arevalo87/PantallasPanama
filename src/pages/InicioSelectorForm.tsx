@@ -6,13 +6,11 @@ import {
   MenuItem,
   Button,
   Stack,
-  Divider,
   Typography,
   Paper,
 } from '@mui/material';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import Swal from 'sweetalert2';
-
 
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
@@ -24,6 +22,8 @@ const PROGRAMAS_OMISO = [
   'Omisos VS Renta',
   'Omisos VS ITBMS',
 ];
+const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
+
 
 const PROGRAMAS_INEXACTO = [
   'Gastos vs anexos',
@@ -37,7 +37,6 @@ const PROGRAMAS_INEXACTO = [
 const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'];
 
 export const InicioSelectorForm: React.FC = () => {
-
   const [form, setForm] = useState<any>({
     periodoInicial: '',
     periodoFinal: '',
@@ -54,6 +53,7 @@ export const InicioSelectorForm: React.FC = () => {
   const esAS = form.categoria === 'Auditoría Sectorial';
   const esFM = form.categoria === 'Fiscalización Masiva';
 
+  const requiereFechas = form.inconsistencia === 'Omiso';
 
   const programasDisponibles = useMemo(() => {
     switch (form.inconsistencia) {
@@ -87,7 +87,6 @@ export const InicioSelectorForm: React.FC = () => {
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
-
         tipologia: value === 'Auditoría Sectorial' ? prev.tipologia : '',
         actividadEconomica: value === 'Fiscalización Masiva' ? prev.actividadEconomica : '',
       }));
@@ -108,73 +107,80 @@ export const InicioSelectorForm: React.FC = () => {
     setForm((prev: any) => ({ ...prev, [name]: value }));
     setMostrarResultados(false);
   };
-  const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
-
-  const hoyYMD = () => {
-    const d = new Date();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${mm}-${dd}`;
-  };
 
 
-  const diffYears = (a: Date, b: Date) => Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 
 
-  const handleConsultar = async () => {
-    const dIni = parseISO(form.periodoInicial);
-    const dFin = parseISO(form.periodoFinal);
-    const hoy = parseISO(hoyYMD());
+const handleConsultar = async () => {
+  const requiereFechas = form.inconsistencia === 'Omiso';
 
-
-    if (!dIni || !dFin) {
-      setMostrarResultados(true);
-      return;
-    }
-
-
-    if (!(dIni < dFin)) {
-      await Swal.fire({
-        title: 'Rango inválido',
-        text: 'El periodo inicial debe ser estrictamente menor que el periodo final.',
-        icon: 'error',
-        confirmButtonText: 'Entendido',
-      });
-      return;
-    }
-
-
-    if (hoy && dFin.getTime() > hoy.getTime()) {
-      await Swal.fire({
-        title: 'Fecha final no permitida',
-        text: 'El periodo final no puede ser posterior a la fecha actual del sistema.',
-        icon: 'error',
-        confirmButtonText: 'Ok',
-      });
-      return;
-    }
-
-
-    const years = diffYears(dIni, dFin);
-    if (years > 5) {
-      const { isConfirmed } = await Swal.fire({
-        title: 'Rango mayor a 5 años',
-        text: 'No está permitido, pero puedes continuar bajo tu responsabilidad.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Continuar',
-        cancelButtonText: 'Cancelar',
-        reverseButtons: true,
-        focusCancel: true,
-      });
-      if (!isConfirmed) return;
-    }
-
-
+  // Si NO es Omiso, no validamos periodos en absoluto
+  if (!requiereFechas) {
     setMostrarResultados(true);
-  };
+    return;
+  }
+
+  // === Desde acá, solo para Omiso ===
+  const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
+  const dIni = parseISO(form.periodoInicial);
+  const dFin = parseISO(form.periodoFinal);
+
+  if (!dIni || !dFin) {
+    await Swal.fire({
+      title: 'Fechas requeridas',
+      text: 'Para la inconsistencia "Omiso", la Fecha Inicial y la Fecha Final son obligatorias.',
+      icon: 'error',
+      confirmButtonText: 'Entendido',
+    });
+    return;
+  }
+
+  if (!(dIni < dFin)) {
+    await Swal.fire({
+      title: 'Rango inválido',
+      text: 'El periodo inicial debe ser estrictamente menor que el periodo final.',
+      icon: 'error',
+      confirmButtonText: 'Entendido',
+    });
+    return;
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (dFin.getTime() > hoy.getTime()) {
+    await Swal.fire({
+      title: 'Fecha final no permitida',
+      text: 'El periodo final no puede ser posterior a la fecha actual del sistema.',
+      icon: 'error',
+      confirmButtonText: 'Ok',
+    });
+    return;
+  }
+
+  const diffYears = (a: Date, b: Date) =>
+    Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+  const years = diffYears(dIni, dFin);
+  if (years > 5) {
+    const { isConfirmed } = await Swal.fire({
+      title:
+        'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
+      text: '¿Desea continuar con el proceso?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+      focusCancel: true,
+    });
+    if (!isConfirmed) return;
+  }
+
+  setMostrarResultados(true);
+};
 
 
+  console.log('sdsd', form.tipologia)
   const handleLimpiar = () => {
     setForm({
       periodoInicial: '',
@@ -196,10 +202,7 @@ export const InicioSelectorForm: React.FC = () => {
           DGI - Dirección General de Ingresos
         </Typography>
 
-
         <Grid container columnSpacing={2} rowSpacing={2}>
-
-
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -217,7 +220,6 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
-
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -234,6 +236,7 @@ export const InicioSelectorForm: React.FC = () => {
               ))}
             </TextField>
           </Grid>
+
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
@@ -245,20 +248,27 @@ export const InicioSelectorForm: React.FC = () => {
               placeholder="Escriba aquí..."
             />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Tipología"
-              name="tipologia"
-              value={form.tipologia}
-              onChange={handleChange}
-              disabled={!esFM}
-              placeholder="Escriba aquí..."
-            />
-          </Grid>
+         <Grid item xs={12} md={6}>
+  <TextField
+    select
+    fullWidth
+    label="Grupo de Impuesto"
+    name="tipologia"
+    value={form.tipologia}
+    onChange={handleChange}
+    disabled={!esFM}
+    placeholder="Seleccione…"
+  >
+    {TIPOLOGIAS_FM.map((t) => (
+      <MenuItem key={t} value={t}>
+        {t}
+      </MenuItem>
+    ))}
+  </TextField>
+</Grid>
+
 
           <Grid item xs={12}>
-
             <TextField
               select
               fullWidth
@@ -276,7 +286,6 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
-
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -287,31 +296,40 @@ export const InicioSelectorForm: React.FC = () => {
               onChange={handleChange}
             />
           </Grid>
+
+          {/* === Fechas con requerimiento condicional para Omiso === */}
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               type="date"
-              label="Periodo Inicial"
+              label="Fecha Inicial"
               name="periodoInicial"
               value={form.periodoInicial}
               onChange={handleChange}
               InputLabelProps={{ shrink: true }}
+              required={requiereFechas}
+              error={requiereFechas && !form.periodoInicial}
+              helperText={
+                requiereFechas && !form.periodoInicial ? 'Obligatoria para Omiso' : ''
+              }
             />
           </Grid>
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               type="date"
-              label="Periodo Final"
+              label="Fecha Final"
               name="periodoFinal"
               value={form.periodoFinal}
               onChange={handleChange}
               InputLabelProps={{ shrink: true }}
+              required={requiereFechas}
+              error={requiereFechas && !form.periodoFinal}
+              helperText={
+                requiereFechas && !form.periodoFinal ? 'Obligatoria para Omiso' : ''
+              }
             />
           </Grid>
-
-          <Grid item xs={12} md={8} />
-
 
           <Grid item xs={12}>
             <Stack direction="row" spacing={2} justifyContent="flex-end">
@@ -326,17 +344,16 @@ export const InicioSelectorForm: React.FC = () => {
         </Grid>
       </Paper>
 
-
       {mostrarResultados && (
         <Box mt={2}>
           <TablasResultadosSelector
             estado={mapEstadoToTabla(form.inconsistencia)}
             categoria={form.categoria}
+            tipologia={form.tipologia}
             programa={form.programa}
           />
         </Box>
       )}
-
     </Box>
   );
 };

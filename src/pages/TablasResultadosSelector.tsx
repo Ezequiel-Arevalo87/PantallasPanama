@@ -10,10 +10,12 @@ import { saveAs } from 'file-saver';
 type Props = {
   estado: string;
   categoria: string;
+  tipologia: string;
   programa?: string; // 👈 NUEVO (para el encabezado del detalle)
 };
 
-export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria, programa }) => {
+export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria, tipologia, programa }) => {
+  console.log('ver tipo', tipologia)
   const mostrarOmiso = estado === 'omiso' || estado === 'Todos';
   const mostrarInexacto = estado === 'inexacto' || estado === 'Todos';
   const mostrarExtemporaneo = estado === 'Extemporáneo' || estado === 'Todos';
@@ -32,7 +34,7 @@ export const TablasResultadosSelector: React.FC<Props> = ({ estado, categoria, p
       {mostrarOmiso && (
         <Box mb={4}>
           <Typography variant="h6" color="error">OMISOS</Typography>
-          <TablaOmisos categoria={categoria} programa={programa} onExport={exportarExcel} />
+          <TablaOmisos categoria={categoria} tipologia={tipologia}  programa={programa}  onExport={exportarExcel} />
         </Box>
       )}
 
@@ -58,7 +60,7 @@ type TablaPropsBase = {
   categoria: string;
   onExport: (nombre: string, data: any[], columns: string[]) => void;
 };
-type TablaOmisosProps = TablaPropsBase & { programa?: string };
+type TablaOmisosProps = TablaPropsBase & { programa?: string; tipologia?: string };
 
 type OmisoFila = {
   ruc: string;
@@ -94,7 +96,7 @@ const OMISOS_MOCK: OmisoFila[] = [
 const totalDeFila = (f: OmisoFila) =>
   Object.values(f.valoresPorPeriodo).reduce((acc, v) => acc + (Number(v) || 0), 0);
 
-const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, onExport }) => {
+const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, tipologia,  onExport }) => {
   const filas = OMISOS_MOCK.map(f => ({
     ...f,
     cantidad: Object.entries(f.valoresPorPeriodo).filter(([_, v]) => (Number(v) || 0) > 0).length,
@@ -109,6 +111,7 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, onExport
     setAbierto(true);
   };
 
+
   const handleExport = () => {
     const columnas = ['RUC', 'Nombre', 'Cantidad periodos omitidos', 'Valor total periodos omitidos'];
     const data = filas.map(f => ({
@@ -119,6 +122,8 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, onExport
     }));
     onExport('Omisos', data, columnas);
   };
+
+
 
   return (
     <Box>
@@ -152,14 +157,14 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, onExport
           </TableBody>
         </Table>
       </TableContainer>
-
-      <DetalleOmisosModal
-        open={abierto}
-        onClose={() => setAbierto(false)}
-        categoria={categoria}
-        programa={programa}
-        fila={seleccion}
-      />
+<DetalleOmisosModal
+  open={abierto}
+  onClose={() => setAbierto(false)}
+  categoria={categoria}
+  programa={programa}
+  tipologia={tipologia}   // 👈 ahora sí viaja al modal
+  fila={seleccion}
+/>
     </Box>
   );
 };
@@ -169,10 +174,11 @@ type DetalleProps = {
   onClose: () => void;
   categoria: string;
   programa?: string;
+  tipologia?: string;
   fila: OmisoFila | null;
 };
 
-const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, programa, fila }) => {
+const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, tipologia, programa, fila }) => {
   const periodosOrdenados = useMemo(() => {
     if (!fila) return [];
     return Object.keys(fila.valoresPorPeriodo); // mantener orden recibido
@@ -180,21 +186,23 @@ const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, 
 
   const total = useMemo(() => (fila ? totalDeFila(fila) : 0), [fila]);
 
+
+
   const handleExportExcel = () => {
     if (!fila) return;
 
-    // Encabezado informativo
-    const meta = [
-      ['Detalle de períodos omitidos'],
-      [],
-      ['Categoría', categoria],
-      ['Inconsistencia', 'Omisos'],
-      [programa ? 'Programa' : 'Tipología', programa || '—'],
-      ['RUC', fila.ruc],
-      ['Nombre', fila.nombre],
-      [],
-      ['Cantidad periodos omitidos'],
-    ];
+console.log({tipologia})
+const meta = [
+  ['Detalle de períodos omitidos'],
+  [],
+  ['Categoría', categoria],
+  ['Inconsistencia', 'Omisos'],
+  [programa ? 'Programa' : 'Grupo de impuesto', programa || (tipologia ?? '—')], // 👈 usar tipología si no hay programa
+  ['RUC', fila.ruc],
+  ['Nombre', fila.nombre],
+  [],
+  ['Cantidad periodos omitidos'],
+];
 
     // Tabla (periodos + total) con valores numéricos crudos
     const headers = [...periodosOrdenados, 'Total'];
@@ -245,9 +253,9 @@ const DetalleOmisosModal: React.FC<DetalleProps> = ({ open, onClose, categoria, 
               <Grid item xs={12} md={4}>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                    {programa ? 'Programa' : 'Tipología'}
+                    {programa ? 'Programa' : 'Grupo de impuesto'}
                   </Typography>
-                  <Typography>{programa || '—'}</Typography>
+                  <Typography>{programa || tipologia}</Typography>
                 </Paper>
               </Grid>
             </Grid>
