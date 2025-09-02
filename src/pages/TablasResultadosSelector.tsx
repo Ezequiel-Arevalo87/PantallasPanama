@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import {
   Box, Typography, Button, Dialog, DialogTitle, DialogContent,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Grid, Divider,
-  Stack
+  Stack,
+  Tooltip
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -137,8 +138,8 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, tipologi
             <TableRow>
               <TableCell>RUC</TableCell>
               <TableCell>Nombre</TableCell>
-              <TableCell align="right">Cantidad períodos omitidos</TableCell>
-              <TableCell align="right">Valor total períodos omitidos</TableCell>
+              <TableCell align="right">Número de períodos </TableCell>
+              <TableCell align="right">Valor total</TableCell>
               <TableCell align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
@@ -149,9 +150,17 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, tipologi
                 <TableCell>{f.nombre}</TableCell>
                 <TableCell align="right">{f.cantidad}</TableCell>
                 <TableCell align="right">{MONEDA.format(f.total)}</TableCell>
-                <TableCell align="center">
-                  <Button size="small" variant="contained" onClick={() => abrirDetalle(f)}>Detalle</Button>
-                </TableCell>
+             <TableCell align="center">
+  <Tooltip title="Detalle de períodos omitidos" arrow>
+    <Button 
+      size="small" 
+      variant="contained" 
+      onClick={() => abrirDetalle(f)}
+    >
+      Detalle
+    </Button>
+  </Tooltip>
+</TableCell>
               </TableRow>
             ))}
           </TableBody>
