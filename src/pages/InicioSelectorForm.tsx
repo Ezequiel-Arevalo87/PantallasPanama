@@ -138,7 +138,7 @@ const handleConsultar = async () => {
   if (!(dIni < dFin)) {
     await Swal.fire({
       title: 'Rango inválido',
-      text: 'El periodo inicial debe ser estrictamente menor que el periodo final.',
+      text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
       icon: 'error',
       confirmButtonText: 'Entendido',
     });
@@ -149,8 +149,8 @@ const handleConsultar = async () => {
   hoy.setHours(0, 0, 0, 0);
   if (dFin.getTime() > hoy.getTime()) {
     await Swal.fire({
-      title: 'Fecha final no permitida',
-      text: 'El periodo final no puede ser posterior a la fecha actual del sistema.',
+      title: 'Fecha No Permitida',
+      text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
       icon: 'error',
       confirmButtonText: 'Ok',
     });
