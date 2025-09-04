@@ -252,7 +252,7 @@ const handleConsultar = async () => {
   <TextField
     select
     fullWidth
-    label="Grupo de Impuesto"
+    label="Impuesto"
     name="tipologia"
     value={form.tipologia}
     onChange={handleChange}

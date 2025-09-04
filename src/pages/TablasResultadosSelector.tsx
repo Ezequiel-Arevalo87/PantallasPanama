@@ -129,7 +129,9 @@ const TablaOmisos: React.FC<TablaOmisosProps> = ({ categoria, programa, tipologi
   return (
     <Box>
       <Box display="flex" justifyContent="flex-end" mb={1}>
-        <Button variant="outlined" onClick={handleExport}>DESCARGAR EXCEL</Button>
+        <Button variant="outlined" onClick={handleExport}> EXCEL</Button>
+        <Button variant="outlined" > WORD</Button>
+        <Button variant="outlined" > PDF</Button>
       </Box>
 
       <TableContainer component={Paper}>
@@ -316,7 +318,13 @@ const meta = [
             <Box>
               <Stack direction="row" spacing={1} justifyContent="flex-end">
                 <Button onClick={handleExportExcel} variant="outlined">
-                  Descargar Excel
+                   Excel
+                </Button>
+                <Button  variant="outlined">
+                  Word
+                </Button>
+                <Button  variant="outlined">
+                  Pdf
                 </Button>
                 <Button onClick={onClose} variant="contained">
                   Cerrar
@@ -342,10 +350,19 @@ const TablaInexactos: React.FC<TablaPropsBase> = ({ categoria, onExport }) => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="flex-end" mb={1}>
-        <Button variant="outlined" sx={{ mb: 1 }} onClick={() => onExport('Inexactos', datos, columnas)}>
-          DESCARGAR EXCEL
+      <Box display="flex" justifyContent="flex-end" mb={2}>
+        <Button variant="outlined"  onClick={() => onExport('Inexactos', datos, columnas)}>
+           EXCEL
         </Button>
+     
+        
+              <Button  variant="outlined">
+                  Word
+                </Button>
+                <Button  variant="outlined">
+                  Pdf
+                </Button>
+    
       </Box>
 
       <TableContainer component={Paper}>
@@ -386,7 +403,13 @@ const TablaExtemporaneo: React.FC<TablaPropsBase> = ({ categoria, onExport }) =>
     <Box>
       <Box display="flex" justifyContent="flex-end" mb={1}>
         <Button variant="outlined" sx={{ mb: 1 }} onClick={() => onExport('Extemporaneo', datos, columnas)}>
-          DESCARGAR EXCEL
+           EXCEL
+        </Button>
+        <Button variant="outlined" sx={{ mb: 1 }} >
+           WORD
+        </Button>
+        <Button variant="outlined" sx={{ mb: 1 }} >
+           PDF
         </Button>
       </Box>
 
