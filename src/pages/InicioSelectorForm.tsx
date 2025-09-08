@@ -112,7 +112,7 @@ export const InicioSelectorForm: React.FC = () => {
 
 
 const handleConsultar = async () => {
-  const requiereFechas = form.inconsistencia === 'Omiso';
+  const requiereFechas = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto' ;
 
   // Si NO es Omiso, no validamos periodos en absoluto
   if (!requiereFechas) {
@@ -180,7 +180,7 @@ const handleConsultar = async () => {
 };
 
 
-  console.log('sdsd', form.tipologia)
+ 
   const handleLimpiar = () => {
     setForm({
       periodoInicial: '',
