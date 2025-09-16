@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Grid,
@@ -15,24 +15,32 @@ import Swal from 'sweetalert2';
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
 
+// --- Catálogos ---
 const PROGRAMAS_OMISO = [
   'Omisos VS Dividendos',
   'Omisos VS 431 (ITBMS)',
   'Omisos VS Informes 22, 23, 43, 44',
   'Omisos VS Renta',
   'Omisos VS ITBMS',
-];
-const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
-
+] as const;
 
 const PROGRAMAS_INEXACTO = [
   'Gastos vs anexos',
   'Ventas vs anexos',
   'Ingresos vs anexos',
+  'Omisos VS 431 (ITBMS)',
   'Costos vs anexos',
   'Gastos vs Reportes ventas de tercer',
   'Costos vs reportes ventas de tercer',
-];
+  'Omisos VS ITBMS',
+] as const;
+
+const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
+
+// --- Helper para deduplicar (case-insensitive, mantiene el primer orden) ---
+const uniqCaseInsensitive = (items: string[]) =>
+  Array.from(new Map(items.map(s => [s.trim().toLowerCase(), s])).values());
+
 
 const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'];
 
@@ -55,20 +63,32 @@ export const InicioSelectorForm: React.FC = () => {
 
   const requiereFechas = form.inconsistencia === 'Omiso';
 
+  // Memo de programasDisponibles (dedup en "Todos")
   const programasDisponibles = useMemo(() => {
     switch (form.inconsistencia) {
       case 'Omiso':
-        return PROGRAMAS_OMISO;
+        return [...PROGRAMAS_OMISO];
       case 'Inexacto':
-        return PROGRAMAS_INEXACTO;
+        return [...PROGRAMAS_INEXACTO];
       case 'Extemporáneo':
-        return PROGRAMAS_EXTEMPORANEO;
+        return [...PROGRAMAS_EXTEMPORANEO];
       case 'Todos':
-        return [...PROGRAMAS_OMISO, ...PROGRAMAS_INEXACTO, ...PROGRAMAS_EXTEMPORANEO];
+        // 👇 aquí unimos y DEDUPLICAMOS
+        return uniqCaseInsensitive([
+          ...PROGRAMAS_OMISO,
+          ...PROGRAMAS_INEXACTO,
+          ...PROGRAMAS_EXTEMPORANEO,
+        ]);
       default:
         return [];
     }
   }, [form.inconsistencia]);
+
+  useEffect(() => {
+    if (form.programa && !programasDisponibles.includes(form.programa)) {
+      setForm((prev: any) => ({ ...prev, programa: '' }));
+    }
+  }, [programasDisponibles, form.programa, setForm]);
 
   const mapEstadoToTabla = (v: string) => {
     switch (v) {
@@ -83,22 +103,22 @@ export const InicioSelectorForm: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
+    if (name === 'inconsistencia') {
+      setForm((prev: any) => ({
+        ...prev,
+        inconsistencia: value,
+        programa: '', // reset al cambiar la inconsistencia
+      }));
+      setMostrarResultados(false);
+      return;
+    }
+
     if (name === 'categoria') {
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
         tipologia: value === 'Auditoría Sectorial' ? prev.tipologia : '',
         actividadEconomica: value === 'Fiscalización Masiva' ? prev.actividadEconomica : '',
-      }));
-      setMostrarResultados(false);
-      return;
-    }
-
-    if (name === 'inconsistencia') {
-      setForm((prev: any) => ({
-        ...prev,
-        inconsistencia: value,
-        programa: '',
       }));
       setMostrarResultados(false);
       return;
@@ -111,76 +131,76 @@ export const InicioSelectorForm: React.FC = () => {
 
 
 
-const handleConsultar = async () => {
-  const requiereFechas = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto' ;
+  const handleConsultar = async () => {
+    const requiereFechas = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto';
 
-  // Si NO es Omiso, no validamos periodos en absoluto
-  if (!requiereFechas) {
+    // Si NO es Omiso, no validamos periodos en absoluto
+    if (!requiereFechas) {
+      setMostrarResultados(true);
+      return;
+    }
+
+    // === Desde acá, solo para Omiso ===
+    const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
+    const dIni = parseISO(form.periodoInicial);
+    const dFin = parseISO(form.periodoFinal);
+
+    if (!dIni || !dFin) {
+      await Swal.fire({
+        title: 'Fechas requeridas',
+        text: 'Para la inconsistencia "Omiso", la Fecha Inicial y la Fecha Final son obligatorias.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+      });
+      return;
+    }
+
+    if (!(dIni < dFin)) {
+      await Swal.fire({
+        title: 'Rango inválido',
+        text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+      });
+      return;
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (dFin.getTime() > hoy.getTime()) {
+      await Swal.fire({
+        title: 'Fecha No Permitida',
+        text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
+        icon: 'error',
+        confirmButtonText: 'Ok',
+      });
+      return;
+    }
+
+    const diffYears = (a: Date, b: Date) =>
+      Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+    const years = diffYears(dIni, dFin);
+    if (years > 5) {
+      const { isConfirmed } = await Swal.fire({
+        title:
+          'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
+        text: '¿Desea continuar con el proceso?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        focusCancel: true,
+      });
+      if (!isConfirmed) return;
+    }
+
     setMostrarResultados(true);
-    return;
-  }
-
-  // === Desde acá, solo para Omiso ===
-  const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
-  const dIni = parseISO(form.periodoInicial);
-  const dFin = parseISO(form.periodoFinal);
-
-  if (!dIni || !dFin) {
-    await Swal.fire({
-      title: 'Fechas requeridas',
-      text: 'Para la inconsistencia "Omiso", la Fecha Inicial y la Fecha Final son obligatorias.',
-      icon: 'error',
-      confirmButtonText: 'Entendido',
-    });
-    return;
-  }
-
-  if (!(dIni < dFin)) {
-    await Swal.fire({
-      title: 'Rango inválido',
-      text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
-      icon: 'error',
-      confirmButtonText: 'Entendido',
-    });
-    return;
-  }
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  if (dFin.getTime() > hoy.getTime()) {
-    await Swal.fire({
-      title: 'Fecha No Permitida',
-      text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
-      icon: 'error',
-      confirmButtonText: 'Ok',
-    });
-    return;
-  }
-
-  const diffYears = (a: Date, b: Date) =>
-    Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-
-  const years = diffYears(dIni, dFin);
-  if (years > 5) {
-    const { isConfirmed } = await Swal.fire({
-      title:
-        'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
-      text: '¿Desea continuar con el proceso?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Cancelar',
-      reverseButtons: true,
-      focusCancel: true,
-    });
-    if (!isConfirmed) return;
-  }
-
-  setMostrarResultados(true);
-};
+  };
 
 
- 
+
   const handleLimpiar = () => {
     setForm({
       periodoInicial: '',
@@ -248,25 +268,24 @@ const handleConsultar = async () => {
               placeholder="Escriba aquí..."
             />
           </Grid>
-         <Grid item xs={12} md={6}>
-  <TextField
-    select
-    fullWidth
-    label="Impuesto"
-    name="tipologia"
-    value={form.tipologia}
-    onChange={handleChange}
-    disabled={!esFM}
-    placeholder="Seleccione…"
-  >
-    {TIPOLOGIAS_FM.map((t) => (
-      <MenuItem key={t} value={t}>
-        {t}
-      </MenuItem>
-    ))}
-  </TextField>
-</Grid>
-
+          <Grid item xs={12} md={6}>
+            <TextField
+              select
+              fullWidth
+              label="Impuesto"
+              name="tipologia"
+              value={form.tipologia}
+              onChange={handleChange}
+              disabled={!esFM}
+              placeholder="Seleccione…"
+            >
+              {TIPOLOGIAS_FM.map((t) => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
 
           <Grid item xs={12}>
             <TextField
@@ -274,18 +293,18 @@ const handleConsultar = async () => {
               fullWidth
               label="Programa"
               name="programa"
-              value={form.programa}
+              value={form.programa ?? ''}
               onChange={handleChange}
               disabled={programasDisponibles.length === 0}
             >
               {programasDisponibles.map((p) => (
-                <MenuItem key={p} value={p}>
+                <MenuItem key={p.toLowerCase()} value={p}>
                   {p}
                 </MenuItem>
               ))}
             </TextField>
-          </Grid>
 
+          </Grid>
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
