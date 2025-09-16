@@ -8,9 +8,14 @@ import {
   Stack,
   Typography,
   Paper,
+  Chip,
+  Checkbox,
+  ListItemText,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import { TablasResultadosSelector } from './TablasResultadosSelector';
 import Swal from 'sweetalert2';
+import { Actividad, loadActividades } from '../services/actividadesLoader';
 
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
@@ -36,13 +41,13 @@ const PROGRAMAS_INEXACTO = [
 ] as const;
 
 const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
+const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'] as const;
 
 // --- Helper para deduplicar (case-insensitive, mantiene el primer orden) ---
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map(s => [s.trim().toLowerCase(), s])).values());
 
-
-const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'];
+const ALL_VALUE = '__ALL__';
 
 export const InicioSelectorForm: React.FC = () => {
   const [form, setForm] = useState<any>({
@@ -50,18 +55,33 @@ export const InicioSelectorForm: React.FC = () => {
     periodoFinal: '',
     categoria: 'Fiscalización Masiva',
     inconsistencia: 'Inexacto',
-    actividadEconomica: '',
+    actividadEconomica: [] as string[],  // 👈 ahora es array para selección múltiple
     tipologia: '',
     programa: '',
     valoresDeclarados: '',
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
+  const [actividades, setActividades] = useState<Actividad[]>([]);
+  const [loadingAct, setLoadingAct] = useState<boolean>(true);
+
+  useEffect(() => {
+    loadActividades().then((arr: Actividad[]) => {
+      setActividades(arr ?? []);
+      setLoadingAct(false);
+    });
+  }, []);
 
   const esAS = form.categoria === 'Auditoría Sectorial';
   const esFM = form.categoria === 'Fiscalización Masiva';
 
-  const requiereFechas = form.inconsistencia === 'Omiso';
+  const requiereFechasFlag = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto';
+
+  const actividadesMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of actividades) m.set(a.code, a.label);
+    return m;
+  }, [actividades]);
 
   // Memo de programasDisponibles (dedup en "Todos")
   const programasDisponibles = useMemo(() => {
@@ -73,7 +93,6 @@ export const InicioSelectorForm: React.FC = () => {
       case 'Extemporáneo':
         return [...PROGRAMAS_EXTEMPORANEO];
       case 'Todos':
-        // 👇 aquí unimos y DEDUPLICAMOS
         return uniqCaseInsensitive([
           ...PROGRAMAS_OMISO,
           ...PROGRAMAS_INEXACTO,
@@ -88,7 +107,7 @@ export const InicioSelectorForm: React.FC = () => {
     if (form.programa && !programasDisponibles.includes(form.programa)) {
       setForm((prev: any) => ({ ...prev, programa: '' }));
     }
-  }, [programasDisponibles, form.programa, setForm]);
+  }, [programasDisponibles, form.programa]);
 
   const mapEstadoToTabla = (v: string) => {
     switch (v) {
@@ -114,11 +133,13 @@ export const InicioSelectorForm: React.FC = () => {
     }
 
     if (name === 'categoria') {
+      // ✅ actividadEconomica se usa en Auditoría Sectorial (AS)
+      // ✅ tipologia (Impuesto) se usa en Fiscalización Masiva (FM)
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
-        tipologia: value === 'Auditoría Sectorial' ? prev.tipologia : '',
-        actividadEconomica: value === 'Fiscalización Masiva' ? prev.actividadEconomica : '',
+        actividadEconomica: value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
+        tipologia: value === 'Fiscalización Masiva' ? prev.tipologia : '',
       }));
       setMostrarResultados(false);
       return;
@@ -128,19 +149,28 @@ export const InicioSelectorForm: React.FC = () => {
     setMostrarResultados(false);
   };
 
+  const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
+    const raw = e.target.value as unknown as string[]; // MUI típicamente entrega string[] en multiple
+    // Si el usuario elige "Todas", limpiamos la selección
+    if (raw.includes(ALL_VALUE)) {
+      setForm((prev: any) => ({ ...prev, actividadEconomica: [] }));
+      setMostrarResultados(false);
+      return;
+    }
 
-
+    const next = uniqCaseInsensitive(raw.filter(v => v !== ALL_VALUE));
+    setForm((prev: any) => ({ ...prev, actividadEconomica: next }));
+    setMostrarResultados(false);
+  };
 
   const handleConsultar = async () => {
     const requiereFechas = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto';
 
-    // Si NO es Omiso, no validamos periodos en absoluto
     if (!requiereFechas) {
       setMostrarResultados(true);
       return;
     }
 
-    // === Desde acá, solo para Omiso ===
     const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
     const dIni = parseISO(form.periodoInicial);
     const dFin = parseISO(form.periodoFinal);
@@ -148,7 +178,7 @@ export const InicioSelectorForm: React.FC = () => {
     if (!dIni || !dFin) {
       await Swal.fire({
         title: 'Fechas requeridas',
-        text: 'Para la inconsistencia "Omiso", la Fecha Inicial y la Fecha Final son obligatorias.',
+        text: 'Para la inconsistencia seleccionada, la Fecha Inicial y la Fecha Final son obligatorias.',
         icon: 'error',
         confirmButtonText: 'Entendido',
       });
@@ -199,20 +229,30 @@ export const InicioSelectorForm: React.FC = () => {
     setMostrarResultados(true);
   };
 
-
-
   const handleLimpiar = () => {
     setForm({
       periodoInicial: '',
       periodoFinal: '',
       categoria: 'Fiscalización Masiva',
       inconsistencia: 'Inexacto',
-      actividadEconomica: '',
+      actividadEconomica: [] as string[],
       tipologia: '',
       programa: '',
       valoresDeclarados: '',
     });
     setMostrarResultados(false);
+  };
+
+  const renderActividadChips = (selected: any) => {
+    const arr: string[] = selected as string[];
+    if (!arr?.length) return 'Todas';
+    return (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {arr.map((code) => (
+          <Chip key={code} size="small" label={actividadesMap.get(code) ?? code} />
+        ))}
+      </Box>
+    );
   };
 
   return (
@@ -257,17 +297,35 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
+          {/* ---- Actividad Económica (AS) - múltiple ---- */}
           <Grid item xs={12} md={6}>
             <TextField
+              select
               fullWidth
               label="Actividad Económica"
               name="actividadEconomica"
               value={form.actividadEconomica}
-              onChange={handleChange}
-              disabled={!esAS}
-              placeholder="Escriba aquí..."
-            />
+              onChange={handleActividadesChange as any}
+              disabled={!esAS || loadingAct}
+              helperText={!esAS ? 'Disponible en Auditoría Sectorial' : ''}
+              SelectProps={{
+                multiple: true,
+                renderValue: renderActividadChips,
+              }}
+            >
+              <MenuItem value={ALL_VALUE} disabled={loadingAct}>
+              
+              </MenuItem>
+              {actividades.map((a) => (
+                <MenuItem key={a.code} value={a.code}>
+                  <Checkbox checked={form.actividadEconomica.includes(a.code)} />
+                  <ListItemText primary={`${a.code} — ${a.label}`} />
+                </MenuItem>
+              ))}
+            </TextField>
           </Grid>
+
+          {/* ---- Impuesto (FM) ---- */}
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -303,8 +361,8 @@ export const InicioSelectorForm: React.FC = () => {
                 </MenuItem>
               ))}
             </TextField>
-
           </Grid>
+
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -316,7 +374,7 @@ export const InicioSelectorForm: React.FC = () => {
             />
           </Grid>
 
-          {/* === Fechas con requerimiento condicional para Omiso === */}
+          {/* === Fechas con requerimiento condicional === */}
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -326,10 +384,10 @@ export const InicioSelectorForm: React.FC = () => {
               value={form.periodoInicial}
               onChange={handleChange}
               InputLabelProps={{ shrink: true }}
-              required={requiereFechas}
-              error={requiereFechas && !form.periodoInicial}
+              required={requiereFechasFlag}
+              error={requiereFechasFlag && !form.periodoInicial}
               helperText={
-                requiereFechas && !form.periodoInicial ? 'Obligatoria para Omiso' : ''
+                requiereFechasFlag && !form.periodoInicial ? 'Obligatoria para la inconsistencia seleccionada' : ''
               }
             />
           </Grid>
@@ -342,10 +400,10 @@ export const InicioSelectorForm: React.FC = () => {
               value={form.periodoFinal}
               onChange={handleChange}
               InputLabelProps={{ shrink: true }}
-              required={requiereFechas}
-              error={requiereFechas && !form.periodoFinal}
+              required={requiereFechasFlag}
+              error={requiereFechasFlag && !form.periodoFinal}
               helperText={
-                requiereFechas && !form.periodoFinal ? 'Obligatoria para Omiso' : ''
+                requiereFechasFlag && !form.periodoFinal ? 'Obligatoria para la inconsistencia seleccionada' : ''
               }
             />
           </Grid>
