@@ -22,26 +22,25 @@ const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const
 
 // --- Catálogos ---
 const PROGRAMAS_OMISO = [
-  'Omisos VS Dividendos',
-  'Omisos VS 431 (ITBMS)',
-  'Omisos VS Informes 22, 23, 43, 44',
-  'Omisos VS Renta',
-  'Omisos VS ITBMS',
+  'Omisos vs Dividendos',
+  'Omisos vs retenciones 4331 ITBMS',
+  'Omisos vs informes',
+  'Omisos vs ISR Renta',
+  'Omisos vs ITBMS',
 ] as const;
 
 const PROGRAMAS_INEXACTO = [
-  'Gastos vs anexos',
-  'Ventas vs anexos',
-  'Ingresos vs anexos',
-  'Omisos VS 431 (ITBMS)',
-  'Costos vs anexos',
-  'Gastos vs Reportes ventas de tercer',
-  'Costos vs reportes ventas de tercer',
-  'Omisos VS ITBMS',
+  'Costos y gastos vs Anexos',
+  'Ventas e ingresos vs Anexos',
+  'Inexactos vs retenciones 4331 ITBMS',
+  'Inexactos vs ITBMS',
 ] as const;
-
 const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
-const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'] as const;
+const PROGRAMAS_EXTEMPORANEO = [
+  'Base contribuyentes VS Calendario ISR',
+  'Base contribuyentes VS Calendario ITBMS',
+  'Base contribuyentes VS Calendario retenciones ITBMS',
+] as const;
 
 // --- Helper para deduplicar (case-insensitive, mantiene el primer orden) ---
 const uniqCaseInsensitive = (items: string[]) =>
