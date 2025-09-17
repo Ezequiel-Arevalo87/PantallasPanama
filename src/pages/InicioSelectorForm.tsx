@@ -74,13 +74,22 @@ export const InicioSelectorForm: React.FC = () => {
   const esAS = form.categoria === 'Auditoría Sectorial';
   const esFM = form.categoria === 'Fiscalización Masiva';
 
-  const requiereFechasFlag = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto';
+  const requiereFechasFlag = form.inconsistencia !== '' ;
 
   const actividadesMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const a of actividades) m.set(a.code, a.label);
     return m;
   }, [actividades]);
+
+  const actividadesSeleccionadas = useMemo(
+  () =>
+    (form.actividadEconomica ?? []).map((code:any) => ({
+      codigo: code,
+      nombre: actividadesMap.get(code) ?? code, // usa el nombre; si no existe, deja el código
+    })),
+  [form.actividadEconomica, actividadesMap]
+);
 
   // Memo de programasDisponibles (dedup en "Todos")
   const programasDisponibles = useMemo(() => {
@@ -163,7 +172,7 @@ export const InicioSelectorForm: React.FC = () => {
   };
 
   const handleConsultar = async () => {
-    const requiereFechas = form.inconsistencia === 'Omiso' || form.inconsistencia === 'Inexacto';
+    const requiereFechas = form.inconsistencia !== '' ;
 
     if (!requiereFechas) {
       setMostrarResultados(true);
@@ -427,6 +436,7 @@ export const InicioSelectorForm: React.FC = () => {
             categoria={form.categoria}
             tipologia={form.tipologia}
             programa={form.programa}
+            actividad={actividadesSeleccionadas}
           />
         </Box>
       )}
