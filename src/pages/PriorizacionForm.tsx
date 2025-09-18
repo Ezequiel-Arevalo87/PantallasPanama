@@ -1,5 +1,13 @@
 import * as React from "react";
-import { Box, Paper, Button, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Paper,
+  Button,
+  Stack,
+  Typography,
+  Chip,
+  Grid,
+} from "@mui/material";
 import {
   DataGrid,
   GridColDef,
@@ -9,12 +17,29 @@ import {
   GridToolbarExport,
   GridToolbarQuickFilter,
   useGridApiRef,
-  GridRowSelectionModel,
   GridColumnVisibilityModel,
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import * as XLSX from "xlsx";
 
+/** ========= Tipos de props recibidas desde el padre ========= */
+type Operador = ">=" | "<=" | "==" | "!=";
+
+type Condicion = {
+  criterio: string;       // solo texto descriptivo
+  operador: Operador;     // >=, <=, ==, !=
+  valorBalboas: number;   // contra esto comparamos la col "valor"
+};
+
+type Props = {
+  condiciones?: Condicion[];
+  categoria?: string;
+  inconsistencia?: string;
+  actividadEconomica?: string[];     // múltiple
+  valoresDeclarados?: number | string;
+};
+
+/** ========= Utilidades ========= */
 const periodoToNumber = (mmAA: string) => {
   const [mm, aa] = mmAA.split("/").map((v) => parseInt(v, 10));
   const year = 2000 + (isNaN(aa) ? 0 : aa);
@@ -22,11 +47,18 @@ const periodoToNumber = (mmAA: string) => {
   return year * 100 + month;
 };
 
-const fmt = new Intl.NumberFormat("es-CO", {
+const toNumber = (v: any): number => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Formato Panamá (Balboa)
+const fmtMoney = new Intl.NumberFormat("es-PA", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
+/** ========= Datos demo ========= */
 type Row = {
   id: number | string;
   categoria: string;
@@ -53,23 +85,50 @@ const rawRows: Row[] = [
   { id: 12, categoria: "Auditoría Sectorial", ruc: "RUC-131313", nombre: "Textiles del Istmo", periodos: "07/24", valor: 3252 },
 ];
 
-const toNumber = (v: any): number => {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
+/** ========= Eval de condiciones contra un valor numérico ========= */
+const evalCond = (valor: number, operador: Operador, objetivo: number) => {
+  switch (operador) {
+    case ">=": return valor >= objetivo;
+    case "<=": return valor <= objetivo;
+    case "==": return valor === objetivo;
+    case "!=": return valor !== objetivo;
+    default:   return true;
+  }
 };
 
-export default function PriorizacionForm() {
-  const apiRef:any = useGridApiRef();
+export default function PriorizacionForm({
+  condiciones = [],
+  categoria,
+  inconsistencia,
+  actividadEconomica,
+  valoresDeclarados,
+}: Props) {
+  const apiRef: any = useGridApiRef();
 
+  /** Normalizar filas y agregar campo auxiliar "cumple" */
   const rows = React.useMemo(() => {
-    return (rawRows ?? []).map((r, idx) => ({
+    const base = (rawRows ?? []).map((r, idx) => ({
       ...r,
       id: r.id ?? idx + 1,
       valor: toNumber(r.valor ?? r.monto ?? r.total),
     }));
-  }, []);
 
-  const columns: GridColDef<Row>[] = [
+    if (!condiciones || condiciones.length === 0) {
+      // sin reglas, no filtro
+      return base.map((r) => ({ ...r, cumple: true }));
+    }
+
+    return base
+      .map((r) => {
+        const v = toNumber(r.valor);
+        const ok = condiciones.every((c) => evalCond(v, c.operador, c.valorBalboas));
+        return { ...r, cumple: ok };
+      })
+      .filter((r) => r.cumple);
+  }, [condiciones]);
+
+  /** Columnas */
+  const columns: GridColDef[] = [
     { field: "categoria", headerName: "Categoría", flex: 1, minWidth: 180 },
     { field: "ruc", headerName: "RUC", flex: 1, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
@@ -83,45 +142,48 @@ export default function PriorizacionForm() {
     },
     {
       field: "valor",
-      headerName: "Valor",
+      headerName: "Valor (B/.)",
       flex: 0.8,
-      minWidth: 140,
+      minWidth: 160,
       sortable: true,
-      valueFormatter: (params: any) => {
-        const num = typeof params === "number" ? params : toNumber(params);
-        return Number.isFinite(num) ? fmt.format(num) : "";
+      valueFormatter: ({ value }) => {
+        const num = toNumber(value);
+        return Number.isFinite(num) ? fmtMoney.format(num) : "";
       },
     },
   ];
 
+  /** Locale */
   const localeText = {
     ...esES.components.MuiDataGrid.defaultProps.localeText,
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
+  /** Estado UI */
   const [paginationModel, setPaginationModel] = React.useState({ page: 0, pageSize: 5 });
-  const [columnVisibilityModel, setColumnVisibilityModel] = React.useState<GridColumnVisibilityModel>({
-    categoria: true,
-    ruc: true,
-    nombre: true,
-    periodos: true,
-    valor: true,
-  });
+  const [columnVisibilityModel, setColumnVisibilityModel] =
+    React.useState<GridColumnVisibilityModel>({
+      categoria: true,
+      ruc: true,
+      nombre: true,
+      periodos: true,
+      valor: true,
+    });
   const [selectedCount, setSelectedCount] = React.useState(0);
 
+  /** Acciones selección */
   const selectAll = () => {
-    if (apiRef.current) {
-      const allIds:any = rows.map((r:any) => r.id);
-      apiRef.current.setRowSelectionModel(allIds);
-    }
+    if (!apiRef.current) return;
+    const allIds = rows.map((r: any) => r.id);
+    apiRef.current.setRowSelectionModel(allIds);
   };
 
   const clearSelection = () => {
-    if (apiRef.current) {
-      apiRef.current.setRowSelectionModel([]);
-    }
+    if (!apiRef.current) return;
+    apiRef.current.setRowSelectionModel([]);
   };
 
+  /** Export de seleccionados */
   const handleAprobar = () => {
     if (!apiRef.current) return;
     const selectedRows = Array.from(apiRef.current.getSelectedRows().values());
@@ -135,44 +197,72 @@ export default function PriorizacionForm() {
     XLSX.writeFile(workbook, "casos_aprobados.xlsx");
   };
 
-function CustomToolbar({ selectedCount, handleAprobar, selectAll, clearSelection }: any) {
-  return (
-    <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
-      <GridToolbarColumnsButton />
-      <GridToolbarDensitySelector />
-      <GridToolbarExport />
-      <Box sx={{ flex: 1 }} />
-      <GridToolbarQuickFilter />
-      <Stack direction="row" spacing={1} sx={{ ml: 1 }}>
-        <Button size="small" variant="outlined" onClick={selectAll}>
-          Seleccionar todo
-        </Button>
-        <Button size="small" variant="text" onClick={clearSelection}>
-          Limpiar selección
-        </Button>
-      
-      </Stack>
-    </GridToolbarContainer>
-  );
-}
+  /** Toolbar personalizada */
+  function CustomToolbar() {
+    return (
+      <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
+        <GridToolbarColumnsButton />
+        <GridToolbarDensitySelector />
+        <GridToolbarExport />
+        <Box sx={{ flex: 1 }} />
+        <GridToolbarQuickFilter />
+        <Stack direction="row" spacing={1} sx={{ ml: 1 }}>
+          <Button size="small" variant="outlined" onClick={selectAll}>
+            Seleccionar todo
+          </Button>
+          <Button size="small" variant="text" onClick={clearSelection}>
+            Limpiar selección
+          </Button>
+        </Stack>
+      </GridToolbarContainer>
+    );
+  }
 
-
   return (
-    <Box component={Paper} sx={{ height: 400, mt: 2, pb: 1 }}>
+    <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
+      {/* Resumen de filtros arriba */}
       <Box sx={{ px: 2, pt: 1 }}>
-        <Typography variant="body2">
-          Seleccionados: <b>{selectedCount}</b>
-        </Typography>
+        <Grid container spacing={1} alignItems="center">
+          <Grid item>
+            <Typography variant="body2">
+              Seleccionados: <b>{selectedCount}</b>
+            </Typography>
+          </Grid>
+          {categoria && (
+            <Grid item>
+              <Chip label={`Categoría: ${categoria}`} size="small" />
+            </Grid>
+          )}
+          {inconsistencia && (
+            <Grid item>
+              <Chip label={`Inconsistencia: ${inconsistencia}`} size="small" />
+            </Grid>
+          )}
+          {actividadEconomica && actividadEconomica.length > 0 && (
+            <Grid item>
+              <Chip label={`Actividades: ${actividadEconomica.join(', ')}`} size="small" />
+            </Grid>
+          )}
+          <Grid item>
+            <Chip
+              color="primary"
+              variant="outlined"
+              label={`Reglas activas: ${condiciones?.length ?? 0}`}
+              size="small"
+            />
+          </Grid>
+        </Grid>
       </Box>
 
       <DataGrid
+        sx={{ height: 420 }}
         apiRef={apiRef}
         localeText={localeText}
         rows={rows}
         columns={columns}
         checkboxSelection
         disableRowSelectionOnClick
-        onRowSelectionModelChange={(m:any) => setSelectedCount(m.length)}
+        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
         slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
         pagination
@@ -185,10 +275,18 @@ function CustomToolbar({ selectedCount, handleAprobar, selectAll, clearSelection
           sorting: { sortModel: [{ field: "periodos", sort: "desc" }] },
         }}
       />
-    <br />
-          <Button size="small" variant="contained" color="success" onClick={handleAprobar}>
-            Aprobar
-          </Button>
+
+      <Box sx={{ px: 2, py: 1 }}>
+        <Button
+          size="small"
+          variant="contained"
+          color="success"
+          onClick={handleAprobar}
+          disabled={selectedCount === 0}
+        >
+          Aprobar
+        </Button>
+      </Box>
     </Box>
   );
 }
