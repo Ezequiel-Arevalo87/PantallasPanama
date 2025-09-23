@@ -1,64 +1,32 @@
 import * as React from "react";
 import {
-  Box,
-  Paper,
-  Button,
-  Stack,
-  Typography,
-  Chip,
-  Grid,
+  Box, Paper, Button, Stack, Typography, Chip, Grid,
 } from "@mui/material";
 import {
-  DataGrid,
-  GridColDef,
-  GridToolbarColumnsButton,
-  GridToolbarContainer,
-  GridToolbarDensitySelector,
-  GridToolbarExport,
-  GridToolbarQuickFilter,
-  useGridApiRef,
-  GridColumnVisibilityModel,
+  DataGrid, GridColDef, GridToolbarColumnsButton, GridToolbarContainer,
+  GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter,
+  useGridApiRef, GridColumnVisibilityModel,
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import * as XLSX from "xlsx";
 
-/** ========= Tipos de props recibidas desde el padre ========= */
+/** ========= Tipos ========= */
 type Operador = ">=" | "<=" | "==" | "!=";
 
 type Condicion = {
-  criterio: string;       // solo texto descriptivo
-  operador: Operador;     // >=, <=, ==, !=
-  valorBalboas: number;   // contra esto comparamos la col "valor"
+  criterio: string;
+  operador: Operador;
+  valorBalboas: number;
 };
 
 type Props = {
   condiciones?: Condicion[];
   categoria?: string;
   inconsistencia?: string;
-  actividadEconomica?: string[];     // múltiple
+  actividadEconomica?: string[];
   valoresDeclarados?: number | string;
 };
 
-/** ========= Utilidades ========= */
-const periodoToNumber = (mmAA: string) => {
-  const [mm, aa] = mmAA.split("/").map((v) => parseInt(v, 10));
-  const year = 2000 + (isNaN(aa) ? 0 : aa);
-  const month = isNaN(mm) ? 1 : mm;
-  return year * 100 + month;
-};
-
-const toNumber = (v: any): number => {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
-// Formato Panamá (Balboa)
-const fmtMoney = new Intl.NumberFormat("es-PA", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-/** ========= Datos demo ========= */
 type Row = {
   id: number | string;
   categoria: string;
@@ -70,9 +38,36 @@ type Row = {
   total?: number | string | null;
 };
 
+/** ========= Utilidades ========= */
+const periodoToNumber = (mmAA: string) => {
+  const [mm, aa] = mmAA.split("/").map((v) => parseInt(v, 10));
+  const year = 2000 + (isNaN(aa) ? 0 : aa);
+  const month = isNaN(mm) ? 1 : mm;
+  return year * 100 + month;
+};
+
+// Convierte "B/. 5,555.00", "654,00", "1.234,56" → número
+const toNumber = (v: any): number => {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  let s = String(v).trim();
+  s = s.replace(/[^\d.,\-]/g, "");       // deja dígitos, coma, punto, signo
+  s = s.replace(/\.(?=\d{3}(\D|$))/g, ""); // quita puntos de miles
+  s = s.replace(/,/, ".");               // coma decimal → punto
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Formato Panamá (Balboa)
+const fmtMoney = new Intl.NumberFormat("es-PA", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** ========= Datos demo ========= */
 const rawRows: Row[] = [
-  { id: 1, categoria: "Fiscalización Masiva", ruc: "8-123-456", nombre: "Individual", periodos: "06/25", valor: 236 },
-  { id: 2, categoria: "Grandes Contribuyentes", ruc: "RUC-998877", nombre: "Comercial ABC S.A.", periodos: "05/25", valor: 654 },
+  { id: 1, categoria: "Fiscalización Masiva", ruc: "8-123-456", nombre: "Individual", periodos: "06/25", valor: 236.0 },
+  { id: 2, categoria: "Grandes Contribuyentes", ruc: "RUC-998877", nombre: "Comercial ABC S.A.", periodos: "05/25", valor: "654,00" },
   { id: 3, categoria: "Auditoría Sectorial", ruc: "RUC-555888", nombre: "Servicios XYZ", periodos: "04/25", valor: 158 },
   { id: 4, categoria: "Fiscalización Masiva", ruc: "RUC-111222", nombre: "Individual", periodos: "03/25", valor: 695 },
   { id: 5, categoria: "Grandes Contribuyentes", ruc: "RUC-222333", nombre: "Inversiones Delta, S.A.", periodos: "02/25", valor: 657 },
@@ -85,14 +80,14 @@ const rawRows: Row[] = [
   { id: 12, categoria: "Auditoría Sectorial", ruc: "RUC-131313", nombre: "Textiles del Istmo", periodos: "07/24", valor: 3252 },
 ];
 
-/** ========= Eval de condiciones contra un valor numérico ========= */
+/** ========= Eval de condiciones ========= */
 const evalCond = (valor: number, operador: Operador, objetivo: number) => {
   switch (operador) {
     case ">=": return valor >= objetivo;
     case "<=": return valor <= objetivo;
     case "==": return valor === objetivo;
     case "!=": return valor !== objetivo;
-    default:   return true;
+    default: return true;
   }
 };
 
@@ -105,26 +100,15 @@ export default function PriorizacionForm({
 }: Props) {
   const apiRef: any = useGridApiRef();
 
-  /** Normalizar filas y agregar campo auxiliar "cumple" */
-  const rows = React.useMemo(() => {
-    const base = (rawRows ?? []).map((r, idx) => ({
-      ...r,
-      id: r.id ?? idx + 1,
-      valor: toNumber(r.valor ?? r.monto ?? r.total),
-    }));
+  /** Filas (si no hay reglas, no filtramos) */
+  const rows = React.useMemo<Row[]>(() => {
+    if (!condiciones || condiciones.length === 0) return rawRows;
 
-    if (!condiciones || condiciones.length === 0) {
-      // sin reglas, no filtro
-      return base.map((r) => ({ ...r, cumple: true }));
-    }
-
-    return base
-      .map((r) => {
-        const v = toNumber(r.valor);
-        const ok = condiciones.every((c) => evalCond(v, c.operador, c.valorBalboas));
-        return { ...r, cumple: ok };
-      })
-      .filter((r) => r.cumple);
+    return rawRows.filter((r) =>
+      condiciones.every((c) =>
+        evalCond(toNumber(r.valor ?? r.monto ?? r.total), c.operador, c.valorBalboas)
+      )
+    );
   }, [condiciones]);
 
   /** Columnas */
@@ -138,19 +122,18 @@ export default function PriorizacionForm({
       flex: 1,
       minWidth: 220,
       sortable: true,
-      sortComparator: (v1, v2) => periodoToNumber(String(v1)) - periodoToNumber(String(v2)),
+      sortComparator: (v1, v2) =>
+        periodoToNumber(String(v1)) - periodoToNumber(String(v2)),
     },
-    {
-      field: "valor",
-      headerName: "Valor (B/.)",
-      flex: 0.8,
-      minWidth: 160,
-      sortable: true,
-      valueFormatter: ({ value }) => {
-        const num = toNumber(value);
-        return Number.isFinite(num) ? fmtMoney.format(num) : "";
-      },
-    },
+  {
+  field: "valor",
+  headerName: "Valor (B/.)",
+  type: "number",
+  flex: 0.8,
+  minWidth: 160,
+  sortable: true,
+
+}
   ];
 
   /** Locale */
@@ -167,7 +150,7 @@ export default function PriorizacionForm({
       ruc: true,
       nombre: true,
       periodos: true,
-      valor: true,
+      valor: true, // 👈 coincide con field
     });
   const [selectedCount, setSelectedCount] = React.useState(0);
 
@@ -177,7 +160,6 @@ export default function PriorizacionForm({
     const allIds = rows.map((r: any) => r.id);
     apiRef.current.setRowSelectionModel(allIds);
   };
-
   const clearSelection = () => {
     if (!apiRef.current) return;
     apiRef.current.setRowSelectionModel([]);
@@ -220,7 +202,7 @@ export default function PriorizacionForm({
 
   return (
     <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
-      {/* Resumen de filtros arriba */}
+      {/* Resumen de filtros */}
       <Box sx={{ px: 2, pt: 1 }}>
         <Grid container spacing={1} alignItems="center">
           <Grid item>
@@ -240,7 +222,7 @@ export default function PriorizacionForm({
           )}
           {actividadEconomica && actividadEconomica.length > 0 && (
             <Grid item>
-              <Chip label={`Actividades: ${actividadEconomica.join(', ')}`} size="small" />
+              <Chip label={`Actividades: ${actividadEconomica.join(", ")}`} size="small" />
             </Grid>
           )}
           <Grid item>
