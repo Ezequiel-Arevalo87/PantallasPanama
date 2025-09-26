@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import Swal from 'sweetalert2';
 import PriorizacionForm from './PriorizacionForm';
 import { Actividad, loadActividades } from '../services/actividadesLoader';
 
@@ -26,24 +27,27 @@ import { Actividad, loadActividades } from '../services/actividadesLoader';
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
 
+/** ===== Programas unificados ===== */
 const PROGRAMAS_OMISO = [
-  'Omisos VS Dividendos',
-  'Omisos VS 431 (ITBMS)',
-  'Omisos VS Informes 22, 23, 43, 44',
-  'Omisos VS Renta',
-  'Omisos VS ITBMS',
+  'Omisos vs Dividendos',
+  'Omisos vs retenciones 4331 ITBMS',
+  'Omisos vs informes',
+  'Omisos vs ISR Renta',
+  'Omisos vs ITBMS',
 ] as const;
 
 const PROGRAMAS_INEXACTO = [
-  'Gastos vs anexos',
-  'Ventas vs anexos',
-  'Ingresos vs anexos',
-  'Costos vs anexos',
-  'Gastos vs Reportes ventas de tercer',
-  'Costos vs reportes ventas de tercer',
+  'Costos y gastos vs Anexos',
+  'Ventas e ingresos vs Anexos',
+  'Inexactos vs retenciones 4331 ITBMS',
+  'Inexactos vs ITBMS',
 ] as const;
 
-const PROGRAMAS_EXTEMPORANEO = ['Fecha de Presentación'] as const;
+const PROGRAMAS_EXTEMPORANEO = [
+  'Base contribuyentes VS Calendario ISR',
+  'Base contribuyentes VS Calendario ITBMS',
+  'Base contribuyentes VS Calendario retenciones ITBMS',
+] as const;
 
 /** ===== Operadores de condición ===== */
 const OPERADORES = ['>=', '<=', '==', '!='] as const;
@@ -61,9 +65,9 @@ const CRITERIOS_EXCEL: Record<string, string[]> = {
   ],
   // Auditoría Sectorial
   'Auditoría Sectorial|Inexacto': [
-    'Manipulación de márgenes sectoriales', // 👈 solo éste, como en tu hoja
+    'Manipulación de márgenes sectoriales',
   ],
-  // Si te pasan más filas del Excel, las agregas aquí.
+  // Agrega más filas si tu Excel crece
 };
 
 type Operador = (typeof OPERADORES)[number];
@@ -83,7 +87,7 @@ export const Priorizacion: React.FC = () => {
     periodo: '',
     categoria: 'Fiscalización Masiva',
     inconsistencia: 'Inexacto',
-    actividadEconomica: [] as string[],  // múltiple
+    actividadEconomica: [] as string[], // múltiple
     tipologia: '',
     programa: '',
     valoresDeclarados: '',
@@ -106,9 +110,8 @@ export const Priorizacion: React.FC = () => {
   const [condiciones, setCondiciones] = useState<Condicion[]>([]);
 
   const esAS = form.categoria === 'Auditoría Sectorial';
-  const esFM = form.categoria === 'Fiscalización Masiva';
 
-  /** cargar actividades (mismo patrón del componente guía) */
+  /** cargar actividades */
   useEffect(() => {
     loadActividades().then((arr) => {
       setActividades(arr ?? []);
@@ -123,23 +126,35 @@ export const Priorizacion: React.FC = () => {
     return m;
   }, [actividades]);
 
-  // Programas dinámicos (si los usas luego)
+  /** Programas dinámicos por inconsistencia */
   const programasDisponibles = useMemo(() => {
     switch (form.inconsistencia) {
       case 'Omiso':
-        return PROGRAMAS_OMISO;
+        return [...PROGRAMAS_OMISO];
       case 'Inexacto':
-        return PROGRAMAS_INEXACTO;
+        return [...PROGRAMAS_INEXACTO];
       case 'Extemporáneo':
-        return PROGRAMAS_EXTEMPORANEO;
+        return [...PROGRAMAS_EXTEMPORANEO];
       case 'Todos':
-        return [...PROGRAMAS_OMISO, ...PROGRAMAS_INEXACTO, ...PROGRAMAS_EXTEMPORANEO];
+        return uniqCaseInsensitive([
+          ...PROGRAMAS_OMISO,
+          ...PROGRAMAS_INEXACTO,
+          ...PROGRAMAS_EXTEMPORANEO,
+        ]);
       default:
         return [];
     }
   }, [form.inconsistencia]);
 
-  // Criterios EXACTOS del Excel según Categoría + Inconsistencia
+  /** Si cambia inconsistencia y el programa ya no aplica, se limpia */
+  useEffect(() => {
+    if (form.programa && !programasDisponibles.includes(form.programa)) {
+      setForm((prev: any) => ({ ...prev, programa: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programasDisponibles]);
+
+  /** Criterios EXACTOS del Excel según Categoría + Inconsistencia */
   const criteriosDisponibles = useMemo(() => {
     const key = `${form.categoria}|${form.inconsistencia}`;
     return CRITERIOS_EXCEL[key] ?? [];
@@ -152,8 +167,7 @@ export const Priorizacion: React.FC = () => {
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
-        tipologia: value === 'Fiscalización Masiva' ? prev.tipologia : '',
-        actividadEconomica: value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
+        // mantiene lo demás; aquí no usamos tipologia en esta pantalla
       }));
       setCriterioSel('');
       setMostrarResultados(false);
@@ -164,7 +178,7 @@ export const Priorizacion: React.FC = () => {
       setForm((prev: any) => ({
         ...prev,
         inconsistencia: value,
-        programa: '',
+        programa: '', // reset al cambiar el tipo de inconsistencia
       }));
       setCriterioSel('');
       setMostrarResultados(false);
@@ -175,7 +189,7 @@ export const Priorizacion: React.FC = () => {
     setMostrarResultados(false);
   };
 
-  /** Actividad Económica (múltiple) — patrón guía */
+  /** Actividad Económica (múltiple) */
   const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
     const raw = e.target.value as unknown as string[];
     if (raw.includes(ALL_VALUE)) {
@@ -209,7 +223,70 @@ export const Priorizacion: React.FC = () => {
     setCondiciones((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleConsultar = () => setMostrarResultados(true);
+  /** === Validaciones de fechas & confirmación CPT === */
+  const requiereFechas = form.inconsistencia !== ''; // igual que tu otro form
+
+  const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
+
+  const handleConsultar = async () => {
+    if (requiereFechas) {
+      const dIni = parseISO(form.periodoInicial);
+      const dFin = parseISO(form.periodoFinal);
+
+      if (!dIni || !dFin) {
+        await Swal.fire({
+          title: 'Fechas requeridas',
+          text: 'La Fecha Inicial y la Fecha Final son obligatorias.',
+          icon: 'error',
+          confirmButtonText: 'Entendido',
+        });
+        return;
+      }
+
+      if (!(dIni < dFin)) {
+        await Swal.fire({
+          title: 'Rango inválido',
+          text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
+          icon: 'error',
+          confirmButtonText: 'Entendido',
+        });
+        return;
+      }
+
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      if (dFin.getTime() > hoy.getTime()) {
+        await Swal.fire({
+          title: 'Fecha No Permitida',
+          text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
+          icon: 'error',
+          confirmButtonText: 'Ok',
+        });
+        return;
+      }
+
+      const diffYears = (a: Date, b: Date) =>
+        Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+      const years = diffYears(dIni, dFin);
+      if (years > 5) {
+        const { isConfirmed } = await Swal.fire({
+          title:
+            'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
+          text: '¿Desea continuar con el proceso?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Continuar',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          focusCancel: true,
+        });
+        if (!isConfirmed) return;
+      }
+    }
+
+    setMostrarResultados(true);
+  };
 
   const handleLimpiar = () => {
     setForm({
@@ -241,6 +318,8 @@ export const Priorizacion: React.FC = () => {
       </Box>
     );
   };
+
+  const requiereFechasFlag = requiereFechas;
 
   return (
     <Box>
@@ -281,6 +360,26 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
+        {/* Programa dependiente de Inconsistencia */}
+        <Grid item xs={12}>
+          <TextField
+            select
+            fullWidth
+            label="Programa"
+            name="programa"
+            value={form.programa ?? ''}
+            onChange={handleChange}
+            disabled={programasDisponibles.length === 0}
+            helperText={programasDisponibles.length === 0 ? 'Seleccione primero un Tipo de Inconsistencia' : ''}
+          >
+            {programasDisponibles.map((p) => (
+              <MenuItem key={p.toLowerCase()} value={p}>
+                {p}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
         {/* Actividad Económica (múltiple, solo AS) */}
         <Grid item xs={12} md={8}>
           <TextField
@@ -310,7 +409,7 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Valores declarados (libre) */}
+        {/* Valores declarados */}
         <Grid item xs={12} md={4}>
           <TextField
             fullWidth
@@ -378,14 +477,42 @@ export const Priorizacion: React.FC = () => {
           />
         </Grid>
 
-       
+        {/* === Fechas === */}
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            type="date"
+            label="Fecha Inicial"
+            name="periodoInicial"
+            value={form.periodoInicial}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            required={requiereFechasFlag}
+            error={requiereFechasFlag && !form.periodoInicial}
+            helperText={requiereFechasFlag && !form.periodoInicial ? 'Obligatoria' : ''}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            type="date"
+            label="Fecha Final"
+            name="periodoFinal"
+            value={form.periodoFinal}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            required={requiereFechasFlag}
+            error={requiereFechasFlag && !form.periodoFinal}
+            helperText={requiereFechasFlag && !form.periodoFinal ? 'Obligatoria' : ''}
+          />
+        </Grid>
 
         {/* Lista de condiciones */}
         <Grid item xs={12}>
           <Paper variant="outlined" sx={{ p: 1 }}>
             {condiciones.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-               
+                Agrega condiciones con el Criterio / Operador / Valor y presiona “+”.
               </Typography>
             ) : (
               <List dense>
@@ -415,6 +542,15 @@ export const Priorizacion: React.FC = () => {
         {/* Acciones */}
         <Grid item xs={12}>
           <Stack direction="row" spacing={2} justifyContent="flex-end">
+            {/* Botón para agregar condición */}
+            <Button
+              variant="outlined"
+              onClick={handleAgregarCondicion}
+              disabled={!criterioSel || !valorBalboas}
+            >
+              + Condición
+            </Button>
+
             <Button variant="contained" onClick={handleConsultar}>
               CONSULTAR
             </Button>
@@ -432,6 +568,10 @@ export const Priorizacion: React.FC = () => {
           inconsistencia={form.inconsistencia}
           actividadEconomica={form.actividadEconomica}
           valoresDeclarados={form.valoresDeclarados}
+          /* nuevos props útiles para el backend / reporte */
+          programa={form.programa}
+          periodoInicial={form.periodoInicial}
+          periodoFinal={form.periodoFinal}
         />
       )}
     </Box>

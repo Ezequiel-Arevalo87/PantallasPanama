@@ -23,8 +23,13 @@ type Props = {
   condiciones?: Condicion[];
   categoria?: string;
   inconsistencia?: string;
-  actividadEconomica?: string[];
+  actividadEconomica?: string[];           // mantiene tu tipo actual
   valoresDeclarados?: number | string;
+
+  /** 🔹 Nuevos props que vienen del padre */
+  programa?: string | null;
+  periodoInicial?: string | null;          // formato "YYYY-MM-DD"
+  periodoFinal?: string | null;            // formato "YYYY-MM-DD"
 };
 
 type Row = {
@@ -64,6 +69,14 @@ const fmtMoney = new Intl.NumberFormat("es-PA", {
   maximumFractionDigits: 2,
 });
 
+// Formatea fecha YYYY-MM-DD → DD/MM/YYYY
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+};
+
 /** ========= Datos demo ========= */
 const rawRows: Row[] = [
   { id: 1, categoria: "Fiscalización Masiva", ruc: "8-123-456", nombre: "Individual", periodos: "06/25", valor: 236.0 },
@@ -97,13 +110,17 @@ export default function PriorizacionForm({
   inconsistencia,
   actividadEconomica,
   valoresDeclarados,
+
+  /** 🔹 Nuevos props */
+  programa,
+  periodoInicial,
+  periodoFinal,
 }: Props) {
   const apiRef: any = useGridApiRef();
 
   /** Filas (si no hay reglas, no filtramos) */
   const rows = React.useMemo<Row[]>(() => {
     if (!condiciones || condiciones.length === 0) return rawRows;
-
     return rawRows.filter((r) =>
       condiciones.every((c) =>
         evalCond(toNumber(r.valor ?? r.monto ?? r.total), c.operador, c.valorBalboas)
@@ -125,7 +142,7 @@ export default function PriorizacionForm({
       sortComparator: (v1, v2) =>
         periodoToNumber(String(v1)) - periodoToNumber(String(v2)),
     },
-  {
+   {
   field: "valor",
   headerName: "Valor (B/.)",
   type: "number",
@@ -133,7 +150,7 @@ export default function PriorizacionForm({
   minWidth: 160,
   sortable: true,
 
-}
+},
   ];
 
   /** Locale */
@@ -150,7 +167,7 @@ export default function PriorizacionForm({
       ruc: true,
       nombre: true,
       periodos: true,
-      valor: true, // 👈 coincide con field
+      valor: true,
     });
   const [selectedCount, setSelectedCount] = React.useState(0);
 
@@ -210,21 +227,50 @@ export default function PriorizacionForm({
               Seleccionados: <b>{selectedCount}</b>
             </Typography>
           </Grid>
+
           {categoria && (
             <Grid item>
               <Chip label={`Categoría: ${categoria}`} size="small" />
             </Grid>
           )}
+
           {inconsistencia && (
             <Grid item>
               <Chip label={`Inconsistencia: ${inconsistencia}`} size="small" />
             </Grid>
           )}
+
+          {programa && (
+            <Grid item>
+              <Chip color="primary" variant="outlined" label={`Programa: ${programa}`} size="small" />
+            </Grid>
+          )}
+
+          {(periodoInicial || periodoFinal) && (
+            <Grid item>
+              <Chip
+                variant="outlined"
+                label={`Rango: ${fmtDate(periodoInicial)}${periodoInicial && periodoFinal ? " — " : ""}${fmtDate(periodoFinal)}`}
+                size="small"
+              />
+            </Grid>
+          )}
+
+          {typeof valoresDeclarados !== "undefined" && valoresDeclarados !== "" && (
+            <Grid item>
+              <Chip
+                label={`Valores declarados: ${fmtMoney.format(toNumber(valoresDeclarados))}`}
+                size="small"
+              />
+            </Grid>
+          )}
+
           {actividadEconomica && actividadEconomica.length > 0 && (
             <Grid item>
               <Chip label={`Actividades: ${actividadEconomica.join(", ")}`} size="small" />
             </Grid>
           )}
+
           <Grid item>
             <Chip
               color="primary"
