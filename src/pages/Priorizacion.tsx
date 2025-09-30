@@ -29,7 +29,7 @@ const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const
 
 /** ===== Programas unificados ===== */
 const PROGRAMAS_OMISO = [
-  'Omisos vs Dividendos',
+  
   'Omisos vs retenciones 4331 ITBMS',
   'Omisos vs informes',
   'Omisos vs ISR Renta',
@@ -361,7 +361,7 @@ export const Priorizacion: React.FC = () => {
         </Grid>
 
         {/* Programa dependiente de Inconsistencia */}
-        <Grid item xs={12}>
+        <Grid item xs={12}  sm={6}>
           <TextField
             select
             fullWidth
@@ -381,7 +381,7 @@ export const Priorizacion: React.FC = () => {
         </Grid>
 
         {/* Actividad Económica (múltiple, solo AS) */}
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12} md={6}>
           <TextField
             select
             fullWidth
@@ -409,18 +409,7 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Valores declarados */}
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Valores Declarados"
-            name="valoresDeclarados"
-            type="number"
-            value={form.valoresDeclarados}
-            onChange={handleChange}
-            InputProps={{ startAdornment: <InputAdornment position="start">B/.</InputAdornment> }}
-          />
-        </Grid>
+       
 
         {/* Criterio — SOLO lo del Excel */}
         <Grid item xs={12} md={6}>
@@ -507,49 +496,12 @@ export const Priorizacion: React.FC = () => {
           />
         </Grid>
 
-        {/* Lista de condiciones */}
-        <Grid item xs={12}>
-          <Paper variant="outlined" sx={{ p: 1 }}>
-            {condiciones.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                Agrega condiciones con el Criterio / Operador / Valor y presiona “+”.
-              </Typography>
-            ) : (
-              <List dense>
-                {condiciones.map((c, idx) => (
-                  <ListItem
-                    key={`${c.criterio}-${c.operador}-${c.valorBalboas}-${idx}`}
-                    secondaryAction={
-                      <IconButton edge="end" aria-label="delete" onClick={() => handleEliminarCondicion(idx)}>
-                        <DeleteOutlineIcon />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemText
-                      primary={c.criterio}
-                      secondary={`Regla: ${c.operador} B/. ${c.valorBalboas.toLocaleString('es-PA', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
+       
 
         {/* Acciones */}
         <Grid item xs={12}>
           <Stack direction="row" spacing={2} justifyContent="flex-end">
-            {/* Botón para agregar condición */}
-            <Button
-              variant="outlined"
-              onClick={handleAgregarCondicion}
-              disabled={!criterioSel || !valorBalboas}
-            >
-              + Condición
-            </Button>
+          
 
             <Button variant="contained" onClick={handleConsultar}>
               CONSULTAR

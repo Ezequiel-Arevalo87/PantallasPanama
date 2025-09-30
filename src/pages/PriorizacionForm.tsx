@@ -130,7 +130,7 @@ export default function PriorizacionForm({
 
   /** Columnas */
   const columns: GridColDef[] = [
-    { field: "categoria", headerName: "Categoría", flex: 1, minWidth: 180 },
+    
     { field: "ruc", headerName: "RUC", flex: 1, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     {
