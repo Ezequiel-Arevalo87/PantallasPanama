@@ -1,35 +1,26 @@
 import * as React from "react";
-import {
-  Box, Paper, Button, Stack, Typography, Chip, Grid,
-} from "@mui/material";
+import { Box, Paper, Grid, Chip, Typography } from "@mui/material";
 import {
   DataGrid, GridColDef, GridToolbarColumnsButton, GridToolbarContainer,
   GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter,
-  useGridApiRef, GridColumnVisibilityModel,
+  GridColumnVisibilityModel,
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
-import * as XLSX from "xlsx";
+// import * as XLSX from "xlsx"; // 👈 oculto: export de aprobados
 
 /** ========= Tipos ========= */
 type Operador = ">=" | "<=" | "==" | "!=";
-
-type Condicion = {
-  criterio: string;
-  operador: Operador;
-  valorBalboas: number;
-};
+type Condicion = { criterio: string; operador: Operador; valorBalboas: number };
 
 type Props = {
   condiciones?: Condicion[];
   categoria?: string;
   inconsistencia?: string;
-  actividadEconomica?: string[];           // mantiene tu tipo actual
+  actividadEconomica?: string[];
   valoresDeclarados?: number | string;
-
-  /** 🔹 Nuevos props que vienen del padre */
   programa?: string | null;
-  periodoInicial?: string | null;          // formato "YYYY-MM-DD"
-  periodoFinal?: string | null;            // formato "YYYY-MM-DD"
+  periodoInicial?: string | null;
+  periodoFinal?: string | null;
 };
 
 type Row = {
@@ -43,33 +34,24 @@ type Row = {
   total?: number | string | null;
 };
 
-/** ========= Utilidades ========= */
+/** ========= Utils ========= */
 const periodoToNumber = (mmAA: string) => {
   const [mm, aa] = mmAA.split("/").map((v) => parseInt(v, 10));
   const year = 2000 + (isNaN(aa) ? 0 : aa);
   const month = isNaN(mm) ? 1 : mm;
   return year * 100 + month;
 };
-
-// Convierte "B/. 5,555.00", "654,00", "1.234,56" → número
 const toNumber = (v: any): number => {
   if (v === null || v === undefined) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
   let s = String(v).trim();
-  s = s.replace(/[^\d.,\-]/g, "");       // deja dígitos, coma, punto, signo
-  s = s.replace(/\.(?=\d{3}(\D|$))/g, ""); // quita puntos de miles
-  s = s.replace(/,/, ".");               // coma decimal → punto
+  s = s.replace(/[^\d.,\-]/g, "");
+  s = s.replace(/\.(?=\d{3}(\D|$))/g, "");
+  s = s.replace(/,/, ".");
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 };
-
-// Formato Panamá (Balboa)
-const fmtMoney = new Intl.NumberFormat("es-PA", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-// Formatea fecha YYYY-MM-DD → DD/MM/YYYY
+const fmtMoney = new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (iso?: string | null) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -85,15 +67,9 @@ const rawRows: Row[] = [
   { id: 4, categoria: "Fiscalización Masiva", ruc: "RUC-111222", nombre: "Individual", periodos: "03/25", valor: 695 },
   { id: 5, categoria: "Grandes Contribuyentes", ruc: "RUC-222333", nombre: "Inversiones Delta, S.A.", periodos: "02/25", valor: 657 },
   { id: 6, categoria: "Auditoría Sectorial", ruc: "RUC-333444", nombre: "AgroPanamá Ltda.", periodos: "01/25", valor: 1025 },
-  { id: 7, categoria: "Fiscalización Masiva", ruc: "8-654-321", nombre: "Individual", periodos: "12/24", valor: 2365 },
-  { id: 8, categoria: "Grandes Contribuyentes", ruc: "RUC-444555", nombre: "Tecno Global S.A.", periodos: "11/24", valor: 236 },
-  { id: 9, categoria: "Auditoría Sectorial", ruc: "RUC-777999", nombre: "Transporte Caribe", periodos: "10/24", valor: 8547 },
-  { id: 10, categoria: "Fiscalización Masiva", ruc: "RUC-101010", nombre: "Individual", periodos: "09/24", valor: 236 },
-  { id: 11, categoria: "Grandes Contribuyentes", ruc: "RUC-121212", nombre: "Construcciones PAC S.A.", periodos: "08/24", valor: 978 },
-  { id: 12, categoria: "Auditoría Sectorial", ruc: "RUC-131313", nombre: "Textiles del Istmo", periodos: "07/24", valor: 3252 },
 ];
 
-/** ========= Eval de condiciones ========= */
+/** ========= Eval condiciones (se mantiene por compatibilidad) ========= */
 const evalCond = (valor: number, operador: Operador, objetivo: number) => {
   switch (operador) {
     case ">=": return valor >= objetivo;
@@ -110,14 +86,10 @@ export default function PriorizacionForm({
   inconsistencia,
   actividadEconomica,
   valoresDeclarados,
-
-  /** 🔹 Nuevos props */
   programa,
   periodoInicial,
   periodoFinal,
 }: Props) {
-  const apiRef: any = useGridApiRef();
-
   /** Filas (si no hay reglas, no filtramos) */
   const rows = React.useMemo<Row[]>(() => {
     if (!condiciones || condiciones.length === 0) return rawRows;
@@ -130,7 +102,6 @@ export default function PriorizacionForm({
 
   /** Columnas */
   const columns: GridColDef[] = [
-    
     { field: "ruc", headerName: "RUC", flex: 1, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     {
@@ -142,15 +113,7 @@ export default function PriorizacionForm({
       sortComparator: (v1, v2) =>
         periodoToNumber(String(v1)) - periodoToNumber(String(v2)),
     },
-   {
-  field: "valor",
-  headerName: "Valor (B/.)",
-  type: "number",
-  flex: 0.8,
-  minWidth: 160,
-  sortable: true,
-
-},
+    { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
   ];
 
   /** Locale */
@@ -159,7 +122,7 @@ export default function PriorizacionForm({
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
-  /** Estado UI */
+  /** Visibilidad de columnas (se deja por si el usuario quiere ocultar desde toolbar) */
   const [paginationModel, setPaginationModel] = React.useState({ page: 0, pageSize: 5 });
   const [columnVisibilityModel, setColumnVisibilityModel] =
     React.useState<GridColumnVisibilityModel>({
@@ -169,34 +132,8 @@ export default function PriorizacionForm({
       periodos: true,
       valor: true,
     });
-  const [selectedCount, setSelectedCount] = React.useState(0);
 
-  /** Acciones selección */
-  const selectAll = () => {
-    if (!apiRef.current) return;
-    const allIds = rows.map((r: any) => r.id);
-    apiRef.current.setRowSelectionModel(allIds);
-  };
-  const clearSelection = () => {
-    if (!apiRef.current) return;
-    apiRef.current.setRowSelectionModel([]);
-  };
-
-  /** Export de seleccionados */
-  const handleAprobar = () => {
-    if (!apiRef.current) return;
-    const selectedRows = Array.from(apiRef.current.getSelectedRows().values());
-    if (selectedRows.length === 0) {
-      alert("No hay casos seleccionados para aprobar.");
-      return;
-    }
-    const worksheet = XLSX.utils.json_to_sheet(selectedRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Casos Aprobados");
-    XLSX.writeFile(workbook, "casos_aprobados.xlsx");
-  };
-
-  /** Toolbar personalizada */
+  /** Toolbar sin acciones de selección/aprobar */
   function CustomToolbar() {
     return (
       <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
@@ -205,14 +142,6 @@ export default function PriorizacionForm({
         <GridToolbarExport />
         <Box sx={{ flex: 1 }} />
         <GridToolbarQuickFilter />
-        <Stack direction="row" spacing={1} sx={{ ml: 1 }}>
-          <Button size="small" variant="outlined" onClick={selectAll}>
-            Seleccionar todo
-          </Button>
-          <Button size="small" variant="text" onClick={clearSelection}>
-            Limpiar selección
-          </Button>
-        </Stack>
       </GridToolbarContainer>
     );
   }
@@ -222,75 +151,34 @@ export default function PriorizacionForm({
       {/* Resumen de filtros */}
       <Box sx={{ px: 2, pt: 1 }}>
         <Grid container spacing={1} alignItems="center">
-          <Grid item>
-            <Typography variant="body2">
-              Seleccionados: <b>{selectedCount}</b>
-            </Typography>
-          </Grid>
-
-          {categoria && (
-            <Grid item>
-              <Chip label={`Categoría: ${categoria}`} size="small" />
-            </Grid>
-          )}
-
-          {inconsistencia && (
-            <Grid item>
-              <Chip label={`Inconsistencia: ${inconsistencia}`} size="small" />
-            </Grid>
-          )}
-
-          {programa && (
-            <Grid item>
-              <Chip color="primary" variant="outlined" label={`Programa: ${programa}`} size="small" />
-            </Grid>
-          )}
-
+          {categoria && <Grid item><Chip label={`Categoría: ${categoria}`} size="small" /></Grid>}
+          {inconsistencia && <Grid item><Chip label={`Inconsistencia: ${inconsistencia}`} size="small" /></Grid>}
+          {programa && <Grid item><Chip color="primary" variant="outlined" label={`Programa: ${programa}`} size="small" /></Grid>}
           {(periodoInicial || periodoFinal) && (
             <Grid item>
-              <Chip
-                variant="outlined"
-                label={`Rango: ${fmtDate(periodoInicial)}${periodoInicial && periodoFinal ? " — " : ""}${fmtDate(periodoFinal)}`}
-                size="small"
-              />
+              <Chip variant="outlined" label={`Rango: ${fmtDate(periodoInicial)}${periodoInicial && periodoFinal ? " — " : ""}${fmtDate(periodoFinal)}`} size="small" />
             </Grid>
           )}
-
           {typeof valoresDeclarados !== "undefined" && valoresDeclarados !== "" && (
-            <Grid item>
-              <Chip
-                label={`Valores declarados: ${fmtMoney.format(toNumber(valoresDeclarados))}`}
-                size="small"
-              />
-            </Grid>
+            <Grid item><Chip label={`Valores declarados: ${fmtMoney.format(toNumber(valoresDeclarados))}`} size="small" /></Grid>
           )}
-
           {actividadEconomica && actividadEconomica.length > 0 && (
-            <Grid item>
-              <Chip label={`Actividades: ${actividadEconomica.join(", ")}`} size="small" />
-            </Grid>
+            <Grid item><Chip label={`Actividades: ${actividadEconomica.join(", ")}`} size="small" /></Grid>
           )}
-
           <Grid item>
-            <Chip
-              color="primary"
-              variant="outlined"
-              label={`Reglas activas: ${condiciones?.length ?? 0}`}
-              size="small"
-            />
+            <Chip color="primary" variant="outlined" label={`Reglas activas: ${condiciones?.length ?? 0}`} size="small" />
           </Grid>
         </Grid>
       </Box>
 
       <DataGrid
         sx={{ height: 420 }}
-        apiRef={apiRef}
-        localeText={localeText}
         rows={rows}
         columns={columns}
-        checkboxSelection
+        // 👇 Se deshabilita la selección con checks
+        checkboxSelection={false}
         disableRowSelectionOnClick
-        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
+        // Sin conteo de seleccionados ni apiRef
         slots={{ toolbar: CustomToolbar }}
         slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
         pagination
@@ -299,22 +187,16 @@ export default function PriorizacionForm({
         onPaginationModelChange={setPaginationModel}
         columnVisibilityModel={columnVisibilityModel}
         onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
-        initialState={{
-          sorting: { sortModel: [{ field: "periodos", sort: "desc" }] },
-        }}
+        initialState={{ sorting: { sortModel: [{ field: "periodos", sort: "desc" }] } }}
       />
 
+      {/* Botón Aprobar oculto (dejar comentado para futura activación)
       <Box sx={{ px: 2, py: 1 }}>
-        <Button
-          size="small"
-          variant="contained"
-          color="success"
-          onClick={handleAprobar}
-          disabled={selectedCount === 0}
-        >
+        <Button size="small" variant="contained" color="success" onClick={handleAprobar} disabled={selectedCount === 0}>
           Aprobar
         </Button>
       </Box>
+      */}
     </Box>
   );
 }
