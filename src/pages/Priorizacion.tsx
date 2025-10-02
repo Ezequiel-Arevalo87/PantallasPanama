@@ -155,10 +155,67 @@ export const Priorizacion: React.FC = () => {
   const requiereFechas = form.inconsistencia !== '';
   const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
 
-  const handleConsultar = async () => {
-    // … mismas validaciones de fechas …
-    setMostrarResultados(true);
-  };
+
+
+const handleConsultar = async () => {
+  if (requiereFechas) {
+    const dIni = parseISO(form.periodoInicial);
+    const dFin = parseISO(form.periodoFinal);
+
+    if (!dIni || !dFin) {
+      await Swal.fire({
+        title: 'Fechas requeridas',
+        text: 'La Fecha Inicial y la Fecha Final son obligatorias.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+      });
+      return;
+    }
+
+    if (!(dIni < dFin)) {
+      await Swal.fire({
+        title: 'Rango inválido',
+        text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
+        icon: 'error',
+        confirmButtonText: 'Entendido',
+      });
+      return;
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (dFin.getTime() > hoy.getTime()) {
+      await Swal.fire({
+        title: 'Fecha No Permitida',
+        text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
+        icon: 'error',
+        confirmButtonText: 'Ok',
+      });
+      return;
+    }
+
+    const diffYears = (a: Date, b: Date) =>
+      Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+    const years = diffYears(dIni, dFin);
+    if (years > 5) {
+      const { isConfirmed } = await Swal.fire({
+        title:
+          'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
+        text: '¿Desea continuar con el proceso?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        focusCancel: true,
+      });
+      if (!isConfirmed) return;
+    }
+  }
+
+  setMostrarResultados(true);
+};
 
   const handleLimpiar = () => {
     setForm({
