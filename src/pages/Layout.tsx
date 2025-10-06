@@ -16,6 +16,7 @@ import { AsignacionesVarias } from './AsignacionesVarias';
 import VariacionesIngreso from './VariacionesIngreso';
 import HistorialCumplimiento from './HistorialCumplimiento';
 import AnalisisFiscal from './AnalisisFiscal';
+import Aprobaciones from './Aprobaciones';
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
 const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
@@ -60,6 +61,8 @@ export const Layout: React.FC = () => {
         return <InicioSelectorForm />;
       case 'PRIORIZACIÓN':
         return <Priorizacion />;
+      case 'APROBACIÓN':
+        return <Aprobaciones />;
       case 'ASIGNACIÓN':
         return <Aprobacion />;
       case 'HISTORIAL CUMPLIMIENTO':

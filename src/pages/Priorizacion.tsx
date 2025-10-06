@@ -352,18 +352,22 @@ const handleConsultar = async () => {
         </Grid>
       </Grid>
 
-      {mostrarResultados && (
-        <PriorizacionForm
-          condiciones={[]} // 👈 sin reglas porque “Criterio” está oculto
-          categoria={form.categoria}
-          inconsistencia={form.inconsistencia}
-          actividadEconomica={form.actividadEconomica}
-          valoresDeclarados={form.valoresDeclarados}
-          programa={form.programa}
-          periodoInicial={form.periodoInicial}
-          periodoFinal={form.periodoFinal}
-        />
-      )}
+    {mostrarResultados && (
+  <PriorizacionForm
+    condiciones={[]} // seguimos sin usar "criterio"
+    categoria={form.categoria}
+    inconsistencia={form.inconsistencia}
+    actividadEconomica={form.actividadEconomica}
+    valoresDeclarados={form.valoresDeclarados}
+    programa={form.programa}
+    periodoInicial={form.periodoInicial}
+    periodoFinal={form.periodoFinal}
+
+    // 👇 NUEVO: filtro simple por operador + valor
+    operadorFiltro={operadorSel}
+    valorFiltro={valorBalboas} // viene en string limpio por la máscara
+  />
+)}
     </Box>
   );
 };

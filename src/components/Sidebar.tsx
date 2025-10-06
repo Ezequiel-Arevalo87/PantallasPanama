@@ -67,6 +67,9 @@ const useMenuData = () => {
   const priorizacion: MenuNode[] = [
     { label: 'PRIORIZACIÓN' },
   ];
+  const aprobacion: MenuNode[] = [
+    { label: 'APROBACIÓN' },
+  ];
   const asignacion: MenuNode[] = [
     { label: 'ASIGNACIÓN' },
   ];
@@ -112,13 +115,13 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return { auditorias, modulos, selectorCaso, priorizacion, asignacion };
+  return { auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const { auditorias, modulos, selectorCaso, priorizacion, asignacion } = useMenuData();
+  const { auditorias, modulos, selectorCaso, priorizacion, aprobacion,  asignacion } = useMenuData();
 
 
   const ROOTS = useMemo(() => ['SELECCIONES DE CASOS', 'PROCESOS DE AUDITORIAS'] as const, []);
@@ -209,6 +212,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
             <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
                 {p.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
+        
+        <Divider sx={{ my: 1.5 }} />
+        {aprobacion.map((a) => {
+          const path = a.label;
+          return (
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {a.label}
               </Typography>
             </ListItemButton>
           );
