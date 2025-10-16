@@ -293,7 +293,7 @@ const Aprobaciones: React.FC = () => {
         columns={columns}
         checkboxSelection
         disableRowSelectionOnClick
-        onRowSelectionModelChange={(m: GridRowSelectionModel) => setSelectedCount(m.length)}
+        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
         slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
         pageSizeOptions={[5, 10, 25, 50]}
