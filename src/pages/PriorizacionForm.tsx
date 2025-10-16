@@ -8,12 +8,13 @@ import {
   DataGrid, GridColDef, GridToolbarColumnsButton, GridToolbarContainer,
   GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter,
   GridColumnVisibilityModel, useGridApiRef,
+  GridRowSelectionModel
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
-import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage"; // 👈 NUEVO
+import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
 
-/** ========= Tipos ========= */
+// ===== Tipos =====
 type Operador = ">=" | "<=" | "==" | "!=";
 type Condicion = { criterio: string; operador: Operador; valorBalboas: number };
 
@@ -26,15 +27,13 @@ type Props = {
   programa?: string | null;
   periodoInicial?: string | null;
   periodoFinal?: string | null;
-
-  /** Filtro simple por operador + valor desde el form padre */
   operadorFiltro?: Operador;
   valorFiltro?: number | string;
 };
 
 type Row = {
   id: number | string;
-  categoria: string;
+  categoria: string; // categoría “real” de la fila demo
   ruc: string;
   nombre: string;
   periodos: string;
@@ -43,7 +42,17 @@ type Row = {
   total?: number | string | null;
 };
 
-/** ========= Utils ========= */
+// ➕ Tipo extendido que guardaremos en Aprobación
+export type RowAprobacion = Row & {
+  metaCategoria?: string;
+  metaInconsistencia?: string;
+  metaPrograma?: string | null;
+  metaActividadEconomica?: string[];
+  metaPeriodoInicial?: string | null;
+  metaPeriodoFinal?: string | null;
+};
+
+// ===== Utils =====
 const periodoToNumber = (mmAA: string) => {
   const [mm, aa] = mmAA.split("/").map((v) => parseInt(v, 10));
   const year = 2000 + (isNaN(aa) ? 0 : aa);
@@ -68,9 +77,9 @@ const fmtDate = (iso?: string | null) => {
   return `${d}/${m}/${y}`;
 };
 
-/** ========= Datos demo ========= */
+// ===== Datos demo =====
 const rawRows: Row[] = [
-  // ===== Fiscalización Masiva (10) =====
+  // Fiscalización Masiva
   { id: 1,  categoria: "Fiscalización Masiva", ruc: "8-123-456",   nombre: "Individual",                 periodos: "06/25", valor: 1250000.50 },
   { id: 2,  categoria: "Fiscalización Masiva", ruc: "8-654-321",   nombre: "Individual",                 periodos: "05/25", valor: 236.00 },
   { id: 3,  categoria: "Fiscalización Masiva", ruc: "RUC-100200",  nombre: "Panamá Retail S.A.",         periodos: "04/25", valor: 2980000.00 },
@@ -82,7 +91,7 @@ const rawRows: Row[] = [
   { id: 9,  categoria: "Fiscalización Masiva", ruc: "RUC-100206",  nombre: "Hoteles del Istmo",          periodos: "10/24", valor: 978.00 },
   { id:10,  categoria: "Fiscalización Masiva", ruc: "RUC-100207",  nombre: "Textiles del Istmo",         periodos: "09/24", valor: 1505000.25 },
 
-  // ===== Grandes Contribuyentes (10) =====
+  // Grandes Contribuyentes
   { id:11,  categoria: "Grandes Contribuyentes", ruc: "RUC-200300", nombre: "Comercial ABC S.A.",        periodos: "06/25", valor: "654,00" },
   { id:12,  categoria: "Grandes Contribuyentes", ruc: "RUC-200301", nombre: "Energía Nacional S.A.",     periodos: "05/25", valor: 4123000.00 },
   { id:13,  categoria: "Grandes Contribuyentes", ruc: "RUC-200302", nombre: "Telecom Panavisión",        periodos: "04/25", valor: 158.00 },
@@ -94,7 +103,7 @@ const rawRows: Row[] = [
   { id:19,  categoria: "Grandes Contribuyentes", ruc: "RUC-200308", nombre: "Farmacéutica Panamericana", periodos: "10/24", valor: 2365.00 },
   { id:20,  categoria: "Grandes Contribuyentes", ruc: "RUC-200309", nombre: "Seguros del Istmo",         periodos: "09/24", valor: "1,080,000.00" },
 
-  // ===== Auditoría Sectorial (10) =====
+  // Auditoría Sectorial
   { id:21,  categoria: "Auditoría Sectorial", ruc: "RUC-300400", nombre: "Servicios XYZ",               periodos: "06/25", valor: 158.00 },
   { id:22,  categoria: "Auditoría Sectorial", ruc: "RUC-300401", nombre: "AgroPanamá Ltda.",            periodos: "05/25", valor: 1025.00 },
   { id:23,  categoria: "Auditoría Sectorial", ruc: "RUC-300402", nombre: "Turismo & Viajes S.A.",       periodos: "04/25", valor: 1350000.00 },
@@ -107,7 +116,6 @@ const rawRows: Row[] = [
   { id:30,  categoria: "Auditoría Sectorial", ruc: "RUC-300409", nombre: "Consultores del Istmo",       periodos: "09/24", valor: 2110000.35 },
 ];
 
-/** ========= Eval condiciones ========= */
 const evalCond = (valor: number, operador: Operador, objetivo: number) => {
   switch (operador) {
     case ">=": return valor >= objetivo;
@@ -118,16 +126,14 @@ const evalCond = (valor: number, operador: Operador, objetivo: number) => {
   }
 };
 
-/** ========= Desglose de periodos (para el modal) ========= */
 const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"];
-
 function buildBreakdown(row: Row) {
   const total = toNumber(row.valor ?? row.monto ?? row.total);
   if (!total) {
     return { items: PERIODOS_FIJOS.map(p => ({ periodo: p, monto: 0 })), total: 0 };
   }
   const seed = (typeof row.id === "number" ? row.id : Number(String(row.id).replace(/\D/g, ''))) || 1;
-  const weights = PERIODOS_FIJOS.map((_, i) => (i + 1) * ((seed % 7) + 3)); // 3..9
+  const weights = PERIODOS_FIJOS.map((_, i) => (i + 1) * ((seed % 7) + 3));
   const sumW = weights.reduce((a, b) => a + b, 0);
   const items = PERIODOS_FIJOS.map((p, i) => ({
     periodo: p,
@@ -138,7 +144,18 @@ function buildBreakdown(row: Row) {
   return { items, total };
 }
 
-/** ========= Componente ========= */
+// === Helpers para el texto del modal según inconsistencia (para subtítulo)
+const normalize = (s?: string | null) => (s || "").toLowerCase();
+const inconsLabels = (inc?: string | null) => {
+  switch (normalize(inc)) {
+    case "omiso":         return { singular: "omiso",         plural: "omisos" };
+    case "inexacto":      return { singular: "inexacto",      plural: "inexactos" };
+    case "extemporáneo":
+    case "extemporaneo":  return { singular: "extemporáneo",  plural: "extemporáneos" };
+    default:              return { singular: "inconsistencia", plural: "inconsistencias" };
+  }
+};
+
 export default function PriorizacionForm({
   condiciones = [],
   categoria,
@@ -153,7 +170,6 @@ export default function PriorizacionForm({
 }: Props) {
   const apiRef = useGridApiRef();
 
-  /** Filas (aplica reglas y filtro simple operador+valor) */
   const rows = React.useMemo<Row[]>(() => {
     let base = rawRows;
 
@@ -164,7 +180,6 @@ export default function PriorizacionForm({
         )
       );
     }
-
     if (typeof valorFiltro !== "undefined" && valorFiltro !== "" && operadorFiltro) {
       const objetivo = toNumber(valorFiltro);
       base = base.filter((r) => {
@@ -172,29 +187,21 @@ export default function PriorizacionForm({
         return evalCond(val, operadorFiltro, objetivo);
       });
     }
-
     return base;
   }, [condiciones, operadorFiltro, valorFiltro]);
 
-  /** Estado UI selección y paginación */
   const [paginationModel, setPaginationModel] = React.useState({ page: 0, pageSize: 5 });
   const [columnVisibilityModel, setColumnVisibilityModel] =
     React.useState<GridColumnVisibilityModel>({
-      categoria: true,
-      ruc: true,
-      nombre: true,
-      periodos: true,
-      valor: true,
+      categoria: true, ruc: true, nombre: true, periodos: true, valor: true,
     });
   const [selectedCount, setSelectedCount] = React.useState(0);
 
-  /** Modal de detalle */
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const openDetail = (row: Row) => { setDetailRow(row); setDetailOpen(true); };
   const closeDetail = () => setDetailOpen(false);
 
-  /** Columnas */
   const columns: GridColDef[] = [
     { field: "ruc", headerName: "RUC", flex: 1, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
@@ -208,8 +215,6 @@ export default function PriorizacionForm({
         periodoToNumber(String(v1)) - periodoToNumber(String(v2)),
     },
     { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
-
-    // Acciones → botón DETALLE
     {
       field: "acciones",
       headerName: "Acciones",
@@ -226,72 +231,56 @@ export default function PriorizacionForm({
     },
   ];
 
-  /** Locale */
   const localeText = {
     ...esES.components.MuiDataGrid.defaultProps.localeText,
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
-  /** Guardar selección en localStorage con confirmación */
+  /** Pasar a Aprobación: guarda selección con metadata y reemplaza lo previo */
   const handleAprobar = async () => {
     const api = apiRef.current;
     if (!api) {
-      await Swal.fire({
-        icon: "error",
-        title: "No se pudo leer la tabla",
-        text: "Intenta nuevamente.",
-        confirmButtonText: "Ok",
-      });
+      await Swal.fire({ icon: "error", title: "No se pudo leer la tabla", text: "Intenta nuevamente.", confirmButtonText: "Ok" });
       return;
     }
 
-    const selectedRows = Array.from(api.getSelectedRows().values()) as Row[];
-
-    if (selectedRows.length === 0) {
-      await Swal.fire({
-        icon: "info",
-        title: "Sin selección",
-        text: "No hay casos seleccionados para pasar a aprobación.",
-        confirmButtonText: "Ok",
-      });
+    const selected = Array.from(api.getSelectedRows().values()) as Row[];
+    if (selected.length === 0) {
+      await Swal.fire({ icon: "info", title: "Sin selección", text: "No hay casos seleccionados para pasar a aprobación.", confirmButtonText: "Ok" });
       return;
     }
 
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Pasar a Aprobación?",
-      html: `Se enviarán <b>${selectedRows.length}</b> casos a aprobación.`,
+      html: `Se enviarán <b>${selected.length}</b> caso(s) a aprobación.<br/>Esto reemplazará cualquier lista previa.`,
       showCancelButton: true,
       confirmButtonText: "Sí, confirmar",
       cancelButtonText: "Cancelar",
       reverseButtons: true,
       focusCancel: true,
     });
-
     if (!isConfirmed) return;
 
-    // 👇 sin cambiar tu lógica, solo usamos la constante compartida
-    const existingRaw = localStorage.getItem(CASOS_KEY);
-    let existing: Row[] = [];
-    try { existing = existingRaw ? JSON.parse(existingRaw) : []; } catch { existing = []; }
+    const conMeta: RowAprobacion[] = selected.map((r) => ({
+      ...r,
+      // ⚠️ fuerza que la Aprobación vea lo elegido aquí
+      metaCategoria: categoria ?? r.categoria,
+      metaInconsistencia: inconsistencia ?? undefined,
+      metaPrograma: programa ?? null,
+      metaActividadEconomica: actividadEconomica ?? [],
+      metaPeriodoInicial: periodoInicial ?? null,
+      metaPeriodoFinal: periodoFinal ?? null,
+    }));
 
-    const byId = new Map<string | number, Row>();
-    for (const r of existing) byId.set(r.id, r);
-    for (const r of selectedRows) byId.set(r.id, r);
-
-    const toSave = Array.from(byId.values());
-    localStorage.setItem(CASOS_KEY, JSON.stringify(toSave));
-
-    // 🔔 avisa a Aprobaciones en el mismo tab (sin routing)
+    localStorage.setItem(CASOS_KEY, JSON.stringify(conMeta));
     notifyAprobaciones();
 
-    await Swal.fire({
-      icon: "success",
-      title: "Guardado",
-      text: `Se guardaron ${selectedRows.length} caso(s) en Aprobación.`,
-      confirmButtonText: "Listo",
-    });
+    await Swal.fire({ icon: "success", title: "Guardado", text: `Se enviaron ${selected.length} caso(s) a Aprobación.`, confirmButtonText: "Listo" });
   };
+
+  // etiquetas dinámicas (solo para el subtítulo)
+  const inc = inconsLabels(inconsistencia);
 
   return (
     <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
@@ -312,22 +301,10 @@ export default function PriorizacionForm({
           {typeof valoresDeclarados !== "undefined" && valoresDeclarados !== "" && (
             <Grid item><Chip label={`Valores declarados: ${fmtMoney.format(toNumber(valoresDeclarados))}`} size="small" /></Grid>
           )}
-          {typeof valorFiltro !== "undefined" && valorFiltro !== "" && operadorFiltro && (
-            <Grid item>
-              <Chip
-                color="primary"
-                variant="outlined"
-                label={`Filtro: valor ${operadorFiltro} ${fmtMoney.format(toNumber(valorFiltro))}`}
-                size="small"
-              />
-            </Grid>
-          )}
           {actividadEconomica && actividadEconomica.length > 0 && (
             <Grid item><Chip label={`Actividades: ${actividadEconomica.join(", ")}`} size="small" /></Grid>
           )}
-          <Grid item>
-            <Chip color="primary" variant="outlined" label={`Reglas activas: ${condiciones?.length ?? 0}`} size="small" />
-          </Grid>
+          <Grid item><Chip color="primary" variant="outlined" label={`Reglas activas: ${condiciones?.length ?? 0}`} size="small" /></Grid>
         </Grid>
       </Box>
 
@@ -338,7 +315,7 @@ export default function PriorizacionForm({
         columns={columns}
         checkboxSelection
         disableRowSelectionOnClick
-        onRowSelectionModelChange={(m:any) => setSelectedCount(m.length)}
+        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
         slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
         pagination
@@ -351,9 +328,10 @@ export default function PriorizacionForm({
         localeText={localeText}
       />
 
-      {/* Modal de Detalle */}
+      {/* Modal Detalle */}
       <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
-        <DialogTitle>Detalle de periodos inexactos</DialogTitle>
+        {/* ✅ TÍTULO SIN “inexactos” */}
+        <DialogTitle>Detalle de períodos</DialogTitle>
         <DialogContent dividers>
           {detailRow && (
             <Box sx={{ mb: 2 }}>
@@ -380,18 +358,21 @@ export default function PriorizacionForm({
                   <Box component={Paper} sx={{ p: 1 }}>{detailRow.nombre}</Box>
                 </Grid>
 
-                <Grid item xs={12}>
-                  <Typography variant="caption">Actividad(es) económica(s)</Typography>
-                  <Box component={Paper} sx={{ p: 1 }}>
-                    {actividadEconomica && actividadEconomica.length
-                      ? actividadEconomica.join(", ")
-                      : "—"}
-                  </Box>
-                </Grid>
+                {actividadEconomica && actividadEconomica.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="caption">Actividad(es) económica(s)</Typography>
+                    <Box component={Paper} sx={{ p: 1 }}>
+                      {actividadEconomica.join(", ")}
+                    </Box>
+                  </Grid>
+                )}
               </Grid>
 
               <Box sx={{ mt: 2 }}>
-                <Typography sx={{ mb: 1 }} variant="subtitle2">Cantidad periodos inexacto</Typography>
+                {/* Subtítulo dinámico se mantiene */}
+                <Typography sx={{ mb: 1 }} variant="subtitle2">
+                  Cantidad de períodos {inc.singular}
+                </Typography>
                 {(() => {
                   const bd = buildBreakdown(detailRow);
                   return (
@@ -445,7 +426,6 @@ export default function PriorizacionForm({
   );
 }
 
-/** ===== Toolbar personalizada (igual que antes) ===== */
 function CustomToolbar() {
   return (
     <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>

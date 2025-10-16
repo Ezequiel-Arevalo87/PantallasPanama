@@ -7,7 +7,8 @@ import type { SelectChangeEvent } from '@mui/material/Select';
 import Swal from 'sweetalert2';
 import PriorizacionForm from './PriorizacionForm';
 import { Actividad, loadActividades } from '../services/actividadesLoader';
-import { NumericFormat, type NumericFormatProps } from 'react-number-format'; // 👈 NUEVO
+import { NumericFormat, type NumericFormatProps } from 'react-number-format';
+
 /** ===== Catálogos base ===== */
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
@@ -50,8 +51,7 @@ const ALL_VALUE = '__ALL__';
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values());
 
-
-// 👇 Input con máscara para MUI TextField
+// Input con máscara para MUI TextField
 const NumericFormatCustom = React.forwardRef<HTMLInputElement, NumericFormatProps>(
   function NumericFormatCustom(props, ref) {
     const { onChange, ...rest } = props as any;
@@ -62,11 +62,7 @@ const NumericFormatCustom = React.forwardRef<HTMLInputElement, NumericFormatProp
         thousandSeparator
         decimalScale={2}
         allowNegative={false}
-        // opcional: separadores según tu preferencia (en PA normalmente , para miles y . para decimales)
-        // thousandSeparator=","
-        // decimalSeparator="."
         onValueChange={(values) => {
-          // values.value -> sin formato (ej: "1000000.5")
           onChange?.({
             target: { name: props.name, value: values.value }
           });
@@ -91,14 +87,14 @@ export const Priorizacion: React.FC = () => {
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
-  // 👇 mantenemos operador y valor
+  // operador y valor (filtro simple)
   const [operadorSel, setOperadorSel] = useState<Operador>('>=');
-  const [valorBalboas, setValorBalboas] = useState<string>(''); // guarda el valor "limpio"
+  const [valorBalboas, setValorBalboas] = useState<string>('');
 
-  // ⚠️ seguimos cargando actividades, etc…
+  // actividades
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingAct, setLoadingAct] = useState<boolean>(true);
-  const [condiciones] = useState<Condicion[]>([]); // dejamos condiciones vacías (Criterio oculto)
+  const [condiciones] = useState<Condicion[]>([]);
 
   const esAS = form.categoria === 'Auditoría Sectorial';
 
@@ -131,10 +127,22 @@ export const Priorizacion: React.FC = () => {
     if (form.programa && !programasDisponibles.includes(form.programa)) {
       setForm((prev: any) => ({ ...prev, programa: '' }));
     }
-  }, [programasDisponibles]);
+  }, [programasDisponibles, form.programa]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
+    // 👉 cuando cambia categoría: ocultar y LIMPIAR actividad si no es AS
+    if (name === 'categoria') {
+      setForm((prev: any) => ({
+        ...prev,
+        categoria: value,
+        actividadEconomica: value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
+      }));
+      setMostrarResultados(false);
+      return;
+    }
+
     setForm((prev: any) => ({ ...prev, [name]: value }));
     setMostrarResultados(false);
   };
@@ -151,71 +159,69 @@ export const Priorizacion: React.FC = () => {
     setMostrarResultados(false);
   };
 
-  // === Validaciones fecha (igual que tenías) ===
+  // === Validaciones fecha ===
   const requiereFechas = form.inconsistencia !== '';
   const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
 
+  const handleConsultar = async () => {
+    if (requiereFechas) {
+      const dIni = parseISO(form.periodoInicial);
+      const dFin = parseISO(form.periodoFinal);
 
+      if (!dIni || !dFin) {
+        await Swal.fire({
+          title: 'Fechas requeridas',
+          text: 'La Fecha Inicial y la Fecha Final son obligatorias.',
+          icon: 'error',
+          confirmButtonText: 'Entendido',
+        });
+        return;
+      }
 
-const handleConsultar = async () => {
-  if (requiereFechas) {
-    const dIni = parseISO(form.periodoInicial);
-    const dFin = parseISO(form.periodoFinal);
+      if (!(dIni < dFin)) {
+        await Swal.fire({
+          title: 'Rango inválido',
+          text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
+          icon: 'error',
+          confirmButtonText: 'Entendido',
+        });
+        return;
+      }
 
-    if (!dIni || !dFin) {
-      await Swal.fire({
-        title: 'Fechas requeridas',
-        text: 'La Fecha Inicial y la Fecha Final son obligatorias.',
-        icon: 'error',
-        confirmButtonText: 'Entendido',
-      });
-      return;
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      if (dFin.getTime() > hoy.getTime()) {
+        await Swal.fire({
+          title: 'Fecha No Permitida',
+          text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
+          icon: 'error',
+          confirmButtonText: 'Ok',
+        });
+        return;
+      }
+
+      const diffYears = (a: Date, b: Date) =>
+        Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+      const years = diffYears(dIni, dFin);
+      if (years > 5) {
+        const { isConfirmed } = await Swal.fire({
+          title:
+            'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
+          text: '¿Desea continuar con el proceso?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Continuar',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          focusCancel: true,
+        });
+        if (!isConfirmed) return;
+      }
     }
 
-    if (!(dIni < dFin)) {
-      await Swal.fire({
-        title: 'Rango inválido',
-        text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
-        icon: 'error',
-        confirmButtonText: 'Entendido',
-      });
-      return;
-    }
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    if (dFin.getTime() > hoy.getTime()) {
-      await Swal.fire({
-        title: 'Fecha No Permitida',
-        text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
-        icon: 'error',
-        confirmButtonText: 'Ok',
-      });
-      return;
-    }
-
-    const diffYears = (a: Date, b: Date) =>
-      Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-
-    const years = diffYears(dIni, dFin);
-    if (years > 5) {
-      const { isConfirmed } = await Swal.fire({
-        title:
-          'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
-        text: '¿Desea continuar con el proceso?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Continuar',
-        cancelButtonText: 'Cancelar',
-        reverseButtons: true,
-        focusCancel: true,
-      });
-      if (!isConfirmed) return;
-    }
-  }
-
-  setMostrarResultados(true);
-};
+    setMostrarResultados(true);
+  };
 
   const handleLimpiar = () => {
     setForm({
@@ -276,30 +282,29 @@ const handleConsultar = async () => {
           </TextField>
         </Grid>
 
-        {/* Actividad Económica (múltiple, solo AS) */}
-        <Grid item xs={12} md={6}>
-          <TextField
-            select fullWidth label="Actividad Económica" name="actividadEconomica" value={form.actividadEconomica}
-            onChange={handleActividadesChange as any} disabled={!esAS || loadingAct}
-            helperText={!esAS ? 'Disponible en Auditoría Sectorial' : ''}
-            SelectProps={{ multiple: true, renderValue: renderActividadChips }}
-          >
-            <MenuItem value={ALL_VALUE} disabled={loadingAct}>
-              <Checkbox checked={form.actividadEconomica.length === 0} />
-              <ListItemText primary="Todas" />
-            </MenuItem>
-            {actividades.map((a) => (
-              <MenuItem key={a.code} value={a.code}>
-                <Checkbox checked={form.actividadEconomica.includes(a.code)} />
-                <ListItemText primary={`${a.code} — ${a.label}`} />
+        {/* Actividad Económica (múltiple, SOLO en AS) */}
+        {esAS && (
+          <Grid item xs={12} md={6}>
+            <TextField
+              select fullWidth label="Actividad Económica" name="actividadEconomica" value={form.actividadEconomica}
+              onChange={handleActividadesChange as any} disabled={!esAS || loadingAct}
+              SelectProps={{ multiple: true, renderValue: renderActividadChips }}
+            >
+              <MenuItem value={ALL_VALUE} disabled={loadingAct}>
+                <Checkbox checked={form.actividadEconomica.length === 0} />
+                <ListItemText primary="Todas" />
               </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
+              {actividades.map((a) => (
+                <MenuItem key={a.code} value={a.code}>
+                  <Checkbox checked={form.actividadEconomica.includes(a.code)} />
+                  <ListItemText primary={`${a.code} — ${a.label}`} />
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+        )}
 
-        {/* ⚠️ Criterio: ocultado, pero sin borrar el código original */}
-
-        {/* Operador (se mantiene) */}
+        {/* Operador */}
         <Grid item xs={6} md={3}>
           <TextField
             select fullWidth label="Operador" value={operadorSel}
@@ -319,9 +324,8 @@ const handleConsultar = async () => {
             onChange={(e) => setValorBalboas(e.target.value)}
             InputProps={{
               startAdornment: <InputAdornment position="start">B/.</InputAdornment>,
-              inputComponent: NumericFormatCustom as any, // 👈 máscara
+              inputComponent: NumericFormatCustom as any,
             }}
-            // helperText={`Valor sin formato: ${valorBalboas || '0'}`} // (opcional para debug)
           />
         </Grid>
 
@@ -352,22 +356,20 @@ const handleConsultar = async () => {
         </Grid>
       </Grid>
 
-    {mostrarResultados && (
-  <PriorizacionForm
-    condiciones={[]} // seguimos sin usar "criterio"
-    categoria={form.categoria}
-    inconsistencia={form.inconsistencia}
-    actividadEconomica={form.actividadEconomica}
-    valoresDeclarados={form.valoresDeclarados}
-    programa={form.programa}
-    periodoInicial={form.periodoInicial}
-    periodoFinal={form.periodoFinal}
-
-    // 👇 NUEVO: filtro simple por operador + valor
-    operadorFiltro={operadorSel}
-    valorFiltro={valorBalboas} // viene en string limpio por la máscara
-  />
-)}
+      {mostrarResultados && (
+        <PriorizacionForm
+          condiciones={[]}
+          categoria={form.categoria}
+          inconsistencia={form.inconsistencia}
+          actividadEconomica={esAS ? form.actividadEconomica : []}  // <— si no es AS, va vacío
+          valoresDeclarados={form.valoresDeclarados}
+          programa={form.programa}
+          periodoInicial={form.periodoInicial}
+          periodoFinal={form.periodoFinal}
+          operadorFiltro={operadorSel}
+          valorFiltro={valorBalboas}
+        />
+      )}
     </Box>
   );
 };

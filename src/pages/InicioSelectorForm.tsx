@@ -22,7 +22,7 @@ const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const
 
 // --- Catálogos ---
 const PROGRAMAS_OMISO = [
-  'Omisos vs Dividendos',
+ 
   'Omisos vs retenciones 4331 ITBMS',
   'Omisos vs informes',
   'Omisos vs ISR Renta',
@@ -35,7 +35,9 @@ const PROGRAMAS_INEXACTO = [
   'Inexactos vs retenciones 4331 ITBMS',
   'Inexactos vs ITBMS',
 ] as const;
+
 const TIPOLOGIAS_FM = ['ITBMS', 'Dividendos', 'Patrimonio', 'Ingresos'] as const;
+
 const PROGRAMAS_EXTEMPORANEO = [
   'Base contribuyentes VS Calendario ISR',
   'Base contribuyentes VS Calendario ITBMS',
@@ -54,7 +56,7 @@ export const InicioSelectorForm: React.FC = () => {
     periodoFinal: '',
     categoria: 'Fiscalización Masiva',
     inconsistencia: 'Inexacto',
-    actividadEconomica: [] as string[],  // 👈 ahora es array para selección múltiple
+    actividadEconomica: [] as string[],  // múltiple
     tipologia: '',
     programa: '',
     valoresDeclarados: '',
@@ -74,7 +76,7 @@ export const InicioSelectorForm: React.FC = () => {
   const esAS = form.categoria === 'Auditoría Sectorial';
   const esFM = form.categoria === 'Fiscalización Masiva';
 
-  const requiereFechasFlag = form.inconsistencia !== '' ;
+  const requiereFechasFlag = form.inconsistencia !== '';
 
   const actividadesMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -83,15 +85,15 @@ export const InicioSelectorForm: React.FC = () => {
   }, [actividades]);
 
   const actividadesSeleccionadas = useMemo(
-  () =>
-    (form.actividadEconomica ?? []).map((code:any) => ({
-      codigo: code,
-      nombre: actividadesMap.get(code) ?? code, // usa el nombre; si no existe, deja el código
-    })),
-  [form.actividadEconomica, actividadesMap]
-);
+    () =>
+      (form.actividadEconomica ?? []).map((code: any) => ({
+        codigo: code,
+        nombre: actividadesMap.get(code) ?? code,
+      })),
+    [form.actividadEconomica, actividadesMap]
+  );
 
-  // Memo de programasDisponibles (dedup en "Todos")
+  // Programas por inconsistencia (dedup en "Todos")
   const programasDisponibles = useMemo(() => {
     switch (form.inconsistencia) {
       case 'Omiso':
@@ -141,12 +143,12 @@ export const InicioSelectorForm: React.FC = () => {
     }
 
     if (name === 'categoria') {
-      // ✅ actividadEconomica se usa en Auditoría Sectorial (AS)
-      // ✅ tipologia (Impuesto) se usa en Fiscalización Masiva (FM)
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
+        // En AS mantenemos actividadEconomica; en otras categorías, limpiamos
         actividadEconomica: value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
+        // En FM mantenemos tipologia; en otras categorías, limpiamos
         tipologia: value === 'Fiscalización Masiva' ? prev.tipologia : '',
       }));
       setMostrarResultados(false);
@@ -158,8 +160,7 @@ export const InicioSelectorForm: React.FC = () => {
   };
 
   const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
-    const raw = e.target.value as unknown as string[]; // MUI típicamente entrega string[] en multiple
-    // Si el usuario elige "Todas", limpiamos la selección
+    const raw = e.target.value as unknown as string[]; // MUI entrega string[] en multiple
     if (raw.includes(ALL_VALUE)) {
       setForm((prev: any) => ({ ...prev, actividadEconomica: [] }));
       setMostrarResultados(false);
@@ -172,7 +173,7 @@ export const InicioSelectorForm: React.FC = () => {
   };
 
   const handleConsultar = async () => {
-    const requiereFechas = form.inconsistencia !== '' ;
+    const requiereFechas = form.inconsistencia !== '';
 
     if (!requiereFechas) {
       setMostrarResultados(true);
@@ -270,7 +271,9 @@ export const InicioSelectorForm: React.FC = () => {
           DGI - Dirección General de Ingresos
         </Typography>
 
+        {/* === ORDEN SOLICITADO === */}
         <Grid container columnSpacing={2} rowSpacing={2}>
+          {/* 1) Categoría */}
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -288,6 +291,7 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
+          {/* 2) Tipo de Inconsistencia */}
           <Grid item xs={12} md={6}>
             <TextField
               select
@@ -305,54 +309,7 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
-          {/* ---- Actividad Económica (AS) - múltiple ---- */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Actividad Económica"
-              name="actividadEconomica"
-              value={form.actividadEconomica}
-              onChange={handleActividadesChange as any}
-              disabled={!esAS || loadingAct}
-              helperText={!esAS ? 'Disponible en Auditoría Sectorial' : ''}
-              SelectProps={{
-                multiple: true,
-                renderValue: renderActividadChips,
-              }}
-            >
-              <MenuItem value={ALL_VALUE} disabled={loadingAct}>
-              
-              </MenuItem>
-              {actividades.map((a) => (
-                <MenuItem key={a.code} value={a.code}>
-                  <Checkbox checked={form.actividadEconomica.includes(a.code)} />
-                  <ListItemText primary={`${a.code} — ${a.label}`} />
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* ---- Impuesto (FM) ---- */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Impuesto"
-              name="tipologia"
-              value={form.tipologia}
-              onChange={handleChange}
-              disabled={!esFM}
-              placeholder="Seleccione…"
-            >
-              {TIPOLOGIAS_FM.map((t) => (
-                <MenuItem key={t} value={t}>
-                  {t}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
+          {/* 3) Programa */}
           <Grid item xs={12}>
             <TextField
               select
@@ -371,6 +328,36 @@ export const InicioSelectorForm: React.FC = () => {
             </TextField>
           </Grid>
 
+          {/* 4) Actividad Económica (SOLO en Auditoría Sectorial) */}
+          {esAS && (
+            <Grid item xs={12}>
+              <TextField
+                select
+                fullWidth
+                label="Actividad Económica"
+                name="actividadEconomica"
+                value={form.actividadEconomica}
+                onChange={handleActividadesChange as any}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: renderActividadChips,
+                }}
+              >
+                <MenuItem value={ALL_VALUE} disabled={loadingAct}>
+                  <Checkbox checked={!form.actividadEconomica?.length} />
+                  <ListItemText primary="Todas" />
+                </MenuItem>
+                {actividades.map((a) => (
+                  <MenuItem key={a.code} value={a.code}>
+                    <Checkbox checked={form.actividadEconomica.includes(a.code)} />
+                    <ListItemText primary={`${a.code} — ${a.label}`} />
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          )}
+
+          {/* 5) Valores declarados */}
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -382,7 +369,7 @@ export const InicioSelectorForm: React.FC = () => {
             />
           </Grid>
 
-          {/* === Fechas con requerimiento condicional === */}
+          {/* 6) Fecha Inicial */}
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -399,6 +386,8 @@ export const InicioSelectorForm: React.FC = () => {
               }
             />
           </Grid>
+
+          {/* 7) Fecha Final */}
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
@@ -416,6 +405,27 @@ export const InicioSelectorForm: React.FC = () => {
             />
           </Grid>
 
+          {/* 8) Impuesto (solo en FM) */}
+          <Grid item xs={12}>
+            <TextField
+              select
+              fullWidth
+              label="Impuesto"
+              name="tipologia"
+              value={form.tipologia}
+              onChange={handleChange}
+              disabled={!esFM}
+              placeholder="Seleccione…"
+            >
+              {TIPOLOGIAS_FM.map((t) => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          {/* Acciones */}
           <Grid item xs={12}>
             <Stack direction="row" spacing={2} justifyContent="flex-end">
               <Button variant="contained" onClick={handleConsultar}>

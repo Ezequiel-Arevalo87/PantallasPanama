@@ -1,119 +1,91 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Box, Grid, TextField, MenuItem, Typography, Button, Stack
-} from '@mui/material';
-import dayjs from 'dayjs';
-import { NuevosCasos } from './NuevosCasos';
+import React, { useEffect, useMemo, useState } from "react";
+import { Box, Grid, TextField, MenuItem, Button, Stack } from "@mui/material";
+import { NuevosCasos } from "./NuevosCasos";
+import { readAprobados } from "../lib/aprobacionesStorage";
 
-export const Aprobacion = () => {
-  const [fecha, setFecha] = useState('');
-  const [formData, setFormData] = useState({
-    red: '',
-    categoria: ''
-  });
-  const [mostrarNuevosCasos, setMostrarNuevosCasos] = useState(false);
+// Tipos mínimos para entender la data
+type Caso = {
+  id: number | string;
+  categoria?: string;              // fallback si no hay metaCategoria
+  metaCategoria?: string;          // preferida
+  ruc: string;
+  nombre: string;
+  estado?: "Pendiente" | "Aprobado";
+};
 
+const CATEGORIAS = [
+  "Todos",
+  "Fiscalización Masiva",
+  "Grandes Contribuyentes",
+  "Auditoría Sectorial",
+] as const;
+
+export const Aprobacion: React.FC = () => {
+  const [categoriaSel, setCategoriaSel] = useState<string>("Todos");
+  const [mostrar, setMostrar] = useState(false);
+  const [aprobados, setAprobados] = useState<Caso[]>([]);
+
+  // Carga inicial y escucha cambios desde Aprobaciones
   useEffect(() => {
-    setFecha(dayjs().format('DD/MM/YY'));
+    const cargar = () => setAprobados(readAprobados<Caso>());
+    cargar();
+    const onUpd = () => cargar();
+    window.addEventListener("casosAprobacion:update", onUpd);
+    window.addEventListener("storage", onUpd);
+    return () => {
+      window.removeEventListener("casosAprobacion:update", onUpd);
+      window.removeEventListener("storage", onUpd);
+    };
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  // Filtra por categoría seleccionada (o todas)
+  const casosFiltrados = useMemo(() => {
+    if (categoriaSel === "Todos") return aprobados;
+    return aprobados.filter((c) => (c.metaCategoria ?? c.categoria) === categoriaSel);
+  }, [aprobados, categoriaSel]);
 
+  const handleConsultar = () => setMostrar(true);
   const handleLimpiar = () => {
-    setFormData({
-      red: '',
-      categoria: ''
-    });
-    setMostrarNuevosCasos(false);
-  };
-
-  const handleConsultar = () => {
-    setMostrarNuevosCasos(true);
+    setCategoriaSel("Todos");
+    setMostrar(false);
   };
 
   return (
     <Box>
-   
-
       <Grid container spacing={2}>
-     
         <Grid item xs={12} sm={6}>
-          <TextField
-            label="SUPERVISOR"
-            value="Nombre del Supervisor"
-            fullWidth
-            InputProps={{ readOnly: true }}
-            sx={{ backgroundColor: '#fde9e0' }}
-          />
-        </Grid>
-
-  
-        <Grid item xs={12} sm={6}>
-          <TextField
-            label="FECHA"
-            value={fecha}
-            fullWidth
-            InputProps={{ readOnly: true }}
-            sx={{ backgroundColor: '#fde9e0' }}
-          />
-        </Grid>
-
-      
-        {/* <Grid item xs={12} sm={6}>
+          {/* Supervisor -> ahora selección de Categoría */}
           <TextField
             select
-            label="RED"
-            name="red"
-            value={formData.red}
-            onChange={handleChange}
             fullWidth
-            sx={{ backgroundColor: '#e4ebf3' }}
-          >
-            <MenuItem value="659">659</MenuItem>
-            <MenuItem value="675">675</MenuItem>
-          </TextField>
-        </Grid>
-
-  
-        <Grid item xs={12} sm={6}>
-          <TextField
-            select
             label="CATEGORÍA"
-            name="categoria"
-            value={formData.categoria}
-            onChange={handleChange}
-            fullWidth
-            sx={{ backgroundColor: '#e4ebf3' }}
+            value={categoriaSel}
+            onChange={(e) => setCategoriaSel(e.target.value)}
           >
-            <MenuItem value="Todos">Todos</MenuItem>
-            <MenuItem value="Fiscalización Masiva">Fiscalización Masiva</MenuItem>
-            <MenuItem value="Grandes Contribuyentes">Grandes Contribuyentes</MenuItem>
-            <MenuItem value="Auditoría Sectorial">Auditoría Sectorial</MenuItem>
+            {CATEGORIAS.map((c) => (
+              <MenuItem key={c} value={c}>{c}</MenuItem>
+            ))}
           </TextField>
-        </Grid> */}
+        </Grid>
 
-   
+        {/* Se elimina FECHA y colores de fondo */}
+
         <Grid item xs={12}>
           <Stack direction="row" justifyContent="flex-end" spacing={2}>
-            <Button variant="contained" color="primary" onClick={handleConsultar}>
+            <Button variant="contained" onClick={handleConsultar}>
               Consultar
             </Button>
-            <Button variant="contained" color="primary" onClick={handleLimpiar}>
+            <Button variant="contained" onClick={handleLimpiar}>
               Limpiar
             </Button>
           </Stack>
         </Grid>
       </Grid>
 
- 
-      {mostrarNuevosCasos && (
+      {/* NUEVOS CASOS -> sólo botones / y al automático le pasamos lo aprobado */}
+      {mostrar && (
         <Box mt={4}>
-          <NuevosCasos />
+          <NuevosCasos casosAprobados={casosFiltrados} />
         </Box>
       )}
     </Box>

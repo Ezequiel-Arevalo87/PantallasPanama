@@ -417,14 +417,14 @@ const DetalleInexactosModal: React.FC<DetalleProps> = ({ open, onClose, categori
   const handleExportExcel = () => {
     if (!fila) return;
     const meta = [
-      ['Detalle de períodos inexactos'], [],
+      ['Detalle de períodos'], [],
       ['Categoría', categoria],
       ['Inconsistencia', 'Inexactos'],
       [programa ? 'Programa' : 'Grupo de impuesto', programa || (tipologia ?? '—')],
       ['RUC', fila.ruc],
       ['Actividad(es)', actividad?.length ? actividad.map(a => a.nombre).join(', ') : '—'],
       ['Nombre', fila.nombre], [],
-      ['Cantidad periodos inexacto'],
+      ['Cantidad periodos'],
     ];
     const headers = [...periodosOrdenados, 'Total'];
     const row = [...periodosOrdenados.map(p => Number(fila.valoresPorPeriodo[p] ?? 0)), Number(total)];
@@ -489,7 +489,7 @@ const DetalleInexactosModal: React.FC<DetalleProps> = ({ open, onClose, categori
               </Grid>
             </Grid>
 
-            <Typography fontWeight={700} mb={1}>Cantidad periodos inexacto</Typography>
+            <Typography fontWeight={700} mb={1}>Cantidad periodos</Typography>
 
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
