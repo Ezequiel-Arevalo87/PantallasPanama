@@ -8,7 +8,7 @@ import {
 import {
   DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
   GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter, useGridApiRef,
-  GridRowSelectionModel
+  
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
