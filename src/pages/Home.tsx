@@ -1,21 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Box, Paper, List, ListItem, ListItemButton, ListItemText, ListItemAvatar,
-  Avatar, Chip, Stack, Typography, Divider, Button, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Tooltip
+  Box, Paper, List, ListItem, ListItemText, ListItemAvatar,
+  Avatar, Chip, Stack, Typography, Divider
 } from "@mui/material";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
-import SendIcon from "@mui/icons-material/Send";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import {
-  readCasosOrdenados, getNextFase, avanzarCaso, FaseFlujo, CasoFlujo
+  readCasosOrdenados, getNextFase, FaseFlujo, CasoFlujo
 } from "../lib/workflowStorage";
+import AdvanceToNext from "../components/AdvanceToNext";
 
-type DialogData = { open: boolean; caso?: CasoFlujo; next?: FaseFlujo; by: string; note: string };
+type Props = {
+  onGo?: (path: string) => void; // callback para navegar
+};
 
-export const Home: React.FC = () => {
+export const Home: React.FC<Props> = ({ onGo }) => {
   const [casos, setCasos] = useState<CasoFlujo[]>([]);
-  const [dlg, setDlg] = useState<DialogData>({ open: false, by: "", note: "" });
 
   const cargar = () => setCasos(readCasosOrdenados());
 
@@ -30,29 +30,25 @@ export const Home: React.FC = () => {
     };
   }, []);
 
-  const abrirDialogo = (caso: CasoFlujo) => {
-    const next = getNextFase(caso.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN");
-    if (!next) return;
-    setDlg({ open: true, caso, next, by: "", note: "" });
-  };
-
-  const confirmarEnvio = () => {
-    if (!dlg.caso || !dlg.next) return;
-    avanzarCaso({ id: dlg.caso.id, to: dlg.next, by: dlg.by || "Sistema", note: dlg.note });
-    setDlg({ open: false, by: "", note: "" });
-  };
-
   const renderLinea = (c: CasoFlujo) => {
     const last = c.history?.[c.history.length - 1];
-    const next = getNextFase(c.fase);
+    const faseActual = (c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
+    const next = getNextFase(faseActual);
+
     return (
-        
       <React.Fragment key={String(c.id)}>
-        <ListItem disableGutters alignItems="flex-start">
+        <ListItem disableGutters alignItems="flex-start"
+          secondaryAction={
+            <AdvanceToNext
+              casoId={c.id}
+              currentFase={faseActual}
+              defaultBy="Home"
+              onGo={onGo}
+            />
+          }
+        >
           <ListItemAvatar>
-            <Avatar>
-              <MailOutlineIcon />
-            </Avatar>
+            <Avatar><MailOutlineIcon /></Avatar>
           </ListItemAvatar>
 
           <ListItemText
@@ -60,7 +56,7 @@ export const Home: React.FC = () => {
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography fontWeight={700}>{c.nombre || "(Sin nombre)"} </Typography>
                 <Typography color="text.secondary">• RUC {c.ruc || "—"}</Typography>
-                <Chip size="small" label={c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN"} sx={{ ml: 1 }} />
+                <Chip size="small" label={faseActual} sx={{ ml: 1 }} />
                 {c.estado === "Aprobado" && (
                   <Chip size="small" color="success" icon={<CheckCircleOutlineIcon />} label="Aprobado" />
                 )}
@@ -73,6 +69,7 @@ export const Home: React.FC = () => {
                     {last.from ? `De ${last.from} → ` : ""}
                     <b>{last.to}</b> • asignó <b>{last.by}</b> • {new Date(last.at).toLocaleString()}
                     {last.note ? ` • “${last.note}”` : ""}
+                    {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
                   </Typography>
                 ) : (
                   <Typography variant="body2" color="text.secondary">Sin historial</Typography>
@@ -80,22 +77,6 @@ export const Home: React.FC = () => {
               </Box>
             }
           />
-
-          <Stack direction="row" spacing={1} ml={2}>
-            <Tooltip title={next ? `Enviar a ${next}` : "Flujo finalizado"}>
-              <span>
-                <Button
-                  variant="contained"
-                  size="small"
-                  endIcon={<SendIcon />}
-                  disabled={!next}
-                  onClick={() => abrirDialogo(c)}
-                >
-                  {next ? `Enviar a ${next}` : "Completado"}
-                </Button>
-              </span>
-            </Tooltip>
-          </Stack>
         </ListItem>
         <Divider component="li" />
       </React.Fragment>
@@ -116,8 +97,8 @@ export const Home: React.FC = () => {
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>Bandeja de pasos</Typography>
         <Typography variant="body2" color="text.secondary">
-          Aquí verás el recorrido de cada caso como si fuera un hilo de correo: quién lo asignó,
-          a qué etapa pasó y cuándo.
+          Avanza cada caso al siguiente paso. El botón cambia automáticamente:
+          Selector → Verificación → Aprobación → Asignación → Inicio de auditoría.
         </Typography>
         <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
           {Array.from(totalPorFase.entries()).map(([fase, n]) => (
@@ -133,37 +114,6 @@ export const Home: React.FC = () => {
           )}
         </List>
       </Paper>
-
-      {/* Dialogo para registrar "quién lo asigna" */}
-      <Dialog open={dlg.open} onClose={() => setDlg({ open: false, by: "", note: "" })} fullWidth maxWidth="sm">
-        <DialogTitle>Enviar al siguiente paso</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Quién asigna"
-              value={dlg.by}
-              onChange={(e) => setDlg((d) => ({ ...d, by: e.target.value }))}
-              autoFocus
-              required
-            />
-            <TextField
-              label="Nota (opcional)"
-              value={dlg.note}
-              onChange={(e) => setDlg((d) => ({ ...d, note: e.target.value }))}
-              multiline minRows={2}
-            />
-            <Typography variant="body2" color="text.secondary">
-              Destino: <b>{dlg.next ?? "—"}</b>
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDlg({ open: false, by: "", note: "" })}>Cancelar</Button>
-          <Button variant="contained" onClick={confirmarEnvio} disabled={!dlg.by.trim()}>
-            Enviar
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

@@ -19,38 +19,34 @@ import AnalisisFiscal from './AnalisisFiscal';
 import Aprobaciones from './Aprobaciones';
 import { InicioSelectorForm } from './InicioSelectorForm';
 import Verificacion from './Verificacion';
-import Home from './Home';
-
+import Home from './Home'; // ✅ import correcto (no el ícono)
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
 const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
 const DIR_PATH = 'PROCESOS DE AUDITORIAS/DIRECTOR';
 
 export const Layout: React.FC = () => {
-  const [selectedPath, setSelectedPath] = useState<string>('HOME'); // ← Home por defecto
+  const [selectedPath, setSelectedPath] = useState<string>('HOME');
   const [readOnly, setReadOnly] = useState<boolean>(false);
 
-  // último segmento de la ruta
   const leaf = useMemo(() => {
     if (!selectedPath) return '';
     const parts = selectedPath.split('/');
     return parts[parts.length - 1] ?? '';
   }, [selectedPath]);
 
-  // Sincroniza ruta <-> readOnly
   useEffect(() => {
     if (!selectedPath) return;
 
     if (leaf === 'AUDITOR' && readOnly && selectedPath !== SUP_PATH) {
-      setSelectedPath(SUP_PATH);        // aprobar -> ir a SUPERVISOR
+      setSelectedPath(SUP_PATH);
     } else if (leaf === 'SUPERVISOR' && !readOnly && selectedPath !== AUD_PATH) {
-      setSelectedPath(AUD_PATH);        // devolver -> volver a AUDITOR
+      setSelectedPath(AUD_PATH);
     } else if (leaf === 'DIRECTOR' && !readOnly && selectedPath !== DIR_PATH) {
       setSelectedPath(DIR_PATH);
     }
   }, [readOnly, leaf, selectedPath]);
 
-  // Clicks desde el Sidebar
   const handleSelect = (ruta: string) => {
     setSelectedPath(ruta);
     setReadOnly(
@@ -61,8 +57,8 @@ export const Layout: React.FC = () => {
 
   const renderContent = () => {
     switch (leaf) {
-        case 'HOME':
-      return <Home />;
+      case 'HOME':
+        return <Home onGo={handleSelect} />;   // ✅ se pasa el callback
       case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
         return <Priorizacion />;
       case 'VERIFICACIÓN':
@@ -106,7 +102,6 @@ export const Layout: React.FC = () => {
 
   return (
     <Box display="flex" flexDirection="column" height="100vh" sx={{ overflow: 'hidden' }}>
-      {/* Encabezado */}
       <Box sx={{ width: '100%' }}>
         <img
           src={logoDos}
@@ -115,9 +110,7 @@ export const Layout: React.FC = () => {
         />
       </Box>
 
-      {/* Zona de trabajo */}
       <Box display="flex" flexGrow={1} sx={{ minHeight: 0 }}>
-        {/* Sidebar con scroll interno */}
         <Box
           sx={{
             width: 300,
@@ -127,15 +120,14 @@ export const Layout: React.FC = () => {
             height: '100%',
             overflowY: 'auto',
             minHeight: 0,
-            flexShrink: 0,        // no se encoje
-            position: 'relative', // contexto de apilamiento
-            zIndex: 2,            // sobre el contenido flotante
+            flexShrink: 0,
+            position: 'relative',
+            zIndex: 2,
           }}
         >
           <Sidebar onSelect={handleSelect} selected={selectedPath} />
         </Box>
 
-        {/* Contenido */}
         <Box
           component="main"
           sx={{
@@ -143,8 +135,8 @@ export const Layout: React.FC = () => {
             p: 4,
             backgroundColor: '#fff',
             overflowY: 'auto',
-            overflowX: 'hidden',  // evita hueco/corte derecho
-            minWidth: 0,          // permite encogimiento dentro del flex
+            overflowX: 'hidden',
+            minWidth: 0,
             position: 'relative',
             zIndex: 1,
           }}
