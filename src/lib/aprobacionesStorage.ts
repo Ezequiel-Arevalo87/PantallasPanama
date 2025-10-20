@@ -2,6 +2,7 @@
 export const CASOS_KEY = "casosAprobacion" as const;
 
 // Dispara un evento para notificar cambios (entre pantallas)
+
 export const notifyAprobaciones = () =>
   window.dispatchEvent(new Event("casosAprobacion:update"));
 
@@ -14,6 +15,8 @@ export const readCasos = <T = any>(): T[] => {
     return [];
   }
 };
+
+
 
 // Devuelve solo los casos aprobados
 export const readAprobados = <T = any>(): T[] =>

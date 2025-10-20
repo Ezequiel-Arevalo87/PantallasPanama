@@ -61,11 +61,13 @@ const buildPath = (parent: string, label: string) =>
 
 /** Datos del menú (con submenús anidados) */
 const useMenuData = () => {
+
+  const home: MenuNode[] = [{ label: "HOME" }];
   const selectorCaso: MenuNode[] = [
-    { label: 'SELECTOR DE CASOS' },
+    { label: 'SELECTOR DE CASOS Y PRIORIZACIÓN' },
   ];
   const priorizacion: MenuNode[] = [
-    { label: 'PRIORIZACIÓN' },
+    { label: 'VERIFICACIÓN' },
   ];
   const aprobacion: MenuNode[] = [
     { label: 'APROBACIÓN' },
@@ -115,16 +117,16 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return { auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
+  return { home, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const { auditorias, modulos, selectorCaso, priorizacion, aprobacion,  asignacion } = useMenuData();
+  const { home, auditorias, modulos, selectorCaso, priorizacion, aprobacion,  asignacion } = useMenuData();
 
 
-  const ROOTS = useMemo(() => ['SELECCIONES DE CASOS', 'PROCESOS DE AUDITORIAS'] as const, []);
+  const ROOTS = useMemo(() => ['SELECTOR DE CASOS Y PRIORIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
   const toggleRoot = (root: typeof ROOTS[number]) => {
     setOpenMap((prev) => {
       const next: Record<string, boolean> = { ...prev };
@@ -192,6 +194,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
           </ListSubheader>
         }
       >
+
+         {/* HOME primero */}
+        {home.map((h) => {
+          const path = h.label;
+          return (
+            <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+                {h.label}
+              </Typography>
+            </ListItemButton>
+          );
+        })}
+
+        <Divider sx={{ my: 1.5 }} />
         {/* Selector de Casos simple al tope */}
         {selectorCaso.map((s) => {
           const path = s.label;

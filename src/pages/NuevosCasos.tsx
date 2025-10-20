@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Button } from "@mui/material";
 import { Casos } from "./Casos";
 import { CasosManueales } from "./CasosManuales";
@@ -9,15 +9,21 @@ type Caso = {
   ruc: string;
   categoria?: string;
   metaCategoria?: string;
+  [k: string]: any;
 };
 
 type Props = {
-  casosAprobados: Caso[]; // vienen de Asignación (filtrados o todos)
+  casosAprobados: Caso[];
 };
 
 export const NuevosCasos: React.FC<Props> = ({ casosAprobados }) => {
   const [auto, setAuto] = useState(false);
   const [manual, setManual] = useState(false);
+
+  const categoriaMostrada = useMemo(() => {
+    const first = casosAprobados?.[0];
+    return first?.metaCategoria || first?.categoria || "(Listado aprobado)";
+  }, [casosAprobados]);
 
   return (
     <Box>
@@ -32,17 +38,15 @@ export const NuevosCasos: React.FC<Props> = ({ casosAprobados }) => {
 
       {auto && (
         <Box mt={2}>
-          {/* Reparto equitativo real, con los casos aprobados */}
           <Casos casos={casosAprobados} onRegresar={() => setAuto(false)} />
         </Box>
       )}
 
       {manual && (
         <Box mt={2}>
-          {/* Puedes pasar aquí la lista para que el usuario los arrastre/seleccione */}
           <CasosManueales
-            categoria="(Listado aprobado)"
-            cantidad={casosAprobados.length}
+            categoria={categoriaMostrada}
+            baseRows={casosAprobados}
             auditores={["Auditor 1", "Auditor 2", "Auditor 3", "Auditor 4"]}
             onRegresar={() => setManual(false)}
             onAsignarRow={(row: any) => console.log("Asignado:", row)}

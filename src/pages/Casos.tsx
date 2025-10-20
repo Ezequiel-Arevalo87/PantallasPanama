@@ -1,169 +1,216 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/pages/Casos.tsx
+import * as React from "react";
 import {
-  Box, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Paper, Button, Dialog, DialogTitle, DialogContent,
-  DialogActions, Typography
+  Box, Paper, Button, Chip, Typography, Grid,
+  Table, TableHead, TableRow, TableCell, TableBody,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
+import { CASOS_KEY } from "../lib/aprobacionesStorage";
 
 type Caso = {
   id: number | string;
-  nombre: string;
   ruc: string;
+  nombre: string;
   categoria?: string;
   metaCategoria?: string;
+  auditor?: string;
+  auditorAsignado?: string;
+  fechaAsignacion?: string;
+  asignado?: boolean;
+  [k: string]: any;
 };
 
-type Auditor = { nombre: string; fm: number; gc: number; as: number };
-
 type Props = {
-  // Si viene 'casos', los distribuye equitativamente entre auditores.
-  casos?: Caso[];
+  casos?: Caso[];              // Lista que te llega (opcional)
+  auditoresUI?: string[];      // Auditores a mostrar (opcional)
   onRegresar?: () => void;
 };
 
-type DetalleItem = {
-  id: number | string;
-  tipo: "FISCALIZACIÓN MASIVA" | "GRANDES CONTRIBUYENTES" | "AUDITORÍA SECTORIAL";
-  nombre: string;
-  ruc: string;
-};
+// === Helpers storage ===
+function readStorage(): Caso[] {
+  try {
+    const raw = localStorage.getItem(CASOS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
-const toTipo = (c: string | undefined): DetalleItem["tipo"] => {
-  const s = (c || "").toLowerCase();
-  if (s.includes("grande")) return "GRANDES CONTRIBUYENTES";
-  if (s.includes("sector")) return "AUDITORÍA SECTORIAL";
-  return "FISCALIZACIÓN MASIVA";
-};
+function mergeWithStorage(base: Caso[], storage: Caso[]): Caso[] {
+  const byKey = new Map<string, Caso>();
+  for (const s of storage) {
+    const k = s.id != null ? `id:${String(s.id)}` : s.ruc ? `ruc:${String(s.ruc)}` : "";
+    if (k) byKey.set(k, s);
+  }
+  return base.map((b) => {
+    const k = b.id != null ? `id:${String(b.id)}` : b.ruc ? `ruc:${String(b.ruc)}` : "";
+    const s = (k && byKey.get(k)) || undefined;
+    if (!s) return b;
+    return {
+      ...b,
+      categoria: s.metaCategoria ?? s.categoria ?? b.metaCategoria ?? b.categoria,
+      metaCategoria: s.metaCategoria ?? b.metaCategoria,
+      auditor: s.auditorAsignado ?? s.auditor ?? b.auditor,
+      auditorAsignado: s.auditorAsignado ?? b.auditorAsignado,
+      fechaAsignacion: s.fechaAsignacion ?? b.fechaAsignacion,
+      asignado: s.asignado ?? b.asignado,
+    };
+  });
+}
 
-const DetalleModal: React.FC<{
-  open: boolean;
-  onClose: () => void;
-  titulo: string; // "AUDITOR x (Total: n)"
-  items: DetalleItem[];
-}> = ({ open, onClose, titulo, items }) => (
-  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-    <DialogTitle>{titulo}</DialogTitle>
-    <DialogContent dividers>
-      {items.length === 0 ? (
-        <Typography>No hay casos para mostrar.</Typography>
-      ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: "bold" }}>Tipo</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Nombre o Razón Social</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>RUC</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {items.map((it) => (
-                <TableRow key={String(it.id)}>
-                  <TableCell>{it.tipo}</TableCell>
-                  <TableCell>{it.nombre}</TableCell>
-                  <TableCell>{it.ruc}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-    </DialogContent>
-    <DialogActions>
-      <Button variant="contained" onClick={onClose}>REGRESAR</Button>
-    </DialogActions>
-  </Dialog>
-);
+// === Cálculos ===
+const CATS = ["Fiscalización Masiva", "Grandes Contribuyentes", "Auditoría Sectorial"];
 
-export const Casos: React.FC<Props> = ({ casos = [], onRegresar }) => {
-  // 3 auditores por defecto
-  const [auditores, setAuditores] = useState<Auditor[]>([
-    { nombre: "AUDITOR 1", fm: 0, gc: 0, as: 0 },
-    { nombre: "AUDITOR 2", fm: 0, gc: 0, as: 0 },
-    { nombre: "AUDITOR 3", fm: 0, gc: 0, as: 0 },
-  ]);
+function auditorOf(r: Caso) {
+  return r.auditorAsignado ?? r.auditor ?? "Sin auditor";
+}
+function categoriaOf(r: Caso) {
+  return r.metaCategoria ?? r.categoria ?? "Sin categoría";
+}
 
-  // Asignación: round-robin equitativo
-  const asignaciones = useMemo(() => {
-    const map: Record<string, DetalleItem[]> = {};
-    auditores.forEach((a) => (map[a.nombre] = []));
-    casos.forEach((c, i) => {
-      const auditor = auditores[i % auditores.length].nombre;
-      map[auditor].push({
-        id: c.id,
-        nombre: c.nombre,
-        ruc: c.ruc,
-        tipo: toTipo(c.metaCategoria ?? c.categoria),
-      });
-    });
-    return map;
-  }, [casos, auditores]);
+function buildCounters(rows: Caso[]) {
+  const counters = new Map<string, { [cat: string]: number; total: number }>();
+  for (const r of rows) {
+    const aud = auditorOf(r);
+    const cat = categoriaOf(r);
+    const row = counters.get(aud) ?? { total: 0 };
+    row[cat] = (row[cat] ?? 0) + 1;
+    row.total += 1;
+    counters.set(aud, row);
+  }
+  // normaliza columnas
+  for (const [, row] of counters) {
+    for (const c of CATS) if (row[c] == null) row[c] = 0;
+  }
+  return counters;
+}
 
-  // Totales por auditor y categoría
-  useEffect(() => {
-    const nuevo = auditores.map((a) => {
-      const items = asignaciones[a.nombre] || [];
-      const fm = items.filter((x) => x.tipo === "FISCALIZACIÓN MASIVA").length;
-      const gc = items.filter((x) => x.tipo === "GRANDES CONTRIBUYENTES").length;
-      const as = items.filter((x) => x.tipo === "AUDITORÍA SECTORIAL").length;
-      return { ...a, fm, gc, as };
-    });
-    setAuditores(nuevo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+const DEFAULT_AUDITORES = ["Auditor 1", "Auditor 2", "Auditor 3", "Auditor 4"];
+
+const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, onRegresar }) => {
+  const [rows, setRows] = React.useState<Caso[]>([]);
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [detailAuditor, setDetailAuditor] = React.useState<string | null>(null);
+
+  const reload = React.useCallback(() => {
+    const storage = readStorage();
+    const base = casos.length > 0 ? casos : storage; // si no te pasan props, usa storage
+    const merged = mergeWithStorage(base, storage);
+    setRows(merged);
   }, [casos]);
 
-  // Modal detalle
-  const [modal, setModal] = useState<{ open: boolean; titulo: string; items: DetalleItem[] }>({
-    open: false, titulo: "", items: []
-  });
+  React.useEffect(() => { reload(); }, [reload]);
 
-  const abrirDetalle = (a: Auditor) => {
-    const items = asignaciones[a.nombre] || [];
-    const total = items.length;
-    setModal({ open: true, titulo: `${a.nombre} — Detalle (Total: ${total})`, items });
+  // 🔔 Actualiza cuando manual dispara notifyAprobaciones()
+  React.useEffect(() => {
+    const onUpdate = () => reload();
+    window.addEventListener("casosAprobacion:update", onUpdate);
+    return () => window.removeEventListener("casosAprobacion:update", onUpdate);
+  }, [reload]);
+
+  const counters = React.useMemo(() => buildCounters(rows), [rows]);
+
+  // auditores para mostrar (UI + los que realmente existen en data)
+  const allAuditors = React.useMemo(() => {
+    const found = Array.from(counters.keys());
+    const set = new Set([...auditoresUI, ...found]);
+    return Array.from(set);
+  }, [counters, auditoresUI]);
+
+  // === Detalle ===
+  const openDetail = (aud: string) => {
+    setDetailAuditor(aud);
+    setDetailOpen(true);
   };
+  const closeDetail = () => setDetailOpen(false);
 
-  const cerrarDetalle = () => setModal((m) => ({ ...m, open: false }));
+  const detailRows = React.useMemo(() => {
+    if (!detailAuditor) return [];
+    return rows.filter((r) => auditorOf(r) === detailAuditor);
+  }, [rows, detailAuditor]);
 
   return (
-    <Box mt={3}>
-      <TableContainer component={Paper} sx={{ width: "auto" }}>
+    <Box component={Paper} sx={{ p: 2 }}>
+      <Grid container alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <Grid item><Typography variant="h6">Asignación automática</Typography></Grid>
+        <Grid item><Chip size="small" variant="outlined" color="primary" label={`Total casos: ${rows.length}`} /></Grid>
+      </Grid>
+
+      <Box sx={{ border: "1px solid #CFD8DC", borderRadius: 1, overflow: "hidden" }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell></TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>FISCALIZACIÓN MASIVA</TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>GRANDES CONTRIBUYENTES</TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>AUDITORÍA SECTORIAL</TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>TOTAL</TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>ACCIÓN</TableCell>
+              <TableCell>Auditor</TableCell>
+              {CATS.map((c) => <TableCell key={c} align="center">{c}</TableCell>)}
+              <TableCell align="center">TOTAL</TableCell>
+              <TableCell align="center">ACCIÓN</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {auditores.map((a) => {
-              const total = a.fm + a.gc + a.as;
+            {allAuditors.map((aud) => {
+              const row = counters.get(aud) ?? { total: 0, [CATS[0]]: 0, [CATS[1]]: 0, [CATS[2]]: 0 };
               return (
-                <TableRow key={a.nombre}>
-                  <TableCell sx={{ fontWeight: "bold" }}>{a.nombre}</TableCell>
-                  <TableCell align="center">{a.fm}</TableCell>
-                  <TableCell align="center">{a.gc}</TableCell>
-                  <TableCell align="center">{a.as}</TableCell>
-                  <TableCell align="center" style={{ fontWeight: "bold" }}>{total}</TableCell>
+                <TableRow key={aud}>
+                  <TableCell>{aud}</TableCell>
+                  {CATS.map((c) => (
+                    <TableCell key={c} align="center">{row[c] ?? 0}</TableCell>
+                  ))}
+                  <TableCell align="center">{row.total ?? 0}</TableCell>
                   <TableCell align="center">
-                    <Button variant="contained" onClick={() => abrirDetalle(a)}>DETALLE</Button>
+                    <Button size="small" variant="contained" onClick={() => openDetail(aud)}>
+                      DETALLE
+                    </Button>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
-      </TableContainer>
+      </Box>
 
-      <Box mt={2} display="flex" gap={2}>
+      <Box mt={2}>
         <Button variant="contained" onClick={onRegresar}>REGRESAR</Button>
       </Box>
 
-      <DetalleModal open={modal.open} onClose={cerrarDetalle} titulo={modal.titulo} items={modal.items} />
+      {/* === Dialog Detalle por Auditor === */}
+      <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
+        <DialogTitle>Detalle – {detailAuditor ?? ""}</DialogTitle>
+        <DialogContent dividers>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>RUC</TableCell>
+                <TableCell>Nombre o Razón Social</TableCell>
+                <TableCell>Categoría</TableCell>
+                <TableCell>Fecha asignación</TableCell>
+                <TableCell>Estado</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {detailRows.map((r) => (
+                <TableRow key={String(r.id) + String(r.ruc)}>
+                  <TableCell>{r.ruc}</TableCell>
+                  <TableCell>{r.nombre}</TableCell>
+                  <TableCell>{categoriaOf(r)}</TableCell>
+                  <TableCell>{r.fechaAsignacion ?? "—"}</TableCell>
+                  <TableCell>{r.asignado ? "Asignado" : "Pendiente"}</TableCell>
+                </TableRow>
+              ))}
+              {detailRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">Sin casos para este auditor</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={closeDetail}>CERRAR</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
+
+export { Casos };
+export default Casos;

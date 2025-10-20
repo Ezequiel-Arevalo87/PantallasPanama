@@ -42,7 +42,7 @@ type Row = {
   total?: number | string | null;
 };
 
-// ➕ Tipo extendido que guardaremos en Aprobación
+// ➕ Tipo extendido que guardaremos en Verificación
 export type RowAprobacion = Row & {
   metaCategoria?: string;
   metaInconsistencia?: string;
@@ -236,7 +236,7 @@ export default function PriorizacionForm({
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
-  /** Pasar a Aprobación: guarda selección con metadata y reemplaza lo previo */
+  /** Pasar a Verificación: guarda selección con metadata y reemplaza lo previo */
   const handleAprobar = async () => {
     const api = apiRef.current;
     if (!api) {
@@ -252,8 +252,8 @@ export default function PriorizacionForm({
 
     const { isConfirmed } = await Swal.fire({
       icon: "question",
-      title: "¿Pasar a Aprobación?",
-      html: `Se enviarán <b>${selected.length}</b> caso(s) a aprobación.<br/>Esto reemplazará cualquier lista previa.`,
+      title: "¿Pasar a Verificación?",
+      html: `Se enviarán <b>${selected.length}</b> caso(s) a verificación.<br/>Esto reemplazará cualquier lista previa.`,
       showCancelButton: true,
       confirmButtonText: "Sí, confirmar",
       cancelButtonText: "Cancelar",
@@ -264,7 +264,7 @@ export default function PriorizacionForm({
 
     const conMeta: RowAprobacion[] = selected.map((r) => ({
       ...r,
-      // ⚠️ fuerza que la Aprobación vea lo elegido aquí
+      // ⚠️ fuerza que la Verificación vea lo elegido aquí
       metaCategoria: categoria ?? r.categoria,
       metaInconsistencia: inconsistencia ?? undefined,
       metaPrograma: programa ?? null,
@@ -276,7 +276,7 @@ export default function PriorizacionForm({
     localStorage.setItem(CASOS_KEY, JSON.stringify(conMeta));
     notifyAprobaciones();
 
-    await Swal.fire({ icon: "success", title: "Guardado", text: `Se enviaron ${selected.length} caso(s) a Aprobación.`, confirmButtonText: "Listo" });
+    await Swal.fire({ icon: "success", title: "Guardado", text: `Se enviaron ${selected.length} caso(s) a Verificación.`, confirmButtonText: "Listo" });
   };
 
   // etiquetas dinámicas (solo para el subtítulo)
@@ -419,7 +419,7 @@ export default function PriorizacionForm({
           onClick={handleAprobar}
           disabled={selectedCount === 0}
         >
-          Pasar a Aprobación
+          Pasar a Verificación
         </Button>
       </Box>
     </Box>

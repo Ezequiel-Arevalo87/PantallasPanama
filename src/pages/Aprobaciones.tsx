@@ -4,20 +4,26 @@ import {
   Box, Paper, Button, Chip, Typography, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableHead, TableRow, TableCell, TableBody, Stack,
+  Tooltip, IconButton, TextField,
 } from "@mui/material";
 import {
   DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
   GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter, useGridApiRef,
-  
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
 
+// Icons
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
+import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
+import OpenInFullOutlinedIcon from "@mui/icons-material/OpenInFullOutlined";
+
 // =============== Tipos ===============
 type RowBase = {
   id: number | string;
-  categoria: string;               // categoría “real” del registro de datos
+  categoria: string;
   ruc: string;
   nombre: string;
   periodos: string;
@@ -25,12 +31,15 @@ type RowBase = {
   monto?: number | string | null;
   total?: number | string | null;
   estado?: "Pendiente" | "Aprobado";
+  // ✅ Nuevos (opcionales, no rompen nada):
+  motivoDevolucion?: string | null;
+  motivoAmpliar?: string | null;
 };
 
 // ✅ Metadata que llega desde Priorización
 type RowMeta = {
   metaCategoria?: string;
-  metaInconsistencia?: string;     // Omiso | Inexacto | Extemporáneo | …
+  metaInconsistencia?: string;
   metaPrograma?: string | null;
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
@@ -108,6 +117,12 @@ const Aprobaciones: React.FC = () => {
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
 
+  // Diálogo de motivo (para Devolver / Ampliar)
+  const [motivoOpen, setMotivoOpen] = React.useState(false);
+  const [motivoText, setMotivoText] = React.useState("");
+  const [motivoAction, setMotivoAction] = React.useState<"Devolver" | "Ampliar" | null>(null);
+  const [motivoRow, setMotivoRow] = React.useState<Row | null>(null);
+
   const openDetail = (row: Row) => { setDetailRow(row); setDetailOpen(true); };
   const closeDetail = () => setDetailOpen(false);
 
@@ -115,7 +130,6 @@ const Aprobaciones: React.FC = () => {
     try {
       const texto = localStorage.getItem(CASOS_KEY);
       const data: Row[] = texto ? JSON.parse(texto) : [];
-      // normaliza estado
       setRows(data.map((r) => (r.estado ? r : { ...r, estado: "Pendiente" as const })));
     } catch {
       setRows([]);
@@ -140,9 +154,8 @@ const Aprobaciones: React.FC = () => {
     setRows(data);
   };
 
-    const getValorDeFila = (row: any) =>
-  row?.valor ?? row?.monto ?? row?.total ?? 0;
-
+  const getValorDeFila = (row: any) =>
+    row?.valor ?? row?.monto ?? row?.total ?? 0;
 
   const aprobarUno = async (row: Row) => {
     const { isConfirmed } = await Swal.fire({
@@ -163,7 +176,6 @@ const Aprobaciones: React.FC = () => {
       r.id === row.id ? { ...r, estado: "Aprobado" as const } : r
     );
 
-  
     persist(updated);
     await Swal.fire({ icon: "success", title: "Aprobado", text: "El caso fue aprobado correctamente.", confirmButtonText: "Listo" });
   };
@@ -197,20 +209,62 @@ const Aprobaciones: React.FC = () => {
     await Swal.fire({ icon: "success", title: "Aprobados", text: "Selección aprobada correctamente.", confirmButtonText: "Listo" });
   };
 
+  // --- Abrir diálogo de motivo para Devolver / Ampliar ---
+  const abrirMotivo = (accion: "Devolver" | "Ampliar", row: Row) => {
+    setMotivoAction(accion);
+    setMotivoRow(row);
+    setMotivoText("");
+    setMotivoOpen(true);
+  };
+  const cerrarMotivo = () => {
+    setMotivoOpen(false);
+    setMotivoText("");
+    setMotivoAction(null);
+    setMotivoRow(null);
+  };
+  const confirmarMotivo = async () => {
+    if (!motivoAction || !motivoRow) return;
+
+    const texto = motivoText.trim();
+    if (!texto) {
+      await Swal.fire({ icon: "info", title: "Motivo requerido", text: "Por favor escribe un motivo.", confirmButtonText: "Ok" });
+      return;
+    }
+
+    const updated = rows.map((r) => {
+      if (r.id !== motivoRow.id) return r;
+      if (motivoAction === "Devolver") {
+        return { ...r, motivoDevolucion: texto };
+      }
+      // Ampliar
+      return { ...r, motivoAmpliar: texto };
+    });
+
+    persist(updated);
+    cerrarMotivo();
+
+    await Swal.fire({
+      icon: "success",
+      title: motivoAction === "Devolver" ? "Devuelto" : "Solicitud de ampliación",
+      text: motivoAction === "Devolver"
+        ? "Se guardó el motivo de devolución."
+        : "Se guardó el motivo para ampliar información.",
+      confirmButtonText: "Listo",
+    });
+  };
+
   const columns: GridColDef<Row>[] = [
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
     {
-  field: "valor" as any,
-  headerName: "Valor (B/.)",
-  flex: 0.8,
-  minWidth: 150,
-  // ✅ Evita crashear si params o row aún no existen
-  valueGetter: (p:any) => getValorDeFila(p?.row),
-  valueFormatter: (p:any) => fmtMoney.format(toNumber(p?.value)),
-},
-
+      field: "valor" as any,
+      headerName: "Valor (B/.)",
+      flex: 0.8,
+      minWidth: 150,
+      valueGetter: (p: any) => getValorDeFila(p?.row),
+      valueFormatter: (p: any) => fmtMoney.format(toNumber(p?.value)),
+    },
     {
       field: "estado",
       headerName: "Estado",
@@ -235,24 +289,56 @@ const Aprobaciones: React.FC = () => {
       filterable: false,
       align: "center",
       headerAlign: "center",
-      minWidth: 200,
+      minWidth: 260,
       renderCell: (params) => {
         const row = params.row as Row;
         const aprobado = (row.estado ?? "Pendiente") === "Aprobado";
         return (
-          <Stack direction="row" spacing={1}>
-            <Button size="small" variant="contained" onClick={() => openDetail(row)}>
-              DETALLE
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="success"
-              disabled={aprobado}
-              onClick={() => aprobarUno(row)}
-            >
-              APROBAR
-            </Button>
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Detalle">
+              <span>
+                <IconButton size="small" onClick={() => openDetail(row)}>
+                  <InfoOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Aprobar">
+              <span>
+                <IconButton
+                  size="small"
+                  color="success"
+                  disabled={aprobado}
+                  onClick={() => aprobarUno(row)}
+                >
+                  <CheckCircleOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Devolver (ingresar motivo)">
+              <span>
+                <IconButton
+                  size="small"
+                  color="warning"
+                  onClick={() => abrirMotivo("Devolver", row)}
+                >
+                  <UndoOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Ampliar (solicitar información)">
+              <span>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  onClick={() => abrirMotivo("Ampliar", row)}
+                >
+                  <OpenInFullOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Stack>
         );
       },
@@ -311,7 +397,6 @@ const Aprobaciones: React.FC = () => {
               <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid item xs={12} md={4}>
                   <Typography variant="caption">Categoría</Typography>
-                  {/* ✅ privilegia metadata enviada desde Priorización */}
                   <Box component={Paper} sx={{ p: 1 }}>
                     {detailRow.metaCategoria ?? detailRow.categoria ?? "—"}
                   </Box>
@@ -343,6 +428,20 @@ const Aprobaciones: React.FC = () => {
                     <Box component={Paper} sx={{ p: 1 }}>
                       {detailRow.metaActividadEconomica.join(", ")}
                     </Box>
+                  </Grid>
+                )}
+
+                {/* Mostrar motivos si existen */}
+                {detailRow.motivoDevolucion && (
+                  <Grid item xs={12}>
+                    <Typography variant="caption">Motivo de devolución</Typography>
+                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoDevolucion}</Box>
+                  </Grid>
+                )}
+                {detailRow.motivoAmpliar && (
+                  <Grid item xs={12}>
+                    <Typography variant="caption">Motivo para ampliar</Typography>
+                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoAmpliar}</Box>
                   </Grid>
                 )}
               </Grid>
@@ -387,6 +486,38 @@ const Aprobaciones: React.FC = () => {
             <Button variant="outlined" size="small">PDF</Button>
           </Stack>
           <Button variant="contained" onClick={closeDetail}>CERRAR</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo Motivo (Devolver / Ampliar) */}
+      <Dialog open={motivoOpen} onClose={cerrarMotivo} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {motivoAction === "Devolver" ? "Motivo de devolución" : "Motivo para ampliar información"}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1}>
+            {motivoRow && (
+              <>
+                <Typography variant="body2"><b>RUC:</b> {motivoRow.ruc}</Typography>
+                <Typography variant="body2"><b>Nombre:</b> {motivoRow.nombre}</Typography>
+              </>
+            )}
+            <TextField
+              label="Escribe el motivo"
+              value={motivoText}
+              onChange={(e) => setMotivoText(e.target.value)}
+              fullWidth
+              multiline
+              minRows={3}
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cerrarMotivo}>Cancelar</Button>
+          <Button variant="contained" onClick={confirmarMotivo}>
+            Guardar motivo
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

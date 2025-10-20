@@ -18,6 +18,8 @@ import HistorialCumplimiento from './HistorialCumplimiento';
 import AnalisisFiscal from './AnalisisFiscal';
 import Aprobaciones from './Aprobaciones';
 import { InicioSelectorForm } from './InicioSelectorForm';
+import Verificacion from './Verificacion';
+import Home from './Home';
 
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
@@ -25,7 +27,7 @@ const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
 const DIR_PATH = 'PROCESOS DE AUDITORIAS/DIRECTOR';
 
 export const Layout: React.FC = () => {
-  const [selectedPath, setSelectedPath] = useState<string>('');
+  const [selectedPath, setSelectedPath] = useState<string>('HOME'); // ← Home por defecto
   const [readOnly, setReadOnly] = useState<boolean>(false);
 
   // último segmento de la ruta
@@ -59,10 +61,12 @@ export const Layout: React.FC = () => {
 
   const renderContent = () => {
     switch (leaf) {
-      case 'SELECTOR DE CASOS':
-        return <InicioSelectorForm />;
-      case 'PRIORIZACIÓN':
+        case 'HOME':
+      return <Home />;
+      case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
         return <Priorizacion />;
+      case 'VERIFICACIÓN':
+        return <Verificacion />;
       case 'APROBACIÓN':
         return <Aprobaciones />;
       case 'ASIGNACIÓN':
