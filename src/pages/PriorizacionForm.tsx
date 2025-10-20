@@ -285,7 +285,7 @@ export default function PriorizacionForm({
   return (
     <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
       {/* Resumen de filtros */}
-      <Box sx={{ px: 2, pt: 1 }}>
+      {/* <Box sx={{ px: 2, pt: 1 }}>
         <Grid container spacing={1} alignItems="center">
           <Grid item>
             <Typography variant="body2">Seleccionados: <b>{selectedCount}</b></Typography>
@@ -306,7 +306,7 @@ export default function PriorizacionForm({
           )}
           <Grid item><Chip color="primary" variant="outlined" label={`Reglas activas: ${condiciones?.length ?? 0}`} size="small" /></Grid>
         </Grid>
-      </Box>
+      </Box> */}
 
       <DataGrid
         sx={{ height: 420 }}

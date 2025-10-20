@@ -131,23 +131,17 @@ const Verificacion: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
+    
+    { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
     {
-      field: "valor" as any,
-      headerName: "Valor (B/.)",
-      flex: 0.8,
-      minWidth: 150,
-      valueGetter: (p: any) => p?.row?.valor ?? p?.row?.monto ?? p?.row?.total ?? 0,
-      valueFormatter: (p: any) => fmtMoney.format(toNumber(p?.value)),
-    },
-    {
-      field: "acciones",
+       field: "acciones",
       headerName: "Acciones",
       sortable: false,
       filterable: false,
       align: "center",
       headerAlign: "center",
       minWidth: 140,
-      renderCell: (params) => (
+    renderCell: (params) => (
         <Button size="small" variant="contained" onClick={() => openDetail(params.row as Row)}>
           DETALLE
         </Button>

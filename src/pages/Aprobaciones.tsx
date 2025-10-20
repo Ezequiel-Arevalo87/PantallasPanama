@@ -257,14 +257,9 @@ const Aprobaciones: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
-    {
-      field: "valor" as any,
-      headerName: "Valor (B/.)",
-      flex: 0.8,
-      minWidth: 150,
-      valueGetter: (p: any) => getValorDeFila(p?.row),
-      valueFormatter: (p: any) => fmtMoney.format(toNumber(p?.value)),
-    },
+    
+             
+    { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
     {
       field: "estado",
       headerName: "Estado",
@@ -357,8 +352,8 @@ const Aprobaciones: React.FC = () => {
     <Box component={Paper} sx={{ p: 2 }}>
       <Grid container alignItems="center" spacing={1} sx={{ mb: 1 }}>
         <Grid item><Typography variant="h6">Aprobaciones</Typography></Grid>
-        <Grid item><Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} /></Grid>
-        <Grid item><Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount ?? 0}`} /></Grid>
+        {/* <Grid item><Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} /></Grid>
+        <Grid item><Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount ?? 0}`} /></Grid> */}
         <Grid item sx={{ ml: "auto" }}>
           <Button
             size="small"
