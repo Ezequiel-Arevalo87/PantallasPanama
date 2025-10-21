@@ -1,6 +1,4 @@
 // src/lib/workflowStorage.ts
-
-// ===== Clave y eventos =====
 export const CASOS_KEY = "casosAprobacion" as const;
 export const notifyAprobaciones = () =>
   window.dispatchEvent(new Event("casosAprobacion:update"));
@@ -16,7 +14,6 @@ export const readCasos = <T = any>(): T[] => {
 export const readAprobados = <T = any>(): T[] =>
   readCasos<T>().filter((r: any) => (r?.estado ?? "Pendiente") === "Aprobado");
 
-// ===== Tipos de flujo =====
 export type FaseFlujo =
   | "SELECTOR DE CASOS Y PRIORIZACIÓN"
   | "VERIFICACIÓN"
@@ -30,7 +27,8 @@ export type PasoHistorial = {
   to: FaseFlujo;
   by: string;
   note?: string;
-  at: string;
+  at: string;               // ISO
+  deadline?: string | null; // opcional
 };
 
 export type CasoFlujo = {
@@ -40,10 +38,10 @@ export type CasoFlujo = {
   categoria?: string;
   estado?: string;
   fase?: FaseFlujo;
+  deadline?: string | null; // opcional
   history?: PasoHistorial[];
 };
 
-// ===== Helpers =====
 const writeCasos = (casos: CasoFlujo[]) => {
   localStorage.setItem(CASOS_KEY, JSON.stringify(casos));
   notifyAprobaciones();
@@ -72,28 +70,40 @@ export const getNextFase = (fase?: FaseFlujo | null): FaseFlujo | null => {
 
 const uuid = () => Math.random().toString(36).slice(2, 10);
 
-export const avanzarCaso = (opts: {
+export type AvanzarOpts = {
   id: string | number;
   to: FaseFlujo;
   by: string;
   note?: string;
-}) => {
-  const { id, to, by, note } = opts;
+  deadline?: string | null;
+};
+
+export const avanzarCaso = (opts: AvanzarOpts) => {
+  const { id, to, by, note, deadline } = opts;
   const casos = readCasos<CasoFlujo>();
   const i = casos.findIndex((c) => String(c.id) === String(id));
   const now = new Date().toISOString();
 
   if (i >= 0) {
     const from = casos[i].fase ?? null;
-    const paso: PasoHistorial = { idPaso: uuid(), from, to, by, note, at: now };
     casos[i] = {
       ...casos[i],
       fase: to,
-      history: [...(casos[i].history ?? []), paso],
+      ...(typeof deadline !== "undefined" ? { deadline } : {}),
+      history: [
+        ...(casos[i].history ?? []),
+        { idPaso: uuid(), from, to, by, note, at: now, deadline: typeof deadline !== "undefined" ? deadline : (casos[i].deadline ?? null) },
+      ],
     };
   } else {
-    const paso: PasoHistorial = { idPaso: uuid(), from: null, to, by, note, at: now };
-    casos.push({ id, ruc: "", nombre: "", fase: to, history: [paso] });
+    casos.push({
+      id,
+      ruc: "",
+      nombre: "",
+      fase: to,
+      deadline: typeof deadline !== "undefined" ? deadline : null,
+      history: [{ idPaso: uuid(), from: null, to, by, note, at: now, deadline: typeof deadline !== "undefined" ? deadline : null }],
+    });
   }
 
   writeCasos(casos);
