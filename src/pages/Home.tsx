@@ -49,8 +49,7 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
   const renderLinea = (c: CasoFlujo) => {
     const last = c.history?.[c.history.length - 1];
-    const faseActual = (c.fase ??
-      "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
+    const faseActual = (c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
     const next = getNextFase(faseActual);
 
     let diasRestantes: number | null = null;
@@ -97,7 +96,12 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                 <Typography color="text.secondary">• RUC {c.ruc || "—"}</Typography>
                 <Chip size="small" label={faseActual} sx={{ ml: 1 }} />
                 {c.estado === "Aprobado" && (
-                  <Chip size="small" color="success" icon={<CheckCircleOutlineIcon />} label="Aprobado" />
+                  <Chip
+                    size="small"
+                    color="success"
+                    icon={<CheckCircleOutlineIcon />}
+                    label="Aprobado"
+                  />
                 )}
               </Stack>
             }
@@ -106,11 +110,15 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                 {last ? (
                   <Typography variant="body2" color="text.secondary">
                     {last.from ? `De ${last.from} → ` : ""}
-                    <b>{last.to}</b> • asignó <b>{last.by}</b> • {new Date(last.at).toLocaleString()}
-                    {last.note ? ` • “${last.note}”` : ""} {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
+                    <b>{last.to}</b> • asignó <b>{last.by}</b> •{" "}
+                    {new Date(last.at).toLocaleString()}
+                    {last.note ? ` • “${last.note}”` : ""}{" "}
+                    {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
                   </Typography>
                 ) : (
-                  <Typography variant="body2" color="text.secondary">Sin historial</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Sin historial
+                  </Typography>
                 )}
 
                 {c.deadline && diasRestantes !== null && (
@@ -119,11 +127,18 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                     sx={{
                       mt: 0.5,
                       color:
-                        diasRestantes === 0 ? "error.main" :
-                        diasRestantes <= 3 ? "warning.main" : "text.secondary",
+                        diasRestantes === 0
+                          ? "error.main"
+                          : diasRestantes <= 3
+                          ? "warning.main"
+                          : "text.secondary",
                     }}
                   >
-                    Fecha límite: <b>{new Date(c.deadline).toLocaleDateString()} ({diasRestantes} días restantes)</b>
+                    Fecha límite:{" "}
+                    <b>
+                      {new Date(c.deadline).toLocaleDateString()} ({diasRestantes} días
+                      restantes)
+                    </b>
                   </Typography>
                 )}
               </Box>
@@ -144,46 +159,57 @@ export const Home: React.FC<Props> = ({ onGo }) => {
     return map;
   }, [casos]);
 
-  const abrirDialogoAsignacion = () => {
-    const primero = casos.find((c) => c.fase === "ASIGNACIÓN");
-    if (!primero) return;
-    const opener = openersRef.current.get(primero.id);
-    opener?.();
-  };
+  // Usamos el primer caso (solo para conectar el botón "Ver todos")
+  const primerCaso = casos[0];
+  const faseActual = (primerCaso?.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" fontWeight={700}>Bandeja de pasos</Typography>
+        <Typography variant="h6" fontWeight={700}>
+          Bandeja de pasos
+        </Typography>
         <Typography variant="body2" color="text.secondary">
           Avanza cada caso al siguiente paso. El botón cambia automáticamente:
           Selector → Verificación → Aprobación → Asignación → Inicio de auditoría.
         </Typography>
 
-        <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" alignItems="center">
-          {Array.from(totalPorFase.entries()).map(([fase, n]) => {
-            const chip = <Chip key={fase} label={`${fase}: ${n}`} />;
-            if (fase === "ASIGNACIÓN") {
-              return (
-                <Stack key={fase} direction="row" spacing={0.5} alignItems="center">
-                  {chip}
-                  <Tooltip title="Ver todos">
-                    <IconButton size="small" aria-label="Ver todos en Asignación" onClick={abrirDialogoAsignacion}>
-                      <VisibilityRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              );
-            }
-            return chip;
-          })}
+        <Stack
+          direction="row"
+          spacing={1}
+          mt={1}
+          flexWrap="wrap"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+            {Array.from(totalPorFase.entries()).map(([fase, n]) => (
+              <Chip key={fase} label={`${fase}: ${n}`} />
+            ))}
+          </Stack>
+
+          {/* 🔹 Mismo botón "Ir a tarea" pero versión icono con tooltip “Ver todos” */}
+          {primerCaso && (
+            <AdvanceToNext
+              renderAs="icon"
+              tooltip="Ver todos"
+              casoId={primerCaso.id}
+              currentFase={faseActual}
+              defaultBy="Home"
+              onGo={onGo}
+            />
+          )}
         </Stack>
       </Paper>
 
       <Paper variant="outlined">
         <List disablePadding>
-          {casos.length ? casos.map(renderLinea) : (
-            <Box p={3}><Typography color="text.secondary">Sin casos por mostrar.</Typography></Box>
+          {casos.length ? (
+            casos.map(renderLinea)
+          ) : (
+            <Box p={3}>
+              <Typography color="text.secondary">Sin casos por mostrar.</Typography>
+            </Box>
           )}
         </List>
       </Paper>
