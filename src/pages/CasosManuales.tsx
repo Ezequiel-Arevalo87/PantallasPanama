@@ -13,6 +13,7 @@ import {
   MenuItem,
   Button,
   Typography,
+  Checkbox,
 } from "@mui/material";
 import dayjs from "dayjs";
 import Swal from "sweetalert2";
@@ -48,8 +49,10 @@ type Fila = {
   nombre: string;
   ruc: string;
   fecha: string;
-  auditor?: string;   // seleccionado en el combo
-  asignado?: boolean; // si ya está asignado
+  auditor?: string;      // seleccionado en el combo
+  asignado?: boolean;    // si ya está asignado
+  bloquear?: boolean;    // 👈 NUEVO
+  red?: string;          // 👈 NUEVO ("659" | "675")
 };
 
 function readStorageArray(): any[] {
@@ -102,6 +105,9 @@ export const CasosManueales: React.FC<Props> = ({
           fecha: hoy.add(idx % 6, "day").format("DD/MM/YY"),
           auditor: asignado ? auditorGuardado : "",
           asignado,
+          // 👇 precarga desde storage si había
+          bloquear: Boolean(stored?.bloquear ?? false),
+          red: stored?.red ?? "",
         };
       });
     }
@@ -119,6 +125,8 @@ export const CasosManueales: React.FC<Props> = ({
         fecha: hoy.add(i % 6, "day").format("DD/MM/YY"),
         auditor: "",
         asignado: false,
+        bloquear: false,
+        red: "",
       });
     }
     return out;
@@ -128,6 +136,14 @@ export const CasosManueales: React.FC<Props> = ({
 
   const handleChangeAuditor = (id: number | string, value: string) => {
     setFilas(prev => prev.map(f => (f.id === id ? { ...f, auditor: value } : f)));
+  };
+
+  const handleChangeBloquear = (id: number | string, value: boolean) => {
+    setFilas(prev => prev.map(f => (f.id === id ? { ...f, bloquear: value } : f)));
+  };
+
+  const handleChangeRed = (id: number | string, value: string) => {
+    setFilas(prev => prev.map(f => (f.id === id ? { ...f, red: value } : f)));
   };
 
   const handleAsignar = async (row: Fila) => {
@@ -179,6 +195,9 @@ export const CasosManueales: React.FC<Props> = ({
         auditorAsignado: row.auditor,
         fechaAsignacion: dayjs().format("YYYY-MM-DD"),
         asignado: true,
+        // 👇 NUEVO: persistimos bloquear y red
+        bloquear: Boolean(row.bloquear),
+        red: row.red ?? "",
       };
 
       if (idx >= 0) {
@@ -198,7 +217,7 @@ export const CasosManueales: React.FC<Props> = ({
       // no romper UX si el storage falla
     }
 
-    // 🎉 Éxito (sin ocultar la tabla, para permitir re-asignar si se quiere)
+    // 🎉 Éxito
     await Swal.fire({
       icon: "success",
       title: reasignando ? "Reasignado" : "Asignado",
@@ -228,13 +247,15 @@ export const CasosManueales: React.FC<Props> = ({
       <TableContainer component={Paper} sx={{ border: "1px solid #b0bec5", width: "auto" }}>
         <Table>
           <TableHead>
-            {/* ❌ Encabezado sin color especial */}
             <TableRow>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }}>Categoría</TableCell>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }}>Nombre o Razón Social</TableCell>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }}>RUC</TableCell>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }}>Fecha</TableCell>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }} align="center">Auditor</TableCell>
+              {/* 👇 NUEVAS COLUMNAS */}
+              <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }} align="center">Bloquear</TableCell>
+              <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }} align="center">Red</TableCell>
               <TableCell sx={{ fontWeight: "bold", border: "1px solid #b0bec5" }} align="center">Acción</TableCell>
             </TableRow>
           </TableHead>
@@ -247,7 +268,7 @@ export const CasosManueales: React.FC<Props> = ({
                 <TableCell sx={{ border: "1px solid #b0bec5" }}>{row.ruc}</TableCell>
                 <TableCell sx={{ border: "1px solid #b0bec5" }}>{row.fecha}</TableCell>
 
-                {/* Auditor (Select) - SIEMPRE HABILITADO */}
+                {/* Auditor */}
                 <TableCell sx={{ border: "1px solid #b0bec5" }} align="center">
                   <Select
                     size="small"
@@ -261,7 +282,32 @@ export const CasosManueales: React.FC<Props> = ({
                   </Select>
                 </TableCell>
 
-                {/* Acción - SIEMPRE HABILITADA (permite re-asignar) */}
+                {/* Bloquear */}
+                <TableCell sx={{ border: "1px solid #b0bec5" }} align="center">
+                  <Checkbox
+                    checked={Boolean(row.bloquear)}
+                    onChange={(e) => handleChangeBloquear(row.id, e.target.checked)}
+                    inputProps={{ "aria-label": "bloquear" }}
+                  />
+                </TableCell>
+
+                {/* Red */}
+                <TableCell sx={{ border: "1px solid #b0bec5" }} align="center">
+                  <Select
+                    size="small"
+                    value={row.red ?? ""}
+                    onChange={(e) => handleChangeRed(row.id, String(e.target.value))}
+                    displayEmpty
+                    sx={{ minWidth: 120 }}
+                    renderValue={(val) => (val ? String(val) : "—")}
+                  >
+                    <MenuItem value=""><em>Ninguna</em></MenuItem>
+                    <MenuItem value="659">659</MenuItem>
+                    <MenuItem value="675">675</MenuItem>
+                  </Select>
+                </TableCell>
+
+                {/* Acción */}
                 <TableCell sx={{ border: "1px solid #b0bec5" }} align="center">
                   <Button variant="contained" onClick={() => handleAsignar(row)}>
                     {row.asignado ? "REASIGNAR" : "ASIGNAR"}

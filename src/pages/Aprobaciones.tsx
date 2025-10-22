@@ -20,7 +20,7 @@ import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import OpenInFullOutlinedIcon from "@mui/icons-material/OpenInFullOutlined";
 
-// =============== Tipos ===============
+/* ===================== Tipos ===================== */
 type RowBase = {
   id: number | string;
   categoria: string;
@@ -31,12 +31,10 @@ type RowBase = {
   monto?: number | string | null;
   total?: number | string | null;
   estado?: "Pendiente" | "Aprobado";
-  // ✅ Nuevos (opcionales, no rompen nada):
   motivoDevolucion?: string | null;
   motivoAmpliar?: string | null;
 };
 
-// ✅ Metadata que llega desde Priorización
 type RowMeta = {
   metaCategoria?: string;
   metaInconsistencia?: string;
@@ -46,25 +44,46 @@ type RowMeta = {
   metaPeriodoFinal?: string | null;
 };
 
-type Row = RowBase & RowMeta;
+// 👉 fila que usaremos en la tabla (incluye número seguro)
+type Row = RowBase & RowMeta & {
+  valorNum: number; // número para mostrar/ordenar/formatear
+};
 
-// =============== Utils ===============
+/* ===================== Utils ===================== */
+// Parse robusto: acepta "1,745,320.90", "3.100.450,10", "654,00", "520000"
 const toNumber = (v: any): number => {
   if (v === null || v === undefined) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+
   let s = String(v).trim();
-  s = s.replace(/[^\d.,\-]/g, "");
-  s = s.replace(/\.(?=\d{3}(\D|$))/g, "");
-  s = s.replace(/,/, ".");
-  const n = parseFloat(s);
+  if (!s) return 0;
+
+  s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
+  const lastDot = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+  let decimalSep: "." | "," | null = null;
+  if (lastDot !== -1 || lastComma !== -1) decimalSep = lastComma > lastDot ? "," : ".";
+  if (decimalSep) {
+    const thousandSep = decimalSep === "." ? "," : ".";
+    s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
+    if (decimalSep === ",") s = s.replace(/,/g, ".");
+  } else {
+    s = s.replace(/[^\d\-]/g, "");
+  }
+  const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 };
 
-const fmtMoney = new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// ✅ Formato 1,000,000.00
+const fmtMoneyUS = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
 
 function buildBreakdown(row: Row) {
-  const total = toNumber((row as any).valor ?? (row as any).monto ?? (row as any).total);
+  const total = row.valorNum || 0;
   if (!total) {
     return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
   }
@@ -107,7 +126,7 @@ const inconsLabels = (inc?: string | null) => {
   }
 };
 
-// =============== Componente ===============
+/* ===================== Componente ===================== */
 const Aprobaciones: React.FC = () => {
   const apiRef = useGridApiRef();
 
@@ -129,8 +148,13 @@ const Aprobaciones: React.FC = () => {
   const loadFromStorage = React.useCallback(() => {
     try {
       const texto = localStorage.getItem(CASOS_KEY);
-      const data: Row[] = texto ? JSON.parse(texto) : [];
-      setRows(data.map((r) => (r.estado ? r : { ...r, estado: "Pendiente" as const })));
+      const data: (RowBase & RowMeta)[] = texto ? JSON.parse(texto) : [];
+      const withNum: Row[] = data.map((r) => ({
+        ...r,
+        estado: r.estado ?? "Pendiente",
+        valorNum: toNumber(r.valor ?? r.monto ?? r.total), // 👈 número seguro
+      }));
+      setRows(withNum);
     } catch {
       setRows([]);
     }
@@ -154,16 +178,11 @@ const Aprobaciones: React.FC = () => {
     setRows(data);
   };
 
-  const getValorDeFila = (row: any) =>
-    row?.valor ?? row?.monto ?? row?.total ?? 0;
-
   const aprobarUno = async (row: Row) => {
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Aprobar caso?",
-      html: `<b>${row.nombre}</b><br/>RUC: ${row.ruc}<br/>Valor: <b>B/. ${fmtMoney.format(
-        toNumber((row as any).valor ?? (row as any).monto ?? (row as any).total)
-      )}</b>`,
+      html: `<b>${row.nombre}</b><br/>RUC: ${row.ruc}<br/>Valor: <b>B/. ${fmtMoneyUS.format(row.valorNum)}</b>`,
       showCancelButton: true,
       confirmButtonText: "Sí, aprobar",
       cancelButtonText: "Cancelar",
@@ -203,13 +222,12 @@ const Aprobaciones: React.FC = () => {
     if (!isConfirmed) return;
 
     const ids = new Set(seleccion.map((r) => r.id));
-    const updated = rows.map((r) => ids.has(r.id) ? { ...r, estado: "Aprobado" as const } : r);
+    const updated = rows.map((r) => (ids.has(r.id) ? { ...r, estado: "Aprobado" as const } : r));
 
     persist(updated);
     await Swal.fire({ icon: "success", title: "Aprobados", text: "Selección aprobada correctamente.", confirmButtonText: "Listo" });
   };
 
-  // --- Abrir diálogo de motivo para Devolver / Ampliar ---
   const abrirMotivo = (accion: "Devolver" | "Ampliar", row: Row) => {
     setMotivoAction(accion);
     setMotivoRow(row);
@@ -236,7 +254,6 @@ const Aprobaciones: React.FC = () => {
       if (motivoAction === "Devolver") {
         return { ...r, motivoDevolucion: texto };
       }
-      // Ampliar
       return { ...r, motivoAmpliar: texto };
     });
 
@@ -257,9 +274,25 @@ const Aprobaciones: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
-    
-             
-    { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
+
+    // ✅ Misma lógica de formato que el resto (en-US con dos decimales)
+    {
+      field: "valorNum",
+      headerName: "Valor (B/.)",
+      type: "number",
+      flex: 0.8,
+      minWidth: 160,
+      sortable: true,
+      valueGetter: (params:any) => Number(params.row?.valorNum) ?? 0, // ordena por número real
+      renderCell: (params) => {
+        const num = typeof params.row?.valorNum === "number"
+          ? params.row.valorNum
+          : Number(params.row?.valorNum) || 0;
+        return fmtMoneyUS.format(num); // -> 1,000,000.00
+      },
+      sortComparator: (a, b) => (Number(a) || 0) - (Number(b) || 0),
+    },
+
     {
       field: "estado",
       headerName: "Estado",
@@ -271,7 +304,7 @@ const Aprobaciones: React.FC = () => {
           <Chip
             size="small"
             label={value}
-            color={aprobado ? "success" : "default"}
+           
             variant={aprobado ? "filled" : "outlined"}
           />
         );
@@ -311,7 +344,7 @@ const Aprobaciones: React.FC = () => {
               </span>
             </Tooltip>
 
-            <Tooltip title="Devolver (ingresar motivo)">
+            <Tooltip title="Cierre (ingresar motivo)">
               <span>
                 <IconButton
                   size="small"
@@ -345,15 +378,12 @@ const Aprobaciones: React.FC = () => {
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
-  // etiqueta dinámica para el subtítulo
   const inc = inconsLabels(detailRow?.metaInconsistencia);
 
   return (
     <Box component={Paper} sx={{ p: 2 }}>
       <Grid container alignItems="center" spacing={1} sx={{ mb: 1 }}>
         <Grid item><Typography variant="h6">Aprobaciones</Typography></Grid>
-        {/* <Grid item><Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} /></Grid>
-        <Grid item><Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount ?? 0}`} /></Grid> */}
         <Grid item sx={{ ml: "auto" }}>
           <Button
             size="small"
@@ -384,7 +414,6 @@ const Aprobaciones: React.FC = () => {
 
       {/* Modal Detalle */}
       <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
-        {/* ✅ TÍTULO sin “inexactos” */}
         <DialogTitle>Detalle de períodos</DialogTitle>
         <DialogContent dividers>
           {detailRow && (
@@ -426,7 +455,6 @@ const Aprobaciones: React.FC = () => {
                   </Grid>
                 )}
 
-                {/* Mostrar motivos si existen */}
                 {detailRow.motivoDevolucion && (
                   <Grid item xs={12}>
                     <Typography variant="caption">Motivo de devolución</Typography>
@@ -441,7 +469,6 @@ const Aprobaciones: React.FC = () => {
                 )}
               </Grid>
 
-              {/* ✅ Subtítulo dinámico (ej: “Cantidad de períodos omisos”) */}
               <Typography sx={{ mb: 1 }} variant="subtitle2">
                 {`Cantidad de períodos ${inc.singular}`}
               </Typography>
@@ -460,11 +487,11 @@ const Aprobaciones: React.FC = () => {
                       <TableRow>
                         {bd.items.map((it) => (
                           <TableCell key={it.periodo} align="right">
-                            {fmtMoney.format(it.monto)}
+                            {fmtMoneyUS.format(it.monto)}
                           </TableCell>
                         ))}
                         <TableCell align="right">
-                          <b>{fmtMoney.format(bd.total)}</b>
+                          <b>{fmtMoneyUS.format(bd.total)}</b>
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -510,9 +537,7 @@ const Aprobaciones: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={cerrarMotivo}>Cancelar</Button>
-          <Button variant="contained" onClick={confirmarMotivo}>
-            Guardar motivo
-          </Button>
+          <Button variant="contained" onClick={confirmarMotivo}>Guardar motivo</Button>
         </DialogActions>
       </Dialog>
     </Box>

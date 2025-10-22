@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   Box, Paper, Button, Chip, Typography, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableHead, TableRow, TableCell, TableBody, Stack
+  Table, TableHead, TableRow, TableCell, TableBody
 } from "@mui/material";
 import {
   DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
@@ -24,7 +24,6 @@ type RowBase = {
   monto?: number | string | null;
   total?: number | string | null;
   estado?: "Pendiente" | "Aprobado";
-  // Se mantienen opcionales por si vuelven a usarse en el futuro:
   motivoDevolucion?: string | null;
   motivoAmpliar?: string | null;
 };
@@ -38,21 +37,36 @@ type RowMeta = {
   metaPeriodoFinal?: string | null;
 };
 
-type Row = RowBase & RowMeta;
+// 👉 fila que usaremos en la tabla (ya con número real para mostrar/ordenar)
+type Row = RowBase & RowMeta & {
+  valorNum: number; // 👈 número seguro (con o sin decimales)
+};
 
 // =============== Utils ===============
 const toNumber = (v: any): number => {
   if (v === null || v === undefined) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  // Limpieza robusta: quita símbolos, maneja miles/decimales mixtos
   let s = String(v).trim();
-  s = s.replace(/[^\d.,\-]/g, "");
-  s = s.replace(/\.(?=\d{3}(\D|$))/g, "");
-  s = s.replace(/,/, ".");
-  const n = parseFloat(s);
+  if (!s) return 0;
+  s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
+  const lastDot = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+  let decimalSep: "." | "," | null = null;
+  if (lastDot !== -1 || lastComma !== -1) decimalSep = lastComma > lastDot ? "," : ".";
+  if (decimalSep) {
+    const thousandSep = decimalSep === "." ? "," : ".";
+    s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
+    if (decimalSep === ",") s = s.replace(/,/g, ".");
+  } else {
+    s = s.replace(/[^\d\-]/g, "");
+  }
+  const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 };
 
-const fmtMoney = new Intl.NumberFormat("es-PA", {
+// ✅ Formato 1,000,000.00
+const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -60,7 +74,7 @@ const fmtMoney = new Intl.NumberFormat("es-PA", {
 const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
 
 function buildBreakdown(row: Row) {
-  const total = toNumber((row as any).valor ?? (row as any).monto ?? (row as any).total);
+  const total = row.valorNum || 0; // 👈 usamos el número ya calculado
   if (!total) {
     return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
   }
@@ -107,8 +121,16 @@ const Verificacion: React.FC = () => {
   const loadFromStorage = React.useCallback(() => {
     try {
       const texto = localStorage.getItem(CASOS_KEY);
-      const data: Row[] = texto ? JSON.parse(texto) : [];
-      setRows(data.map((r) => (r.estado ? r : { ...r, estado: "Pendiente" as const })));
+      const data: (RowBase & RowMeta)[] = texto ? JSON.parse(texto) : [];
+      const withNum: Row[] = data.map((r) => {
+        const n = toNumber(r.valor ?? r.monto ?? r.total);
+        return {
+          ...r,
+          estado: r.estado ?? "Pendiente",
+          valorNum: n, // 👈 número seguro (puede tener decimales)
+        };
+      });
+      setRows(withNum);
     } catch {
       setRows([]);
     }
@@ -131,17 +153,39 @@ const Verificacion: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
-    
-    { field: "valor", headerName: "Valor (B/.)", type: "number", flex: 0.8, minWidth: 160, sortable: true },
+
+    // 👇 misma lógica de formato que en Priorización: mostramos valorNum con en-US
     {
-       field: "acciones",
+      field: "valorNum",
+      headerName: "Valor (B/.)",
+      type: "number",
+      flex: 0.8,
+      minWidth: 160,
+      sortable: true,
+
+      // el grid ordena numéricamente
+      valueGetter: (params:any) => Number(params.row?.valorNum) ?? 0,
+
+      // pintamos con 1,000,000.00 evitando dobles formateos
+      renderCell: (params) => {
+        const num = typeof params.row?.valorNum === "number"
+          ? params.row.valorNum
+          : Number(params.row?.valorNum) || 0;
+        return fmtMoneyUS.format(num);
+      },
+
+      sortComparator: (a, b) => (Number(a) || 0) - (Number(b) || 0),
+    },
+
+    {
+      field: "acciones",
       headerName: "Acciones",
       sortable: false,
       filterable: false,
       align: "center",
       headerAlign: "center",
       minWidth: 140,
-    renderCell: (params) => (
+      renderCell: (params) => (
         <Button size="small" variant="contained" onClick={() => openDetail(params.row as Row)}>
           DETALLE
         </Button>
@@ -181,7 +225,7 @@ const Verificacion: React.FC = () => {
     });
     if (!isConfirmed) return;
 
-    // ✅ Enviar SOLO lo seleccionado
+    // ✅ Enviar SOLO lo seleccionado (se conserva el valorNum en el objeto)
     localStorage.setItem(CASOS_KEY, JSON.stringify(seleccion));
     notifyAprobaciones(); // refresca en el mismo tab
 
@@ -197,8 +241,12 @@ const Verificacion: React.FC = () => {
     <Box component={Paper} sx={{ p: 2 }}>
       <Grid container alignItems="center" spacing={1} sx={{ mb: 1 }}>
         <Grid item><Typography variant="h6">Verificación</Typography></Grid>
-        <Grid item><Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} /></Grid>
-        <Grid item><Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount}`} /></Grid>
+        <Grid item>
+          <Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} />
+        </Grid>
+        <Grid item>
+          <Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount}`} />
+        </Grid>
       </Grid>
 
       <DataGrid
@@ -209,7 +257,7 @@ const Verificacion: React.FC = () => {
         checkboxSelection
         disableRowSelectionOnClick
         onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
-        onRowDoubleClick={(p) => openDetail(p.row as Row)}   // doble click también abre el detalle
+        onRowDoubleClick={(p) => openDetail(p.row as Row)}
         slots={{ toolbar: CustomToolbar }}
         slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
         pageSizeOptions={[5, 10, 25, 50]}
@@ -294,11 +342,11 @@ const Verificacion: React.FC = () => {
                       <TableRow>
                         {bd.items.map((it) => (
                           <TableCell key={it.periodo} align="right">
-                            {fmtMoney.format(it.monto)}
+                            {fmtMoneyUS.format(it.monto)}
                           </TableCell>
                         ))}
                         <TableCell align="right">
-                          <b>{fmtMoney.format(bd.total)}</b>
+                          <b>{fmtMoneyUS.format(bd.total)}</b>
                         </TableCell>
                       </TableRow>
                     </TableBody>
