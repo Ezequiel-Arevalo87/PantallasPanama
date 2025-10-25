@@ -20,6 +20,8 @@ import Aprobaciones from './Aprobaciones';
 import { InicioSelectorForm } from './InicioSelectorForm';
 import Verificacion from './Verificacion';
 import Home from './Home'; // ✅ import correcto (no el ícono)
+import TrazabilidadBusqueda from './TrazabilidadBusqueda';
+import ConsultasDeEstado from './ConsultasDeEstado';
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
 const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
@@ -58,7 +60,9 @@ export const Layout: React.FC = () => {
   const renderContent = () => {
     switch (leaf) {
       case 'HOME':
-        return <Home onGo={handleSelect} />;   // ✅ se pasa el callback
+        return <Home onGo={handleSelect} />; 
+        case 'TRAZABILIDAD':
+  return <TrazabilidadBusqueda />;  // ✅ se pasa el callback
       case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
         return <Priorizacion />;
       case 'VERIFICACIÓN':
@@ -73,6 +77,8 @@ export const Layout: React.FC = () => {
         return <AnalisisFiscal />;
       case 'VARIACIÓN EN INGRESOS':
         return <VariacionesIngreso />;
+      case 'CONSULTAS DE ESTADOS':
+        return <ConsultasDeEstado/>
       case 'INICIO DE AUDITORIA':
         return <Apertura />;
       case 'AUDITOR':

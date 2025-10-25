@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   Box, Paper, Button, Chip, Typography, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableHead, TableRow, TableCell, TableBody
+  Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab
 } from "@mui/material";
 import {
   DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
@@ -12,8 +12,9 @@ import {
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
 import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
+import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
-// =============== Tipos ===============
+/* =============== Tipos =============== */
 type RowBase = {
   id: number | string;
   categoria: string;
@@ -37,16 +38,16 @@ type RowMeta = {
   metaPeriodoFinal?: string | null;
 };
 
-// 👉 fila que usaremos en la tabla (ya con número real para mostrar/ordenar)
+// 👉 fila de la tabla (+ número real para ordenar/mostrar + trazabilidad opcional)
 type Row = RowBase & RowMeta & {
-  valorNum: number; // 👈 número seguro (con o sin decimales)
+  valorNum: number;
+  trazas?: TrazaItem[];
 };
 
-// =============== Utils ===============
+/* =============== Utils =============== */
 const toNumber = (v: any): number => {
   if (v === null || v === undefined) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  // Limpieza robusta: quita símbolos, maneja miles/decimales mixtos
   let s = String(v).trim();
   if (!s) return 0;
   s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
@@ -74,7 +75,7 @@ const fmtMoneyUS = new Intl.NumberFormat("en-US", {
 const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
 
 function buildBreakdown(row: Row) {
-  const total = row.valorNum || 0; // 👈 usamos el número ya calculado
+  const total = row.valorNum || 0;
   if (!total) {
     return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
   }
@@ -105,7 +106,13 @@ function CustomToolbar() {
   );
 }
 
-// =============== Componente ===============
+/* ===== Mock de trazas si la fila aún no las trae ===== */
+const mockTrazas = (ruc: string): TrazaItem[] => [
+  { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), actor: "Supervisor A", accion: "Revisión", estado: "PENDIENTE", detalle: "Ingreso a verificación" },
+  { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(), actor: "Auditor B", accion: "Análisis", estado: "APROBADO", detalle: "Documentación completa" },
+];
+
+/* =============== Componente =============== */
 const Verificacion: React.FC = () => {
   const apiRef = useGridApiRef();
 
@@ -114,8 +121,9 @@ const Verificacion: React.FC = () => {
 
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
+  const [tab, setTab] = React.useState(0);
 
-  const openDetail = (row: Row) => { setDetailRow(row); setDetailOpen(true); };
+  const openDetail = (row: Row) => { setDetailRow(row); setTab(0); setDetailOpen(true); };
   const closeDetail = () => setDetailOpen(false);
 
   const loadFromStorage = React.useCallback(() => {
@@ -127,7 +135,9 @@ const Verificacion: React.FC = () => {
         return {
           ...r,
           estado: r.estado ?? "Pendiente",
-          valorNum: n, // 👈 número seguro (puede tener decimales)
+          valorNum: n,
+          // si ya viene con trazas, se respetan; si no, mock mín.
+          trazas: (r as any).trazas ?? mockTrazas(String(r.ruc)),
         };
       });
       setRows(withNum);
@@ -153,8 +163,6 @@ const Verificacion: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
-
-    // 👇 misma lógica de formato que en Priorización: mostramos valorNum con en-US
     {
       field: "valorNum",
       headerName: "Valor (B/.)",
@@ -162,21 +170,15 @@ const Verificacion: React.FC = () => {
       flex: 0.8,
       minWidth: 160,
       sortable: true,
-
-      // el grid ordena numéricamente
       valueGetter: (params:any) => Number(params.row?.valorNum) ?? 0,
-
-      // pintamos con 1,000,000.00 evitando dobles formateos
       renderCell: (params) => {
         const num = typeof params.row?.valorNum === "number"
           ? params.row.valorNum
           : Number(params.row?.valorNum) || 0;
         return fmtMoneyUS.format(num);
       },
-
       sortComparator: (a, b) => (Number(a) || 0) - (Number(b) || 0),
     },
-
     {
       field: "acciones",
       headerName: "Acciones",
@@ -225,9 +227,8 @@ const Verificacion: React.FC = () => {
     });
     if (!isConfirmed) return;
 
-    // ✅ Enviar SOLO lo seleccionado (se conserva el valorNum en el objeto)
     localStorage.setItem(CASOS_KEY, JSON.stringify(seleccion));
-    notifyAprobaciones(); // refresca en el mismo tab
+    notifyAprobaciones();
 
     await Swal.fire({
       icon: "success",
@@ -272,87 +273,102 @@ const Verificacion: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Modal Detalle */}
+      {/* Modal Detalle con Tabs */}
       <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
-        <DialogTitle>Detalle de períodos</DialogTitle>
+        <DialogTitle>Detalle del caso</DialogTitle>
         <DialogContent dividers>
           {detailRow && (
             <>
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption">Categoría</Typography>
-                  <Box component={Paper} sx={{ p: 1 }}>
-                    {detailRow.metaCategoria ?? detailRow.categoria ?? "—"}
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption">RUC</Typography>
-                  <Box component={Paper} sx={{ p: 1 }}>{detailRow.ruc}</Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption">Nombre</Typography>
-                  <Box component={Paper} sx={{ p: 1 }}>{detailRow.nombre}</Box>
-                </Grid>
+              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+                <Tab label="Información" />
+                <Tab label="Trazabilidad" />
+              </Tabs>
 
-                {!!detailRow.metaPrograma && (
-                  <Grid item xs={12} md={4}>
-                    <Typography variant="caption">Programa</Typography>
-                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaPrograma}</Box>
-                  </Grid>
-                )}
-                {!!detailRow.metaInconsistencia && (
-                  <Grid item xs={12} md={4}>
-                    <Typography variant="caption">Inconsistencia</Typography>
-                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaInconsistencia}</Box>
-                  </Grid>
-                )}
-                {!!detailRow.metaActividadEconomica?.length && (
-                  <Grid item xs={12}>
-                    <Typography variant="caption">Actividad(es) económica(s)</Typography>
-                    <Box component={Paper} sx={{ p: 1 }}>
-                      {detailRow.metaActividadEconomica.join(", ")}
-                    </Box>
-                  </Grid>
-                )}
-                {detailRow.motivoDevolucion && (
-                  <Grid item xs={12}>
-                    <Typography variant="caption">Motivo de devolución</Typography>
-                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoDevolucion}</Box>
-                  </Grid>
-                )}
-                {detailRow.motivoAmpliar && (
-                  <Grid item xs={12}>
-                    <Typography variant="caption">Motivo para ampliar</Typography>
-                    <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoAmpliar}</Box>
-                  </Grid>
-                )}
-              </Grid>
+              {tab === 0 && (
+                <Box>
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid item xs={12} md={4}>
+                      <Typography variant="caption">Categoría</Typography>
+                      <Box component={Paper} sx={{ p: 1 }}>
+                        {detailRow.metaCategoria ?? detailRow.categoria ?? "—"}
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Typography variant="caption">RUC</Typography>
+                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.ruc}</Box>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <Typography variant="caption">Nombre</Typography>
+                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.nombre}</Box>
+                    </Grid>
 
-              {(() => {
-                const bd = buildBreakdown(detailRow);
-                return (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        {PERIODOS_FIJOS.map((p) => <TableCell key={p} align="right">{p}</TableCell>)}
-                        <TableCell align="right"><b>Total</b></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      <TableRow>
-                        {bd.items.map((it) => (
-                          <TableCell key={it.periodo} align="right">
-                            {fmtMoneyUS.format(it.monto)}
-                          </TableCell>
-                        ))}
-                        <TableCell align="right">
-                          <b>{fmtMoneyUS.format(bd.total)}</b>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                );
-              })()}
+                    {!!detailRow.metaPrograma && (
+                      <Grid item xs={12} md={4}>
+                        <Typography variant="caption">Programa</Typography>
+                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaPrograma}</Box>
+                      </Grid>
+                    )}
+                    {!!detailRow.metaInconsistencia && (
+                      <Grid item xs={12} md={4}>
+                        <Typography variant="caption">Inconsistencia</Typography>
+                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaInconsistencia}</Box>
+                      </Grid>
+                    )}
+                    {!!detailRow.metaActividadEconomica?.length && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption">Actividad(es) económica(s)</Typography>
+                        <Box component={Paper} sx={{ p: 1 }}>
+                          {detailRow.metaActividadEconomica.join(", ")}
+                        </Box>
+                      </Grid>
+                    )}
+                    {detailRow.motivoDevolucion && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption">Motivo de devolución</Typography>
+                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoDevolucion}</Box>
+                      </Grid>
+                    )}
+                    {detailRow.motivoAmpliar && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption">Motivo para ampliar</Typography>
+                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoAmpliar}</Box>
+                      </Grid>
+                    )}
+                  </Grid>
+
+                  {(() => {
+                    const bd = buildBreakdown(detailRow);
+                    return (
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            {PERIODOS_FIJOS.map((p) => <TableCell key={p} align="right">{p}</TableCell>)}
+                            <TableCell align="right"><b>Total</b></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          <TableRow>
+                            {bd.items.map((it) => (
+                              <TableCell key={it.periodo} align="right">
+                                {fmtMoneyUS.format(it.monto)}
+                              </TableCell>
+                            ))}
+                            <TableCell align="right">
+                              <b>{fmtMoneyUS.format(bd.total)}</b>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    );
+                  })()}
+                </Box>
+              )}
+
+              {tab === 1 && (
+                <Box>
+                  <Trazabilidad rows={detailRow.trazas ?? []} height={360} />
+                </Box>
+              )}
             </>
           )}
         </DialogContent>

@@ -63,6 +63,7 @@ const buildPath = (parent: string, label: string) =>
 const useMenuData = () => {
 
   const home: MenuNode[] = [{ label: "HOME" }];
+  const trazabilidad: MenuNode[] = [{ label: 'TRAZABILIDAD' }];
   const selectorCaso: MenuNode[] = [
     { label: 'SELECTOR DE CASOS Y PRIORIZACIÓN' },
   ];
@@ -87,6 +88,7 @@ const useMenuData = () => {
   // ];
 
   const auditorias: MenuNode[] = [
+    {label : 'CONSULTAS DE ESTADOS'},
     { label: 'INICIO DE AUDITORIA' },
     {
       label: 'GESTIÓN DE AUDITORIA',
@@ -117,13 +119,13 @@ const useMenuData = () => {
     { label: 'MÓDULO ALERTAS' },
   ];
 
-  return { home, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
+  return { home, trazabilidad, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-  const { home, auditorias, modulos, selectorCaso, priorizacion, aprobacion,  asignacion } = useMenuData();
+  const { home, trazabilidad, auditorias, modulos, selectorCaso, priorizacion, aprobacion,  asignacion } = useMenuData();
 
 
   const ROOTS = useMemo(() => ['SELECTOR DE CASOS Y PRIORIZACIÓN', 'PROCESOS DE AUDITORIAS'] as const, []);
@@ -208,7 +210,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
         })}
 
         <Divider sx={{ my: 1.5 }} />
+        {/* NUEVO: Trazabilidad simple */}
+{trazabilidad.map((t) => {
+  const path = t.label;
+  return (
+    <ListItemButton key={path} sx={{ ...SECTION_STYLE, py: 1 }} onClick={() => onSelect(path)} selected={selected === path}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
+        {t.label}
+      </Typography>
+    </ListItemButton>
+  );
+})}
+
+<Divider sx={{ my: 1.5 }} />
         {/* Selector de Casos simple al tope */}
+
         {selectorCaso.map((s) => {
           const path = s.label;
           return (

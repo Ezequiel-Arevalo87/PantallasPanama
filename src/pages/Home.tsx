@@ -14,6 +14,8 @@ import {
   Divider,
   Tooltip,
   IconButton,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -26,12 +28,21 @@ import {
 } from "../lib/workflowStorage";
 import AdvanceToNext from "../components/AdvanceToNext";
 
+// ==========================================================
+//  Home con dos pestañas: "Tareas sin realizar" y "Realizadas"
+//  - En "sin realizar" se muestran los casos cuyo estado !== "Aprobado"
+//  - En "realizadas" se muestran los casos con estado === "Aprobado"
+//  - Cuando un caso está Aprobado, el botón de ir a tarea se deshabilita
+//    y se muestra un tooltip "Ya está aprobado".
+// ==========================================================
+
 type Props = {
   onGo?: (path: string) => void;
 };
 
 export const Home: React.FC<Props> = ({ onGo }) => {
   const [casos, setCasos] = useState<CasoFlujo[]>([]);
+  const [tab, setTab] = useState<0 | 1>(0); // 0: pendientes, 1: realizadas
   const openersRef = useRef<Map<string | number, () => void>>(new Map());
 
   const cargar = () => setCasos(readCasosOrdenados());
@@ -47,10 +58,24 @@ export const Home: React.FC<Props> = ({ onGo }) => {
     };
   }, []);
 
+  const pendientes = useMemo(
+    () => casos.filter((c) => c.estado !== "Aprobado"),
+    [casos]
+  );
+  const realizadas = useMemo(
+    () => casos.filter((c) => c.estado === "Aprobado"),
+    [casos]
+  );
+
+  // Colección activa según la pestaña
+  const activos = tab === 0 ? pendientes : realizadas;
+
   const renderLinea = (c: CasoFlujo) => {
     const last = c.history?.[c.history.length - 1];
     const faseActual = (c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
     const next = getNextFase(faseActual);
+
+    const isAprobado = c.estado === "Aprobado";
 
     let diasRestantes: number | null = null;
     if (c.deadline) {
@@ -71,15 +96,26 @@ export const Home: React.FC<Props> = ({ onGo }) => {
           }}
           secondaryAction={
             <Box sx={{ mr: 1 }}>
-              <AdvanceToNext
-                renderAs="icon"
-                tooltip="Ir a tarea"
-                casoId={c.id}
-                currentFase={faseActual}
-                defaultBy="Home"
-                onGo={onGo}
-                registerOpen={(fn) => openersRef.current.set(c.id, fn)}
-              />
+              {isAprobado ? (
+                <Tooltip title="Ya está aprobado">
+                  {/* envolver en span para que Tooltip funcione con disabled */}
+                  <span>
+                    <IconButton disabled>
+                      <VisibilityRoundedIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : (
+                <AdvanceToNext
+                  renderAs="icon"
+                  tooltip="Ir a tarea"
+                  casoId={c.id}
+                  currentFase={faseActual}
+                  defaultBy="Home"
+                  onGo={onGo}
+                  registerOpen={(fn) => openersRef.current.set(c.id, fn)}
+                />
+              )}
             </Box>
           }
         >
@@ -95,7 +131,7 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                 <Typography fontWeight={700}>{c.nombre || "(Sin nombre)"}</Typography>
                 <Typography color="text.secondary">• RUC {c.ruc || "—"}</Typography>
                 <Chip size="small" label={faseActual} sx={{ ml: 1 }} />
-                {c.estado === "Aprobado" && (
+                {isAprobado && (
                   <Chip
                     size="small"
                     color="success"
@@ -110,10 +146,8 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                 {last ? (
                   <Typography variant="body2" color="text.secondary">
                     {last.from ? `De ${last.from} → ` : ""}
-                    <b>{last.to}</b> • asignó <b>{last.by}</b> •{" "}
-                    {new Date(last.at).toLocaleString()}
-                    {last.note ? ` • “${last.note}”` : ""}{" "}
-                    {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
+                    <b>{last.to}</b> • asignó <b>{last.by}</b> • {new Date(last.at).toLocaleString()}
+                    {last.note ? ` • “${last.note}”` : ""} {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
                   </Typography>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
@@ -127,17 +161,16 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                     sx={{
                       mt: 0.5,
                       color:
-                        diasRestantes === 0
-                          ? "error.main"
-                          : diasRestantes <= 3
-                          ? "warning.main"
-                          : "text.secondary",
+                        diasRestantes <= 2
+                          ? "error.main" // 0-2 días: rojo
+                          : diasRestantes <= 5
+                          ? "warning.main" // 3-5 días: amarillo
+                          : "success.main", // >5 días: verde
                     }}
                   >
                     Fecha límite:{" "}
                     <b>
-                      {new Date(c.deadline).toLocaleDateString()} ({diasRestantes} días
-                      restantes)
+                      {new Date(c.deadline).toLocaleDateString()} ({diasRestantes} días restantes)
                     </b>
                   </Typography>
                 )}
@@ -152,26 +185,35 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
   const totalPorFase = useMemo(() => {
     const map = new Map<FaseFlujo, number>();
-    casos.forEach((c) => {
+    (activos || []).forEach((c) => {
       const f = (c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
       map.set(f, (map.get(f) ?? 0) + 1);
     });
     return map;
-  }, [casos]);
+  }, [activos]);
 
-  // Usamos el primer caso (solo para conectar el botón "Ver todos")
-  const primerCaso = casos[0];
+  // Usamos el primer caso activo (solo para conectar el botón "Ver todos")
+  const primerCaso = activos[0];
   const faseActual = (primerCaso?.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+      {/* ======== Tabs ======== */}
+      <Paper variant="outlined" sx={{ mb: 2 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} aria-label="tabs tareas">
+          <Tab label={`Tareas sin realizar (${pendientes.length})`} />
+          <Tab label={`Tareas realizadas (${realizadas.length})`} />
+        </Tabs>
+      </Paper>
+
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>
-          Bandeja de pasos
+          {tab === 0 ? "Bandeja de pasos" : "Tareas realizadas"}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Avanza cada caso al siguiente paso. El botón cambia automáticamente:
-          Selector → Verificación → Aprobación → Asignación → Inicio de auditoría.
+          {tab === 0
+            ? "Avanza cada caso al siguiente paso. El botón cambia automáticamente: Selector → Verificación → Aprobación → Asignación → Inicio de auditoría."
+            : "Listado de casos aprobados. No es posible abrir la tarea desde aquí."}
         </Typography>
 
         <Stack
@@ -188,8 +230,8 @@ export const Home: React.FC<Props> = ({ onGo }) => {
             ))}
           </Stack>
 
-          {/* 🔹 Mismo botón "Ir a tarea" pero versión icono con tooltip “Ver todos” */}
-          {primerCaso && (
+          {/* 🔹 Botón versión icono con tooltip “Ver todos” en la fase del primer caso activo */}
+          {primerCaso && tab === 0 && (
             <AdvanceToNext
               renderAs="icon"
               tooltip="Ver todos"
@@ -204,11 +246,13 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
       <Paper variant="outlined">
         <List disablePadding>
-          {casos.length ? (
-            casos.map(renderLinea)
+          {activos.length ? (
+            activos.map(renderLinea)
           ) : (
             <Box p={3}>
-              <Typography color="text.secondary">Sin casos por mostrar.</Typography>
+              <Typography color="text.secondary">
+                {tab === 0 ? "No hay tareas pendientes." : "No hay tareas realizadas."}
+              </Typography>
             </Box>
           )}
         </List>

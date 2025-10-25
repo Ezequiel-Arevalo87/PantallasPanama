@@ -361,7 +361,7 @@ export const Priorizacion: React.FC = () => {
           condiciones={[]}
           categoria={form.categoria}
           inconsistencia={form.inconsistencia}
-          actividadEconomica={esAS ? form.actividadEconomica : []}  // <— si no es AS, va vacío
+          actividadEconomica={esAS ? form.actividadEconomica : []}
           valoresDeclarados={form.valoresDeclarados}
           programa={form.programa}
           periodoInicial={form.periodoInicial}
@@ -370,6 +370,7 @@ export const Priorizacion: React.FC = () => {
           valorFiltro={valorBalboas}
         />
       )}
+
     </Box>
   );
 };
