@@ -108,8 +108,8 @@ function CustomToolbar() {
 
 /* ===== Mock de trazas si la fila aún no las trae ===== */
 const mockTrazas = (ruc: string): TrazaItem[] => [
-  { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), actor: "Supervisor A", accion: "Revisión", estado: "PENDIENTE", detalle: "Ingreso a verificación" },
-  { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(), actor: "Auditor B", accion: "Análisis", estado: "APROBADO", detalle: "Documentación completa" },
+  { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), actor: "Supervisor A", accion: "Revisión", estado: "PENDIENTE",  },
+  { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(), actor: "Auditor B", accion: "Análisis", estado: "APROBADO", },
 ];
 
 /* =============== Componente =============== */
