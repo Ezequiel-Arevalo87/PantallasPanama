@@ -24,15 +24,23 @@ import {
 } from '../helpers/data';
 
 type Paso = 'inicio' | 'tabla' | 'form' | 'detalle';
-type Nivel = 'AUDITOR' | 'SUPERVISOR' | 'DIRECTOR';
+export type Nivel = 'AUDITOR' | 'SUPERVISOR' | 'DIRECTOR';
+
+type Props = {
+  readOnly?: boolean;
+  setReadOnly?: (v: boolean) => void;
+
+  // Nuevo: permitir control externo del nivel
+  nivel?: Nivel;
+  setNivel?: React.Dispatch<React.SetStateAction<Nivel>>;
+};
 
 export default function AutoAperturaFlow({
   readOnly,
   setReadOnly,
-}: {
-  readOnly: any;
-  setReadOnly: any;
-}) {
+  nivel: nivelProp,
+  setNivel: setNivelProp,
+}: Props) {
   const [paso, setPaso] = useState<Paso>('inicio');
   const [rucSeleccionado, setRucSeleccionado] = useState<string>('');
 
@@ -45,8 +53,20 @@ export default function AutoAperturaFlow({
   const [alcance, setAlcance] =
     useState<Required<Alcance> | null>(null);
 
-  // Nuevo: nivel del flujo
-  const [nivel, setNivel] = useState<Nivel>('AUDITOR');
+  // === CONTROL de nivel: soporta controlado y no-controlado
+  const isControlled = nivelProp !== undefined && setNivelProp !== undefined;
+  const [nivelLocal, setNivelLocal] = useState<Nivel>(nivelProp ?? 'AUDITOR');
+
+  // si viene nivelProp desde fuera, sincronizamos el espejo local
+  useEffect(() => {
+    if (nivelProp !== undefined) setNivelLocal(nivelProp);
+  }, [nivelProp]);
+
+  const nivel: Nivel = isControlled ? (nivelProp as Nivel) : nivelLocal;
+  const setNivelUnified = (n: Nivel) => {
+    if (isControlled) setNivelProp!(n);
+    else setNivelLocal(n);
+  };
 
   // (Opcional) sincroniza con tus props legacy readOnly/setReadOnly
   useEffect(() => {
@@ -73,25 +93,25 @@ export default function AutoAperturaFlow({
     const objCompleto = withDefaultsDos(baseObj, ruc);
     setInvestigacionObtejo(objCompleto);
 
-    // 3) Alcance / objeto 2
+    // 3) Objeto 2
     const baseObjDos = INVESTIGACIONOBJETODOS[ruc] ?? {};
     const objCompletoDos = withDefaultsCuatro(baseObjDos, ruc);
     setInvestigacionObtejoDos(objCompletoDos);
 
-    // 4) Alcance (tabla de documentos y demás si aplica)
+    // 4) Alcance
     const baseAlcance = ALCANCE[ruc] ?? {};
     const alcanceCompleto = withDefaultsTres(baseAlcance, ruc);
     setAlcance(alcanceCompleto);
 
     // Entrar al detalle siempre como AUDITOR
-    setNivel('AUDITOR');
+    setNivelUnified('AUDITOR');
     setPaso('detalle');
   };
 
   return (
     <Box>
-      <Typography variant="h6" color="error" align="center" sx={{ mb: 2 }}>
-        PROGRAMACIÓN DE AUTO DE APERTURA
+      <Typography variant="h6" color="succes" align="center" sx={{ mb: 2 }}>
+        INFORME DE AUDITORIA
       </Typography>
 
       {paso === 'inicio' && (
@@ -127,12 +147,12 @@ export default function AutoAperturaFlow({
             investigacionObtejo={investigacionObtejo}
             investigacionObtejoDos={investigacionObtejoDos}
             alcance={alcance}
-            // Control de flujo por nivel
+            // Control de flujo por nivel (unificado)
             nivel={nivel}
-            setNivel={setNivel}
-            // Compatibilidad legacy (si aún los usas en el hijo)
+            setNivel={setNivelUnified}
+            // Compatibilidad legacy
             readOnly={nivel !== 'AUDITOR'}
-            setReadOnly={(ro: boolean) => setNivel(ro ? 'SUPERVISOR' : 'AUDITOR')}
+            setReadOnly={() => { /* legacy no-op */ }}
           />
 
           <Box mt={2} display="flex" justifyContent="space-between">

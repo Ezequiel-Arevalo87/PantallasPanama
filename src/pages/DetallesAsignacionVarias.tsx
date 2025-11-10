@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import dayjs from 'dayjs';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 export type TipoRevisionIn =
   | 'REVISIÓN AUDITOR'
@@ -27,6 +28,10 @@ const normalize = (t: TipoRevisionIn): TipoCanonico => {
   return 'AUDITOR';
 };
 
+// === Ruta a la plantilla PDF (colócala en public/plantillas/) ===
+const PLANTILLA_URL = '/plantillas/plantilla-acta-inicio.pdf';
+
+
 export const DetallesAsignacionVarias: React.FC<Props> = ({ tipo }) => {
   const tipoN = normalize(tipo);
 
@@ -38,6 +43,7 @@ export const DetallesAsignacionVarias: React.FC<Props> = ({ tipo }) => {
   const [periodo, setPeriodo] = useState('');
   const [ruc, setRuc] = useState('');
   const [numeroAuto, setNumeroAuto] = useState('');
+  const [estado, setEstado] = useState<'PARCIAL' | 'TOTAL'>('PARCIAL'); // por si quieres variarlo
   const [mensaje, setMensaje] = useState('');
 
   useEffect(() => {
@@ -53,11 +59,98 @@ export const DetallesAsignacionVarias: React.FC<Props> = ({ tipo }) => {
   const notify = (t: string) => { setMensaje(t); setTimeout(() => setMensaje(''), 4000); };
   const handleVisualizar = () => notify('👁️ Abriendo Acta de Inicio de Fiscalización…');
 
+  // =========================
+  // Generar PDF desde plantilla
+  // =========================
+  const generarActaPDF = async () => {
+    try {
+      // 1) Cargar plantilla
+      const resp = await fetch(PLANTILLA_URL);
+      const arrayBuffer = await resp.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+      // 2) Fuentes y página
+      const page = pdfDoc.getPages()[0];
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      // 3) Helper para texto
+      const draw = (text: string, x: number, y: number, opts?: { size?: number; bold?: boolean }) => {
+        const size = opts?.size ?? 11;
+        const usedFont = opts?.bold ? fontBold : font;
+        page.drawText(text ?? '', {
+          x, y,
+          size,
+          font: usedFont,
+          color: rgb(0, 0, 0),
+        });
+      };
+
+      // =========================================
+      // 4) Escribir campos dinámicos en la plantilla
+      // Nota: coordenadas aproximadas (en puntos PDF).
+      //       Si necesitas ajustar, mueve x/y levemente.
+      //       El (0,0) está abajo-izquierda.
+      // =========================================
+
+      // Encabezado tabla: DOCUMENTO / ESTADO / FECHA
+      // (Coordenadas aproximadas para un A4)
+      draw(numeroAuto || '—', 72, 700, { bold: true });        // DOCUMENTO
+      draw(estado,           260, 700, { bold: true });         // ESTADO
+      draw(
+        dayjs(fechaAsignacion || new Date()).format('DD/MM/YYYY'),
+        430, 700, { bold: true }
+      ); // FECHA
+
+      // Señor(es)
+      draw('Señor(es)', 72, 655, { bold: true });
+      draw('______________________________________', 72, 643);
+      // Si tienes el nombre, puedes sustituir aquí:
+      // draw(nombreContribuyente, 72, 643);
+
+      // RUC
+      draw('Ruc', 72, 620, { bold: true });
+      draw((ruc && ruc.trim()) ? ruc : '____________________________', 110, 620);
+
+      // Frase/Referencia (puedes personalizarla)
+      draw('Referencia: Acta de Inicio de Fiscalización', 72, 595);
+
+      // Firma/autoridad (parte inferior aprox.)
+      if (auditor) {
+        draw(`Auditor: ${auditor}`, 72, 140);
+      }
+      if (supervisor) {
+        draw(`Supervisor: ${supervisor}`, 72, 125);
+      }
+
+      // 5) Serializar y abrir/descargar
+      const pdfBytes:any = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+
+      // Abrir en nueva pestaña
+      window.open(url, '_blank', 'noopener,noreferrer');
+
+      // Forzar descarga
+      const a = document.createElement('a');
+      a.href = url;
+      const nombreArchivo = `ActaInicio_${numeroAuto || 'sin-numero'}_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
+      a.download = nombreArchivo;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      notify('📝 Acta generada correctamente.');
+    } catch (err) {
+      console.error(err);
+      notify('⚠️ No se pudo generar el PDF. Revisa la ruta de la plantilla o los datos.');
+    }
+  };
+
   const acciones = () => {
     if (tipoN === 'AUDITOR') {
       return (
         <Stack direction="row" spacing={2} justifyContent="center">
-          <Button variant="contained" onClick={() => notify('📝 Acta generada correctamente.')}>
+          <Button variant="contained" onClick={generarActaPDF}>
             GENERAR ACTA DE INICIO FISCALIZACIÓN
           </Button>
           <Button variant="outlined" onClick={() => notify('✅ La asignación ha sido registrada correctamente.')}>
@@ -124,6 +217,14 @@ export const DetallesAsignacionVarias: React.FC<Props> = ({ tipo }) => {
             <Grid item xs={6} p={1}>
               <TextField fullWidth value={numeroAuto} onChange={(e) => setNumeroAuto(e.target.value)} />
             </Grid>
+
+            <Grid item xs={6} p={1} bgcolor="#f7d9c4"><strong>Estado</strong></Grid>
+            <Grid item xs={6} p={1}>
+              <TextField fullWidth select value={estado} onChange={(e) => setEstado(e.target.value as any)}>
+                <MenuItem value="PARCIAL">PARCIAL</MenuItem>
+                <MenuItem value="TOTAL">TOTAL</MenuItem>
+              </TextField>
+            </Grid>
           </Grid>
         </Grid>
 
@@ -132,7 +233,6 @@ export const DetallesAsignacionVarias: React.FC<Props> = ({ tipo }) => {
           <Grid container border={1}>
             <Grid item xs={6} p={1} bgcolor="#fce7da">Jefe</Grid>
             <Grid item xs={6} p={1}>
-              {/* Valor fijo */}
               <TextField fullWidth value="Jefe de Secciones" InputProps={{ readOnly: true }} />
             </Grid>
 

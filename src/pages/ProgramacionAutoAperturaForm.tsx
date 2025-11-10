@@ -1,12 +1,29 @@
 // src/pages/ProgramacionAutoAperturaForm.tsx
 import React, { useState } from 'react';
 import {
-  Box, Grid, TextField, MenuItem, Typography, Button, Stack
+  Box, Grid, TextField, MenuItem, Button, Stack
 } from '@mui/material';
 
 import AutoAperturaFlow from '../components/AutoAperturaFlow';
 
-export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:any; setReadOnly:any}) => {
+// Mantén el mismo tipo de nivel que usas en Layout / DetalleAutoApertura
+export type Nivel = 'AUDITOR' | 'SUPERVISOR' | 'DIRECTOR';
+
+type Props = {
+  readOnly?: boolean;
+  setReadOnly?: (v: boolean) => void;
+
+  // 👇 nuevas props para control del flujo
+  nivel?: Nivel;
+  setNivel?: React.Dispatch<React.SetStateAction<Nivel>>;
+};
+
+export const ProgramacionAutoAperturaForm: React.FC<Props> = ({
+  readOnly,
+  setReadOnly,
+  nivel,
+  setNivel,
+}) => {
   const [formData, setFormData] = useState({
     red: '659',
     categoria: 'Fiscalización Masiva',
@@ -29,21 +46,21 @@ export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:
       'ingresos ITBMS vs Ingresos Renta',
       'compras ITBMS vs compras',
       'gastos vs compras',
-      'Fecha de Presentación'
+      'Fecha de Presentación',
     ],
     omiso: [
       'omisos vs compras',
       'omisos vs dividendos',
       'omisos vs 431',
       'omisos vs renta',
-      'omisos vs ITBMS'
+      'omisos vs ITBMS',
     ],
     inexacto: [
       'ingresos ITBMS vs Ingresos Renta',
       'compras ITBMS vs compras',
-      'gastos vs compras'
+      'gastos vs compras',
     ],
-    Extemporáneo: ['Fecha de Presentación']
+    Extemporáneo: ['Fecha de Presentación'],
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,18 +68,15 @@ export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      ...(name === 'estado' && { programa: '' })
+      ...(name === 'estado' && { programa: '' }),
     }));
     setMostrarResultados(false);
   };
 
-  const programas = opcionesPrograma[formData.estado] || []; 
-
-  console.log({readOnly})
+  const programas = opcionesPrograma[formData.estado] || [];
 
   return (
     <Box>
-
       <Grid container spacing={2}>
         <Grid item xs={12} sm={3}>
           <TextField
@@ -136,7 +150,6 @@ export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:
           />
         </Grid>
 
-
         <Grid item xs={12} sm={3}>
           <TextField
             label="RUC"
@@ -174,7 +187,13 @@ export const ProgramacionAutoAperturaForm = ( {readOnly, setReadOnly}:{readOnly:
       </Grid>
 
       {mostrarResultados && (
-        <AutoAperturaFlow readOnly = {readOnly} setReadOnly = {setReadOnly}  />
+        <AutoAperturaFlow
+          readOnly={readOnly}
+          setReadOnly={setReadOnly}
+          // 👇 Reexpedimos las props nuevas al flujo
+          nivel={nivel}
+          setNivel={setNivel ? (n:any) => setNivel(n) : undefined}
+        />
       )}
     </Box>
   );

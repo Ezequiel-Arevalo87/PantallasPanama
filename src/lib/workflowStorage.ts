@@ -14,12 +14,16 @@ export const readCasos = <T = any>(): T[] => {
 export const readAprobados = <T = any>(): T[] =>
   readCasos<T>().filter((r: any) => (r?.estado ?? "Pendiente") === "Aprobado");
 
+// ⬇️⬇️⬇️ AGREGA AQUÍ LAS FASES QUE USAS EN Home.tsx
 export type FaseFlujo =
   | "SELECTOR DE CASOS Y PRIORIZACIÓN"
   | "VERIFICACIÓN"
   | "APROBACIÓN"
   | "ASIGNACIÓN"
-  | "INICIO DE AUDITORIA";
+  | "INICIO DE AUDITORIA"
+  | "REVISIÓN SUPERVISOR"
+  | "REVISIÓN JEFE DE SECCIÓN"
+  | "CIERRE";
 
 export type PasoHistorial = {
   idPaso: string;
@@ -47,28 +51,24 @@ const writeCasos = (casos: CasoFlujo[]) => {
   notifyAprobaciones();
 };
 
-export const upsertCaso = (nuevo: CasoFlujo) => {
-  const casos = readCasos<CasoFlujo>();
-  const idx = casos.findIndex((c) => String(c.id) === String(nuevo.id));
-  if (idx >= 0) casos[idx] = { ...casos[idx], ...nuevo };
-  else casos.push(nuevo);
-  writeCasos(casos);
-  return nuevo;
-};
+// ⚠️ EXPORTA uuid para usarlo desde Home.tsx
+export const uuid = () => Math.random().toString(36).slice(2, 10);
 
 export const getNextFase = (fase?: FaseFlujo | null): FaseFlujo | null => {
+  // ⬇️⬇️⬇️ ACTUALIZA EL ORDEN PARA INCLUIR LAS NUEVAS FASES
   const orden: FaseFlujo[] = [
     "SELECTOR DE CASOS Y PRIORIZACIÓN",
     "VERIFICACIÓN",
     "APROBACIÓN",
     "ASIGNACIÓN",
     "INICIO DE AUDITORIA",
+    "REVISIÓN SUPERVISOR",
+    "REVISIÓN JEFE DE SECCIÓN",
+    "CIERRE",
   ];
   const i = orden.indexOf(fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN");
   return i >= 0 && i < orden.length - 1 ? orden[i + 1] : null;
 };
-
-const uuid = () => Math.random().toString(36).slice(2, 10);
 
 export type AvanzarOpts = {
   id: string | number;
@@ -76,6 +76,15 @@ export type AvanzarOpts = {
   by: string;
   note?: string;
   deadline?: string | null;
+};
+
+export const upsertCaso = (nuevo: CasoFlujo) => {
+  const casos = readCasos<CasoFlujo>();
+  const idx = casos.findIndex((c) => String(c.id) === String(nuevo.id));
+  if (idx >= 0) casos[idx] = { ...casos[idx], ...nuevo };
+  else casos.push(nuevo);
+  writeCasos(casos);
+  return nuevo;
 };
 
 export const avanzarCaso = (opts: AvanzarOpts) => {
@@ -92,7 +101,16 @@ export const avanzarCaso = (opts: AvanzarOpts) => {
       ...(typeof deadline !== "undefined" ? { deadline } : {}),
       history: [
         ...(casos[i].history ?? []),
-        { idPaso: uuid(), from, to, by, note, at: now, deadline: typeof deadline !== "undefined" ? deadline : (casos[i].deadline ?? null) },
+        {
+          idPaso: uuid(),
+          from,
+          to,
+          by,
+          note,
+          at: now,
+          deadline:
+            typeof deadline !== "undefined" ? deadline : casos[i].deadline ?? null,
+        },
       ],
     };
   } else {
@@ -102,7 +120,17 @@ export const avanzarCaso = (opts: AvanzarOpts) => {
       nombre: "",
       fase: to,
       deadline: typeof deadline !== "undefined" ? deadline : null,
-      history: [{ idPaso: uuid(), from: null, to, by, note, at: now, deadline: typeof deadline !== "undefined" ? deadline : null }],
+      history: [
+        {
+          idPaso: uuid(),
+          from: null,
+          to,
+          by,
+          note,
+          at: now,
+          deadline: typeof deadline !== "undefined" ? deadline : null,
+        },
+      ],
     });
   }
 
