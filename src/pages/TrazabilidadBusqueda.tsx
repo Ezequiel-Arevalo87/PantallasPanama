@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import Trazabilidad, { type TrazaItem, type EstadoAprobacion } from "../components/Trazabilidad";
 
-/** PRNG determinístico a partir de una semilla (derivada del RUC) */
+/** PRNG determinístico a partir de una semilla (derivada del RUC/trámite) */
 function seedFrom(str: string) {
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++) {
@@ -45,20 +45,18 @@ const ACTORES = ["Sistema", "Supervisor", "Auditor"] as const;
 const ACCIONES = ["Recepción de caso", "Asignación", "Revisión", "Actualización"] as const;
 const ESTADOS: EstadoAprobacion[] = ["PENDIENTE", "ASIGNADO", "APROBADO", "RECHAZADO"];
 
-/** Genera trazabilidad simulada para cualquier RUC (fechas “al azar” coherentes) */
-/** Genera trazabilidad simulada para cualquier RUC (con fechas aleatorias coherentes) */
-function buildMockTrazas(ruc: string): TrazaItem[] {
-  const seed = Array.from(String(ruc)).reduce((a, ch) => a + ch.charCodeAt(0), 0);
-  const rnd = (min: number, max: number) =>
-    Math.floor(Math.abs(Math.sin(seed + Math.random()) * (max - min + 1))) + min;
+/** Genera trazabilidad simulada para cualquier combinación (RUC / Trámite) */
+function buildMockTrazas(key: string): TrazaItem[] {
+  const seed = seedFrom(key);
+  const rndf = mulberry32(seed);
 
-  // Últimos 18 meses como rango
+  // Últimos 18 meses como rango con distribución simple
   const randomDate = (): string => {
     const now = new Date();
-    const pastMonths = rnd(0, 18);
-    const day = rnd(1, 28);
-    const hour = rnd(7, 18);
-    const minute = rnd(0, 59);
+    const pastMonths = Math.floor(rndf() * 19); // 0..18
+    const day = 1 + Math.floor(rndf() * 28);
+    const hour = 7 + Math.floor(rndf() * 12); // 7..18
+    const minute = Math.floor(rndf() * 60);
     const d = new Date(now);
     d.setMonth(d.getMonth() - pastMonths);
     d.setDate(day);
@@ -66,21 +64,16 @@ function buildMockTrazas(ruc: string): TrazaItem[] {
     return d.toISOString();
   };
 
-  const estados = ["PENDIENTE", "ASIGNADO", "APROBADO", "RECHAZADO"] as const;
-  const actores = ["Sistema", "Supervisor", "Auditor"];
-  const acciones = ["Recepción de caso", "Asignación", "Revisión", "Actualización"];
-
   const rows: TrazaItem[] = [];
-  const total = rnd(3, 6); // entre 3 y 6 filas
+  const total = 3 + Math.floor(rndf() * 4); // 3..6 filas
 
   for (let i = 0; i < total; i++) {
-    const fechaISO = randomDate();
     rows.push({
-      id: `${ruc}-${i + 1}`,
-      fechaISO,
-      actor: actores[rnd(0, actores.length - 1)],
-      accion: acciones[rnd(0, acciones.length - 1)],
-      estado: estados[rnd(0, estados.length - 1)],
+      id: `${key}-${i + 1}`,
+      fechaISO: randomDate(),
+      actor: ACTORES[Math.floor(rndf() * ACTORES.length)],
+      accion: ACCIONES[Math.floor(rndf() * ACCIONES.length)],
+      estado: ESTADOS[Math.floor(rndf() * ESTADOS.length)],
     });
   }
 
@@ -91,15 +84,22 @@ function buildMockTrazas(ruc: string): TrazaItem[] {
 
 const TrazabilidadBusqueda: React.FC = () => {
   const [ruc, setRuc] = React.useState("");
+  const [tramite, setTramite] = React.useState("");
   const [rows, setRows] = React.useState<TrazaItem[]>([]);
 
   const handleBuscar = () => {
-    const clean = ruc.trim();
-    if (!clean) {
+    const rucClean = ruc.trim();
+    const traClean = tramite.trim();
+
+    // Requerimos al menos uno de los dos campos
+    if (!rucClean && !traClean) {
       setRows([]);
       return;
     }
-    setRows(buildMockTrazas(clean));
+
+    // Semilla combinada estable (si uno está vacío, igual funciona)
+    const key = `${rucClean}|${traClean}`;
+    setRows(buildMockTrazas(key));
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -108,33 +108,58 @@ const TrazabilidadBusqueda: React.FC = () => {
 
   const handleLimpiar = () => {
     setRuc("");
+    setTramite("");
     setRows([]);
   };
 
   return (
     <Box component={Paper} sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
-        Trazabilidad por RUC (simulado)
+        Trazabilidad por RUC y Número de trámite (simulado)
       </Typography>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
-        <TextField
-          label="RUC"
-          value={ruc}
-          onChange={(e) => setRuc(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Ej.: 8-123-456"
-          fullWidth
-        />
-        <Button variant="contained" onClick={handleBuscar}>Buscar</Button>
-        <Button variant="outlined" color="inherit" onClick={handleLimpiar}>Limpiar</Button>
-      </Stack>
+    <Stack
+  direction={{ xs: "column", sm: "row" }}
+  spacing={1.5}
+  sx={{
+    mb: 2,
+    alignItems: "stretch",
+    "& .MuiTextField-root": { flex: 1 },
+    "& .MuiButton-root": {
+      minWidth: 120,
+      fontWeight: "bold",
+      height: "56px", // igual que los TextField
+    },
+  }}
+>
+  <TextField
+    label="RUC"
+    value={ruc}
+    onChange={(e) => setRuc(e.target.value)}
+    onKeyDown={handleKey}
+    placeholder="Ej.: 8-123-456"
+  />
+  <TextField
+    label="Número de trámite"
+    value={tramite}
+    onChange={(e) => setTramite(e.target.value)}
+    onKeyDown={handleKey}
+    placeholder="Ej.: 2025-000123"
+  />
+  <Button variant="contained" onClick={handleBuscar}>
+    Buscar
+  </Button>
+  <Button variant="outlined" color="inherit" onClick={handleLimpiar}>
+    Limpiar
+  </Button>
+</Stack>
+
 
       {rows.length > 0 ? (
         <Trazabilidad rows={rows} height={420} />
       ) : (
         <Box sx={{ py: 6, textAlign: "center", color: "text.secondary" }}>
-          Ingresa un RUC y presiona <b>Buscar</b> para ver la trazabilidad simulada.
+          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona <b>Buscar</b> para ver la trazabilidad simulada.
         </Box>
       )}
     </Box>

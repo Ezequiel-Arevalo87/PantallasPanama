@@ -1,6 +1,6 @@
 // src/components/Trazabilidad.tsx
 import * as React from "react";
-import { Chip, Box } from "@mui/material";
+import { Chip, Box, Typography } from "@mui/material";
 import {
   DataGrid,
   type GridColDef,
@@ -27,6 +27,7 @@ type Props = {
   height?: number | string;
 };
 
+/** ---------- Toolbar ---------- */
 function Toolbar() {
   return (
     <GridToolbarContainer>
@@ -51,7 +52,7 @@ const EstadoChip: React.FC<{ value: EstadoAprobacion }> = ({ value }) => {
   return <Chip size="small" label={value} color={color as any} />;
 };
 
-// ---- Helpers ----
+/** ---------- Helpers fecha/periodo ---------- */
 const safeFormatDateTime = (iso?: string) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -71,7 +72,49 @@ const periodoFromISO = (iso?: string) => {
   return `${mm}/${yyyy}`;
 };
 
+/** ---------- Random name determinístico a partir de rows ---------- */
+function hashSeed(str: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function rngFromSeed(seed: number) {
+  // xorshift32 simple
+  let x = seed || 1;
+  return () => {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    return ((x >>> 0) / 0xffffffff);
+  };
+}
+function pick<T>(arr: T[], r: () => number) {
+  return arr[Math.floor(r() * arr.length)];
+}
+function buildDisplayName(rows: TrazaItem[]): string {
+  const base = rows.map(r => r.id).join("|"); // estable para un mismo dataset
+  const rnd = rngFromSeed(hashSeed(base));
+
+  const asPersona = rnd() < 0.5; // mitad persona / mitad empresa
+  if (asPersona) {
+    const nombres = ["María", "Juan", "Luis", "Ana", "Carlos", "Diana", "Pedro", "Paola", "Andrés", "Sofía", "Gabriel", "Valeria"];
+    const apellidos = ["Pérez", "Rodríguez", "González", "García", "Martínez", "Fernández", "López", "Sánchez", "Ramírez", "Castillo", "Moreno", "Torres"];
+    return `${pick(nombres, rnd)} ${pick(apellidos, rnd)}`;
+  } else {
+    const prefijos = ["Grupo", "Inversiones", "Servicios", "Constructora", "Comercial", "Tecnologías", "Industrias", "Distribuidora", "Consultores", "Alimentos"];
+    const nucleos = ["Istmo", "Panamá", "Canal", "Pacífico", "Atlas", "Global", "Centenario", "Horizonte", "Delta", "Sigma"];
+    const sufijos = ["S.A.", "S.R.L.", "Corp.", "Holdings", "SAS"];
+    return `${pick(prefijos, rnd)} ${pick(nucleos, rnd)} ${pick(sufijos, rnd)}`;
+  }
+}
+
 export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
+  // ✅ Nombre mostrado arriba (estable para el mismo set de filas)
+  const displayName = React.useMemo(() => (rows?.length ? buildDisplayName(rows) : ""), [rows]);
+
   // ✅ Pre-calcula "periodo" en los datos (evita valueGetter)
   const rowsWithPeriodo = React.useMemo(
     () =>
@@ -84,27 +127,24 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
 
   const columns = React.useMemo<GridColDef<TrazaItem>[]>(
     () => [
-   {
-  field: "fechaISO",
-  headerName: "Fecha",
-  minWidth: 170,
-  // (opcional) expón el valor para ordenar/filtrar
-  valueGetter: (params : any) => (params?.row as TrazaItem)?.fechaISO ?? "",
- renderCell: (params) => {
-  const iso = (params?.row as TrazaItem)?.fechaISO;
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("es-CO", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-},
-
-},
-
-      { field: "actor", headerName: "Actor", minWidth: 180, flex: 1 },
+      {
+        field: "fechaISO",
+        headerName: "Fecha",
+        minWidth: 170,
+        valueGetter: (params: any) => (params?.row as TrazaItem)?.fechaISO ?? "",
+        renderCell: (params) => {
+          const iso = (params?.row as TrazaItem)?.fechaISO;
+          if (!iso) return "";
+          const d = new Date(iso);
+          if (Number.isNaN(d.getTime())) return "";
+          return new Intl.DateTimeFormat("es-CO", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(d);
+        },
+      },
+      { field: "actor", headerName: "Responsable", minWidth: 180, flex: 1 },
       { field: "accion", headerName: "Acción", minWidth: 160 },
       {
         field: "estado",
@@ -114,7 +154,6 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
           <EstadoChip value={params.value as EstadoAprobacion} />
         ),
       },
-      // 👇 ahora es un campo normal (ya viene en cada fila)
       {
         field: "periodo",
         headerName: "Periodo",
@@ -126,6 +165,16 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
 
   return (
     <Box sx={{ height, width: "100%" }}>
+      {/* Encabezado con nombre aleatorio */}
+      {displayName ? (
+        <Typography
+          variant="subtitle1"
+          sx={{ mb: 1.5, fontWeight: 700, color: "text.primary" }}
+        >
+          {displayName}
+        </Typography>
+      ) : null}
+
       <DataGrid
         rows={rowsWithPeriodo}
         columns={columns}

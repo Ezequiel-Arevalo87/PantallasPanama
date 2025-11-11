@@ -17,7 +17,6 @@ import {
   Tabs,
   Tab,
   Button,
-  Grid,
   Switch,
   FormControlLabel,
 } from "@mui/material";
@@ -35,7 +34,8 @@ import AdvanceToNext from "../components/AdvanceToNext";
 
 /* ==========================================================
    Home con:
-   - Pestañas: "Tareas sin realizar" y "Tareas realizadas"
+   - Pestañas: "Tareas sin realizar", "Tareas realizadas"
+               y "Próximos a vencer (≤2 días)"
    - Sistema de "No leídos" (localStorage: casosUnread)
    - Modo DEMO para cargar casos ejemplo (Auditor→Supervisor→Director)
    ========================================================== */
@@ -79,7 +79,7 @@ const demoCasos: CasoFlujo[] = [
     ruc: "RUC-100201",
     fase: "INICIO DE AUDITORIA",
     estado: "Pendiente",
-    deadline: mkDeadline(2), // ROJO
+    deadline: mkDeadline(2), // ROJO (≤2)
     history: [
       {
         idPaso: uuid(),
@@ -118,7 +118,7 @@ const demoCasos: CasoFlujo[] = [
     ruc: "8-123-456",
     fase: "REVISIÓN JEFE DE SECCIÓN",
     estado: "Pendiente",
-    deadline: mkDeadline(1), // ROJO
+    deadline: mkDeadline(1), // ROJO (≤2)
     history: [
       {
         idPaso: uuid(),
@@ -184,8 +184,9 @@ function saveUnread(s: Set<string>) {
 }
 
 export const Home: React.FC<Props> = ({ onGo }) => {
+  // ⬇️ ahora soporta 3 pestañas: 0 pendientes, 1 realizadas, 2 próximos a vencer
+  const [tab, setTab] = useState<0 | 1 | 2>(0);
   const [casos, setCasos] = useState<CasoFlujo[]>([]);
-  const [tab, setTab] = useState<0 | 1>(0); // 0: pendientes, 1: realizadas
   const openersRef = useRef<Map<string | number, () => void>>(new Map());
 
   // No leídos
@@ -248,26 +249,44 @@ export const Home: React.FC<Props> = ({ onGo }) => {
     [casos]
   );
 
-  // En pestaña "pendientes": por defecto solo NO LEÍDOS (si el toggle está apagado)
+  const getDiasRestantes = (c: CasoFlujo): number | null => {
+    if (!c.deadline) return null;
+    const hoy = new Date();
+    const fin = new Date(c.deadline);
+    const diff = Math.ceil(
+      (fin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return diff >= 0 ? diff : 0;
+  };
+
+  // Pendientes visibles según "no leídos" toggle
   const pendientesFiltrados = useMemo(() => {
     if (mostrarTodosPendientes) return pendientes;
     return pendientes.filter((c) => unread.has(asKey(c.id)));
   }, [pendientes, mostrarTodosPendientes, unread]);
 
-  // Colección activa según la pestaña
-  const activos = tab === 0 ? pendientesFiltrados : realizadas;
+  // ⬇️ NUEVO: Próximos a vencer (solo pendientes con <=2 días)
+  const proximosAVencer = useMemo(() => {
+    const list = pendientes.filter((c) => {
+      const d = getDiasRestantes(c);
+      return d !== null && d <= 2;
+    });
+    // opcional: ordenar por fecha límite asc
+    return list.sort((a, b) => {
+      const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return da - db;
+    });
+  }, [pendientes]);
 
-  const getDiasRestantes = (c: CasoFlujo): number | null => {
-    if (!c.deadline) return null;
-    const hoy = new Date();
-    const fin = new Date(c.deadline);
-    const diff = Math.ceil((fin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-    return diff >= 0 ? diff : 0;
-  };
+  // Colección activa según la pestaña
+  const activos =
+    tab === 0 ? pendientesFiltrados : tab === 1 ? realizadas : proximosAVencer;
 
   const renderLinea = (c: CasoFlujo) => {
     const last = c.history?.[c.history.length - 1];
-    const faseActual = (c.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
+    const faseActual = (c.fase ??
+      "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
     const next = getNextFase(faseActual);
     const isAprobado = c.estado === "Aprobado";
     const diasRestantes = getDiasRestantes(c);
@@ -320,8 +339,8 @@ export const Home: React.FC<Props> = ({ onGo }) => {
             primary={
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography fontWeight={700}>{c.nombre || "(Sin nombre)"}</Typography>
-                <Typography color="text.secondary">• RUC {c.ruc || "—"}</Typography>
-                <Chip size="small" label={faseActual} sx={{ ml: 1 }} />
+                <Typography color="text.secondary">•  {c.ruc || "—"}</Typography>
+                {/* <Chip size="small" label={faseActual} sx={{ ml: 1 }} /> */}
                 {unread.has(asKey(c.id)) && <Chip size="small" color="info" label="No leído" />}
                 {isAprobado && (
                   <Chip
@@ -339,7 +358,7 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                   <Typography variant="body2" color="text.secondary">
                     {last.from ? `De ${last.from} → ` : ""}
                     <b>{last.to}</b> • asignó <b>{last.by}</b> • {new Date(last.at).toLocaleString()}
-                    {last.note ? ` • “${last.note}”` : ""} {next ? ` • Siguiente: ${next}` : ` • Flujo finalizado`}
+                    {last.note ? ` • “${last.note}”` : ""}
                   </Typography>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
@@ -386,7 +405,8 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
   // Usamos el primer caso activo (solo para conectar el botón "Ver todos")
   const primerCaso = activos[0];
-  const faseActual = (primerCaso?.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
+  const faseActual = (primerCaso?.fase ??
+    "SELECTOR DE CASOS Y PRIORIZACIÓN") as FaseFlujo;
 
   // Contadores de no leídos / leídos en pendientes
   const pendientesNoLeidos = pendientes.filter((c) => unread.has(asKey(c.id))).length;
@@ -412,9 +432,9 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                 setUnread(new Set(allIds));
 
                 // Normaliza history para garantizar idPaso en todos los steps
-                const demoConIds = demoCasos.map((c:any) => ({
+                const demoConIds = demoCasos.map((c: any) => ({
                   ...c,
-                  history: (c.history ?? []).map((h:any) => ({
+                  history: (c.history ?? []).map((h: any) => ({
                     idPaso: h.idPaso ?? uuid(),
                     ...h,
                   })),
@@ -447,8 +467,12 @@ export const Home: React.FC<Props> = ({ onGo }) => {
       {/* ======== Tabs ======== */}
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} aria-label="tabs tareas">
-          <Tab label={`Tareas sin realizar (${pendientes.length}) • No leídos ${pendientesNoLeidos}`} />
+          <Tab
+            label={`Tareas sin realizar (${pendientes.length}) • No leídos ${pendientesNoLeidos}`}
+          />
           <Tab label={`Tareas realizadas (${realizadas.length})`} />
+          {/* ⬇️ NUEVA PESTAÑA */}
+          <Tab label={`Próximos a vencer (≤2 días) (${proximosAVencer.length})`} />
         </Tabs>
       </Paper>
 
@@ -528,6 +552,35 @@ export const Home: React.FC<Props> = ({ onGo }) => {
         </Paper>
       )}
 
+      {tab === 2 && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            spacing={1}
+          >
+            <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+              <Typography variant="h6" fontWeight={700}>
+                Casos próximos a vencer (≤2 días)
+              </Typography>
+              <Chip size="small" color="error" label={`Total: ${proximosAVencer.length}`} />
+            </Stack>
+
+            {/* Resumen por fase de los que están por vencer */}
+            <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+              {Array.from(totalPorFase.entries()).map(([fase, n]) => (
+                <Chip key={fase} label={`${fase}: ${n}`} />
+              ))}
+            </Stack>
+          </Stack>
+
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Muestra únicamente tareas pendientes cuya fecha límite ocurre hoy, mañana o en 2 días.
+          </Typography>
+        </Paper>
+      )}
+
       <Paper variant="outlined">
         <List disablePadding>
           {activos.length ? (
@@ -539,7 +592,9 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                   ? mostrarTodosPendientes
                     ? "No hay tareas pendientes."
                     : "No hay tareas pendientes no leídas."
-                  : "No hay tareas realizadas."}
+                  : tab === 1
+                  ? "No hay tareas realizadas."
+                  : "No hay casos próximos a vencer."}
               </Typography>
             </Box>
           )}

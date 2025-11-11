@@ -56,7 +56,7 @@ const DocumentoAutoApertura = React.forwardRef<HTMLDivElement, {
     >
       {/* Encabezado simple (sin color) */}
       <Box sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>AUTO DE APERTURA DE INVESTIGACIÓN</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>INFORME DE AUDITORIA</Typography>
         <Typography variant="body2">Dirección General – Unidad de Fiscalización</Typography>
         <Box sx={{ borderTop: '1px solid #000', mt: 1 }} />
       </Box>
@@ -285,7 +285,7 @@ export const DetalleAutoApertura: React.FC<{
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      pdf.save(`AutoApertura_${ficha.identificacion}_${ficha.numAuto}.pdf`);
+      pdf.save(`INFORME_DE_AUDITORIA_${ficha.identificacion}_${ficha.numAuto}.pdf`);
     } catch (e) {
       console.error(e);
       setToast('No se pudo generar el PDF');
