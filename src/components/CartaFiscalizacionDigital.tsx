@@ -7,6 +7,7 @@ import {
   Stack,
   Typography,
   Paper,
+  Divider,
 } from '@mui/material';
 import dayjs from 'dayjs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -75,7 +76,7 @@ function drawParagraph(opts: {
 
 // ==== Helper: convertir Uint8Array a Blob seguro ====
 function uint8ToBlob(u8: Uint8Array, mime = 'application/pdf') {
-  const ab:any = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+  const ab: any = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
   return new Blob([ab], { type: mime });
 }
 
@@ -88,7 +89,7 @@ export default function CartaFiscalizacionDigital() {
   const [telefonoVerificacion, setTelefonoVerificacion] = useState<string>('XXXXXXXX');
   const [correoConsultas, setCorreoConsultas] = useState<string>('XXXXXXXXXXX');
 
-  // Texto base
+  // ===== Textos =====
   const cuerpo1 = useMemo(
     () =>
       'La Dirección General de Ingresos, está ejecutando un Procedimiento de Fiscalización Digital de Omisos e Inexactos, para la detección de contribuyentes que presentan omisión en las declaraciones juradas; sin embargo, señalamos que en cruce de información a terceros obligados se evidencia que tiene operaciones reportadas, por lo que se le informa que debe ingresar a la plataforma eTax 2.0 con su RUC Y NIT, seleccionar en la barra de herramientas el menú -  CONSULTAS, la opción- CONSULTA PANTALLA COMUNICACIÓN FISCALIZACIÓN DIGITAL. Allí encontrará el documento de Auto de Apertura donde podrá ver, en la Sección de Cruce Pre elaborado, la cantidad reportada. También podrá encontrar los trámites pendientes que le está solicitando la Administración Tributaria, debido a que se ha detectado algunas omisiones en su (s) declaración (es) que ameritan aclaración de su parte, a continuación, se relaciona:',
@@ -237,89 +238,186 @@ Dirección General de Ingresos`,
     if (forzarDescarga) {
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Acta_de_inicio${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
+      a.download = `Acta_de_inicio_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
       a.click();
     }
   };
 
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-       Acta de inicio (editable)
-      </Typography>
+  // ===== Vista previa HTML (hoja A4) =====
+  const Preview = () => (
+    <Paper
+      variant="outlined"
+      sx={{
+        mx: 'auto',
+        p: 4,
+        width: '100%',
+        maxWidth: 820, // contenedor
+        bgcolor: 'background.paper',
+      }}
+    >
+      <Box
+        sx={{
+          width: '100%',
+          mx: 'auto',
+          border: (t) => `1px solid ${t.palette.divider}`,
+          boxShadow: (t) => t.shadows[0],
+          bgcolor: 'white',
+        }}
+      >
+        <Box
+          sx={{
+            // proporción A4 ~ 595x842pt -> 1:1.414
+            p: 4,
+            minHeight: 920,
+            // tipografía "documento"
+            '& p': { mb: 2, lineHeight: 1.6, fontSize: 14 },
+          }}
+        >
+          <Typography sx={{ fontSize: 14, mb: 3 }}>
+            Panamá, {fmt(fecha)}
+          </Typography>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={3}>
-          <TextField
-            label="Fecha"
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid item xs={12} md={9}>
-          <TextField
-            label="Señor(es)"
-            value={senores}
-            onChange={(e) => setSenores(e.target.value)}
-            fullWidth
-          />
-        </Grid>
+          <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1 }}>
+            Señor(es)
+          </Typography>
+          <Typography sx={{ whiteSpace: 'pre-line', fontSize: 14 }}>
+            {senores}
+          </Typography>
+          <Typography sx={{ fontSize: 14, mt: 1 }}>Ruc {ruc}</Typography>
+          <Typography sx={{ fontSize: 14, mb: 3 }}>Presente</Typography>
 
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="RUC"
-            value={ruc}
-            onChange={(e) => setRuc(e.target.value)}
-            fullWidth
-          />
-        </Grid>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>
+            Estimado señor(a):
+          </Typography>
 
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="Correo del auditor fiscal"
-            value={correoAuditor}
-            onChange={(e) => setCorreoAuditor(e.target.value)}
-            fullWidth
-          />
-        </Grid>
+          <Typography sx={{ whiteSpace: 'pre-line' }}>{cuerpo1}</Typography>
 
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="Teléfono para verificar legitimidad"
-            value={telefonoVerificacion}
-            onChange={(e) => setTelefonoVerificacion(e.target.value)}
-            fullWidth
-          />
-        </Grid>
+          <Box sx={{ mt: 2, mb: 2 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>
+              Impuesto &nbsp;&nbsp;Periodo fiscal&nbsp;&nbsp;Declaración
+            </Typography>
+            {IMPUESTOS.map((row) => (
+              <Box
+                key={`${row.impuesto}-${row.declaracion}`}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '120px 160px 1fr',
+                  gap: 1,
+                  fontSize: 14,
+                  py: 0.3,
+                }}
+              >
+                <span>{row.impuesto}</span>
+                <span>{row.periodo}</span>
+                <span>{row.declaracion}</span>
+              </Box>
+            ))}
+          </Box>
 
-        <Grid item xs={12} md={6}>
-          <TextField
-            label="Correo para consultas del contribuyente"
-            value={correoConsultas}
-            onChange={(e) => setCorreoConsultas(e.target.value)}
-            fullWidth
-          />
-        </Grid>
-      </Grid>
+          <Typography sx={{ whiteSpace: 'pre-line' }}>{opcion1}</Typography>
+          <Typography sx={{ whiteSpace: 'pre-line', mt: 1 }}>{opcion2}</Typography>
 
-      <Stack direction="row" spacing={2} mt={3}>
-        <Button variant="contained" onClick={() => generarPDF(false)}>
-          Previsualizar PDF
-        </Button>
-        <Button variant="outlined" onClick={() => generarPDF(true)}>
-          Descargar PDF
-        </Button>
-      </Stack>
-
-      <Box mt={2}>
-        <Typography variant="caption" color="text.secondary">
-          El PDF se genera en tamaño A4 con márgenes, párrafos con ajuste de
-          línea y la tabla de impuestos incluida.
-        </Typography>
+          <Typography sx={{ whiteSpace: 'pre-line', mt: 2 }}>{cierre}</Typography>
+        </Box>
       </Box>
     </Paper>
+  );
+
+  return (
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Acta de inicio (editable)
+      </Typography>
+
+      <Grid container spacing={3}>
+        {/* Columna Izquierda: Form */}
+        <Grid item xs={12} md={5}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Fecha"
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="RUC"
+                  value={ruc}
+                  onChange={(e) => setRuc(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  label="Señor(es)"
+                  value={senores}
+                  onChange={(e) => setSenores(e.target.value)}
+                  fullWidth
+                  multiline
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  label="Correo del auditor fiscal"
+                  value={correoAuditor}
+                  onChange={(e) => setCorreoAuditor(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Teléfono verificación"
+                  value={telefonoVerificacion}
+                  onChange={(e) => setTelefonoVerificacion(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Correo para consultas"
+                  value={correoConsultas}
+                  onChange={(e) => setCorreoConsultas(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+
+            <Stack direction="row" spacing={2} mt={3}>
+              <Button variant="contained" onClick={() => generarPDF(false)}>
+                Previsualizar PDF
+              </Button>
+              <Button variant="outlined" onClick={() => generarPDF(true)}>
+                Descargar PDF
+              </Button>
+            </Stack>
+
+            <Box mt={2}>
+              <Typography variant="caption" color="text.secondary">
+                El PDF se genera en tamaño A4 con márgenes, párrafos con ajuste
+                de línea y la tabla de impuestos incluida.
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Columna Derecha: Vista previa del documento */}
+        <Grid item xs={12} md={7}>
+          <Preview />
+        </Grid>
+      </Grid>
+    </Box>
   );
 }
