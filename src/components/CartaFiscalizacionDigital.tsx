@@ -237,7 +237,7 @@ Dirección General de Ingresos`,
     if (forzarDescarga) {
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Carta_Fiscalizacion_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
+      a.download = `Acta_de_inicio${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
       a.click();
     }
   };
@@ -245,7 +245,7 @@ Dirección General de Ingresos`,
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Carta de Fiscalización Digital (editable)
+       Acta de inicio (editable)
       </Typography>
 
       <Grid container spacing={2}>

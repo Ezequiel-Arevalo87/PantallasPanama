@@ -22,6 +22,8 @@ import Verificacion from './Verificacion';
 import Home from './Home'; // ✅ import correcto (no el ícono)
 import TrazabilidadBusqueda from './TrazabilidadBusqueda';
 import ConsultasDeEstado from './ConsultasDeEstado';
+import PantallaControNotificacion from '../components/PantallaControNotificacion';
+
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
 const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
@@ -87,8 +89,11 @@ export const Layout: React.FC = () => {
         return <ProgramacionAutoAperturaForm readOnly={readOnly} setReadOnly={setReadOnly} />;
       case 'REVISIÓN AUDITOR':
         return <AsignacionesVarias tipo="REVISIÓN AUDITOR" />;
+         case 'NOTIFICACIÓN ACTA DE INICIO':
+        return < PantallaControNotificacion tipo= "NOTIFICACIÓN ACTA DE INICIO" />;
       case 'REVISIÓN SUPERVISOR':
         return <AsignacionesVarias tipo="REVISIÓN SUPERVISOR" />;
+     
       case 'REVISIÓN JEFE DE SECCIÓN':
         return <AsignacionesVarias tipo="REVISIÓN JEFE DE SECCIÓN" />;
       case 'PRESENTACIÓN VOLUNTARIA':

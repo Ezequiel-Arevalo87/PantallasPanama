@@ -99,12 +99,14 @@ const useMenuData = () => {
       ],
     },
     { label: 'REVISIÓN AUDITOR' },
+    { label: 'NOTIFICACIÓN ACTA DE INICIO' }, 
     { label: 'VARIACIÓN EN INGRESOS' },
     { label: 'HISTORIAL CUMPLIMIENTO' },
     { label: 'ANALISIS FISCAL' },
     // { label: 'PRIORIZACIÓN' },
     
     { label: 'REVISIÓN SUPERVISOR' },
+    
     { label: 'REVISIÓN JEFE DE SECCIÓN' },
     { label: 'PRESENTACIÓN VOLUNTARIA' },
     { label: 'LIQUIDACIONES ADICIONALES' },

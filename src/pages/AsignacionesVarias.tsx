@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Box, Grid, TextField, MenuItem, Button, Stack } from '@mui/material';
-import { DetallesAsignacionVarias, TipoRevisionIn } from './DetallesAsignacionVarias';
+import { DetallesAsignacionVarias,  } from './DetallesAsignacionVarias';
 
 type Props = {
   /** "REVISIÓN AUDITOR" | "REVISIÓN SUPERVISOR" | "REVISIÓN JEFE DE SECCIÓN" */
-  tipo: TipoRevisionIn;
+  tipo: any;
 };
 
 export const AsignacionesVarias: React.FC<Props> = ({ tipo }) => {

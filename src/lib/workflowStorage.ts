@@ -23,6 +23,7 @@ export type FaseFlujo =
   | "INICIO DE AUDITORIA"
   | "REVISIÓN SUPERVISOR"
   | "REVISIÓN JEFE DE SECCIÓN"
+  | "NOTIFICACIÓN ACTA DE INICIO" // ⬅️ NUEVA FASE
   | "CIERRE";
 
 export type PasoHistorial = {

@@ -4,15 +4,18 @@ import dayjs from "dayjs";
 export type Categoria = "Fiscalización Masiva" | "Auditoría Sectorial" | "Grandes Contribuyentes" | "Todos";
 export type EstadoActividad =
   | "asignacion"
-  | "acta de inicio"
-  | "notificacion"
-  | "informe auditoria"
-  | "propuesta de regularizacion"
-  | "aceptacion total"
-  | "aceptacion parcial"
-  | "rechazo"
-  | "resolucion"
-  | "cierre y archivo";
+  |"acta de inicio"
+  |"notificacion acta de inicio"
+  |"notificacion"
+  |"informe auditoria"
+  |"propuesta de regularizacion"
+  |"notificación propuesta de regularizacion"
+  |"aceptacion total"
+  |"aceptacion parcial"
+  |"rechazo"
+  |"resolucion en firme"
+  |"notificación de resolución"
+  |"cierre y archivo"
 export type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 
 export type FilaEstado = {
@@ -59,13 +62,16 @@ const CONTRIBUYENTES = [
 const ESTADOS: EstadoActividad[] = [
   "asignacion",
   "acta de inicio",
+  "notificacion acta de inicio",
   "notificacion",
   "informe auditoria",
   "propuesta de regularizacion",
+  "notificación propuesta de regularizacion",
   "aceptacion total",
   "aceptacion parcial",
   "rechazo",
-  "resolucion",
+  "resolucion en firme",
+  "notificación de resolución",
   "cierre y archivo",
 ];
 
