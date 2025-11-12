@@ -6,7 +6,6 @@ export type EstadoActividad =
   | "asignacion"
   |"acta de inicio"
   |"notificacion acta de inicio"
-  |"notificacion"
   |"informe auditoria"
   |"propuesta de regularizacion"
   |"notificación propuesta de regularizacion"
@@ -63,7 +62,6 @@ const ESTADOS: EstadoActividad[] = [
   "asignacion",
   "acta de inicio",
   "notificacion acta de inicio",
-  "notificacion",
   "informe auditoria",
   "propuesta de regularizacion",
   "notificación propuesta de regularizacion",
