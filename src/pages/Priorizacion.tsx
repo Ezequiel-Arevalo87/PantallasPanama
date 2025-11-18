@@ -15,6 +15,7 @@ const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const
 
 /** ===== Provincias ===== */
 const PROVINCIAS = [
+  'Todos',          // 👈 opción TODOS
   'Panamá',
   'Colón',
   'Darién',
@@ -97,7 +98,7 @@ export const Priorizacion: React.FC = () => {
     valoresDeclarados: '',
     periodoInicial: '',
     periodoFinal: '',
-    provincia: '',        // 👈 nueva propiedad en el formulario
+    provincia: 'Todos',      // 👈 valor inicial TODOS
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -147,7 +148,7 @@ export const Priorizacion: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    // 👉 cuando cambia categoría: ocultar y LIMPIAR actividad si no es AS
+    // cuando cambia categoría: limpiar actividad si no es AS
     if (name === 'categoria') {
       setForm((prev: any) => ({
         ...prev,
@@ -249,7 +250,7 @@ export const Priorizacion: React.FC = () => {
       valoresDeclarados: '',
       periodoInicial: '',
       periodoFinal: '',
-      provincia: '',   // 👈 limpiar provincia
+      provincia: 'Todos',   // 👈 vuelve a TODOS
     });
     setOperadorSel('>=');
     setValorBalboas('');
@@ -326,7 +327,7 @@ export const Priorizacion: React.FC = () => {
           <TextField
             select
             fullWidth
-            label="Motivo/Inmueble"
+            label="Motivo/Impuesto"
             name="programa"
             value={form.programa ?? ''}
             onChange={handleChange}
@@ -447,9 +448,7 @@ export const Priorizacion: React.FC = () => {
           periodoFinal={form.periodoFinal}
           operadorFiltro={operadorSel}
           valorFiltro={valorBalboas}
-          // 👇 si luego quieres usar provincia en el resultado,
-          // tendrás que agregar una prop `provincia` en PriorizacionForm
-          // provincia={form.provincia}
+          provincia={form.provincia}   // 👈 se envía a la tabla
         />
       )}
 

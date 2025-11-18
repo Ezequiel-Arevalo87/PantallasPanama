@@ -20,6 +20,7 @@ type RowBase = {
   categoria: string;
   ruc: string;
   nombre: string;
+  provincia:any;
   periodos: string;
   valor?: number | string | null;
   monto?: number | string | null;
@@ -163,6 +164,7 @@ const Verificacion: React.FC = () => {
     { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
     { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
     { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
+       { field: "provincia", headerName: "Provincia", flex: 1, minWidth: 140 },
     {
       field: "valorNum",
       headerName: "Valor (B/.)",

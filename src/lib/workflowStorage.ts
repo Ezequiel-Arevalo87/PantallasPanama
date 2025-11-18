@@ -43,6 +43,7 @@ export type CasoFlujo = {
   categoria?: string;
   estado?: string;
   fase?: FaseFlujo;
+  provincia?: any;
   deadline?: string | null; // opcional
   history?: PasoHistorial[];
 };
@@ -87,6 +88,28 @@ export const upsertCaso = (nuevo: CasoFlujo) => {
   writeCasos(casos);
   return nuevo;
 };
+// 👉 Guardar un nuevo caso en el flujo (Home)
+export const saveCasoFlujo = (caso: CasoFlujo) => {
+  const casos = readCasos<CasoFlujo>();
+
+  casos.push({
+    ...caso,
+    history: caso.history ?? [
+      {
+        idPaso: uuid(),
+        from: null,
+        to: caso.fase ?? "SELECTOR DE CASOS Y PRIORIZACIÓN",
+        by: "Sistema",
+        at: new Date().toISOString(),
+        deadline: caso.deadline ?? null,
+      },
+    ],
+  });
+
+  localStorage.setItem(CASOS_KEY, JSON.stringify(casos));
+  notifyAprobaciones();
+};
+
 
 export const avanzarCaso = (opts: AvanzarOpts) => {
   const { id, to, by, note, deadline } = opts;
