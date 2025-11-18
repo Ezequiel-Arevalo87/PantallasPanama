@@ -276,72 +276,75 @@ export default function PriorizacionForm({
      🔥 PASAR A VERIFICACIÓN + ENVIAR AL HOME
      =========================================== */
   const handleAprobar = async () => {
-    const api = apiRef.current;
-    if (!api) return;
-    const selected = Array.from(api.getSelectedRows().values()) as Row[];
+  const api = apiRef.current;
+  if (!api) return;
+  const selected = Array.from(api.getSelectedRows().values()) as Row[];
 
-    if (selected.length === 0) {
-      await Swal.fire({
-        icon: "info",
-        title: "Sin selección",
-        text: "No hay casos seleccionados para pasar a Verificación.",
-        confirmButtonText: "Ok",
-      });
-      return;
-    }
-
-    const { isConfirmed } = await Swal.fire({
-      icon: "question",
-      title: "¿Pasar a Verificación?",
-      html: `Se enviarán <b>${selected.length}</b> caso(s).`,
-      showCancelButton: true,
-      confirmButtonText: "Sí, confirmar",
-      cancelButtonText: "Cancelar",
-    });
-    if (!isConfirmed) return;
-
-    const conMeta: RowAprobacion[] = selected.map((r) => ({
-      ...r,
-      metaCategoria: categoria ?? r.categoria,
-      metaInconsistencia: inconsistencia ?? undefined,
-      metaPrograma: programa ?? null,
-      metaActividadEconomica: actividadEconomica ?? [],
-      metaPeriodoInicial: periodoInicial ?? null,
-      metaPeriodoFinal: periodoFinal ?? null,
-    }));
-
-    // Guardar en Aprobaciones
-    localStorage.setItem(CASOS_KEY, JSON.stringify(conMeta));
-    notifyAprobaciones();
-
-    // 🔥 GUARDAR TAMBIÉN PARA EL HOME
-    conMeta.forEach((c) => {
-      saveCasoFlujo({
-        id: `${c.ruc}-${Date.now()}`, 
-        nombre: c.nombre,
-        ruc: c.ruc,
-        fase: "INICIO DE AUDITORIA",
-        estado: "Pendiente",
-        deadline: new Date().toISOString(),
-        history: [
-          {
-            idPaso: uuid(),
-            
-            to: "INICIO DE AUDITORIA",
-            by: "Sistema",
-            at: new Date().toISOString(),
-          },
-        ],
-      });
-    });
-
+  if (selected.length === 0) {
     await Swal.fire({
-      icon: "success",
-      title: "Guardado",
-      text: `Se enviaron ${selected.length} caso(s) a Verificación.`,
-      confirmButtonText: "Listo",
+      icon: "info",
+      title: "Sin selección",
+      text: "No hay casos seleccionados para pasar a Verificación.",
+      confirmButtonText: "Ok",
     });
-  };
+    return;
+  }
+
+  const { isConfirmed } = await Swal.fire({
+    icon: "question",
+    title: "¿Pasar a Verificación?",
+    html: `Se enviarán <b>${selected.length}</b> caso(s).`,
+    showCancelButton: true,
+    confirmButtonText: "Sí, confirmar",
+    cancelButtonText: "Cancelar",
+  });
+  if (!isConfirmed) return;
+
+  // 🔥 AGREGAR METADATOS + PROVINCIA CORRECTA
+  const conMeta: RowAprobacion[] = selected.map((r) => ({
+    ...r,
+    provincia: r.provincia ?? "SIN PROVINCIA",
+    metaCategoria: categoria ?? r.categoria,
+    metaInconsistencia: inconsistencia ?? undefined,
+    metaPrograma: programa ?? null,
+    metaActividadEconomica: actividadEconomica ?? [],
+    metaPeriodoInicial: periodoInicial ?? null,
+    metaPeriodoFinal: periodoFinal ?? null,
+  }));
+
+  // 🔥 GUARDAR EN localStorage PARA VERIFICACIÓN (incluye provincia)
+  localStorage.setItem(CASOS_KEY, JSON.stringify(conMeta));
+  notifyAprobaciones();
+
+  // 🔥 GUARDAR TAMBIÉN PARA EL HOME
+  conMeta.forEach((c) => {
+    saveCasoFlujo({
+      id: `${c.ruc}-${Date.now()}`,
+      nombre: c.nombre,
+      ruc: c.ruc,
+      fase: "INICIO DE AUDITORIA",
+      estado: "Pendiente",
+      deadline: new Date().toISOString(),
+      history: [
+        {
+          idPaso: uuid(),
+          from: "ASIGNACIÓN",
+          to: "INICIO DE AUDITORIA",
+          by: "Sistema",
+          at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
+
+  await Swal.fire({
+    icon: "success",
+    title: "Guardado",
+    text: `Se enviaron ${selected.length} caso(s) a Verificación.`,
+    confirmButtonText: "Listo",
+  });
+};
+
 
   return (
     <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
