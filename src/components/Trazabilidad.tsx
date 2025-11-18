@@ -88,24 +88,72 @@ function rngFromSeed(seed: number) {
     x ^= x << 13;
     x ^= x >>> 17;
     x ^= x << 5;
-    return ((x >>> 0) / 0xffffffff);
+    return (x >>> 0) / 0xffffffff;
   };
 }
 function pick<T>(arr: T[], r: () => number) {
   return arr[Math.floor(r() * arr.length)];
 }
 function buildDisplayName(rows: TrazaItem[]): string {
-  const base = rows.map(r => r.id).join("|"); // estable para un mismo dataset
+  const base = rows.map((r) => r.id).join("|"); // estable para un mismo dataset
   const rnd = rngFromSeed(hashSeed(base));
 
   const asPersona = rnd() < 0.5; // mitad persona / mitad empresa
   if (asPersona) {
-    const nombres = ["María", "Juan", "Luis", "Ana", "Carlos", "Diana", "Pedro", "Paola", "Andrés", "Sofía", "Gabriel", "Valeria"];
-    const apellidos = ["Pérez", "Rodríguez", "González", "García", "Martínez", "Fernández", "López", "Sánchez", "Ramírez", "Castillo", "Moreno", "Torres"];
+    const nombres = [
+      "María",
+      "Juan",
+      "Luis",
+      "Ana",
+      "Carlos",
+      "Diana",
+      "Pedro",
+      "Paola",
+      "Andrés",
+      "Sofía",
+      "Gabriel",
+      "Valeria",
+    ];
+    const apellidos = [
+      "Pérez",
+      "Rodríguez",
+      "González",
+      "García",
+      "Martínez",
+      "Fernández",
+      "López",
+      "Sánchez",
+      "Ramírez",
+      "Castillo",
+      "Moreno",
+      "Torres",
+    ];
     return `${pick(nombres, rnd)} ${pick(apellidos, rnd)}`;
   } else {
-    const prefijos = ["Grupo", "Inversiones", "Servicios", "Constructora", "Comercial", "Tecnologías", "Industrias", "Distribuidora", "Consultores", "Alimentos"];
-    const nucleos = ["Istmo", "Panamá", "Canal", "Pacífico", "Atlas", "Global", "Centenario", "Horizonte", "Delta", "Sigma"];
+    const prefijos = [
+      "Grupo",
+      "Inversiones",
+      "Servicios",
+      "Constructora",
+      "Comercial",
+      "Tecnologías",
+      "Industrias",
+      "Distribuidora",
+      "Consultores",
+      "Alimentos",
+    ];
+    const nucleos = [
+      "Istmo",
+      "Panamá",
+      "Canal",
+      "Pacífico",
+      "Atlas",
+      "Global",
+      "Centenario",
+      "Horizonte",
+      "Delta",
+      "Sigma",
+    ];
     const sufijos = ["S.A.", "S.R.L.", "Corp.", "Holdings", "SAS"];
     return `${pick(prefijos, rnd)} ${pick(nucleos, rnd)} ${pick(sufijos, rnd)}`;
   }
@@ -113,7 +161,10 @@ function buildDisplayName(rows: TrazaItem[]): string {
 
 export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
   // ✅ Nombre mostrado arriba (estable para el mismo set de filas)
-  const displayName = React.useMemo(() => (rows?.length ? buildDisplayName(rows) : ""), [rows]);
+  const displayName = React.useMemo(
+    () => (rows?.length ? buildDisplayName(rows) : ""),
+    [rows]
+  );
 
   // ✅ Pre-calcula "periodo" en los datos (evita valueGetter)
   const rowsWithPeriodo = React.useMemo(

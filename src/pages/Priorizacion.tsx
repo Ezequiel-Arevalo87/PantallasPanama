@@ -13,6 +13,20 @@ import { NumericFormat, type NumericFormatProps } from 'react-number-format';
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
 
+/** ===== Provincias ===== */
+const PROVINCIAS = [
+  'Panamá',
+  'Colón',
+  'Darién',
+  'Coclé',
+  'Veraguas',
+  'Bocas del Toro',
+  'Herrera',
+  'Los Santos',
+  'Chiriquí',
+  'Panamá Oeste',
+] as const;
+
 /** ===== Programas unificados ===== */
 const PROGRAMAS_OMISO = [
   'Omisos vs retenciones 4331 ITBMS',
@@ -83,6 +97,7 @@ export const Priorizacion: React.FC = () => {
     valoresDeclarados: '',
     periodoInicial: '',
     periodoFinal: '',
+    provincia: '',        // 👈 nueva propiedad en el formulario
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -234,6 +249,7 @@ export const Priorizacion: React.FC = () => {
       valoresDeclarados: '',
       periodoInicial: '',
       periodoFinal: '',
+      provincia: '',   // 👈 limpiar provincia
     });
     setOperadorSel('>=');
     setValorBalboas('');
@@ -259,26 +275,67 @@ export const Priorizacion: React.FC = () => {
       <Grid container spacing={2}>
         {/* Categoría */}
         <Grid item xs={12} sm={6}>
-          <TextField select fullWidth label="Categoría" name="categoria" value={form.categoria} onChange={handleChange}>
-            {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+          <TextField
+            select
+            fullWidth
+            label="Categoría"
+            name="categoria"
+            value={form.categoria}
+            onChange={handleChange}
+          >
+            {CATEGORIAS.map((c) => (
+              <MenuItem key={c} value={c}>{c}</MenuItem>
+            ))}
           </TextField>
         </Grid>
 
         {/* Tipo de Inconsistencia */}
         <Grid item xs={12} sm={6}>
-          <TextField select fullWidth label="Tipo de Inconsistencia" name="inconsistencia" value={form.inconsistencia} onChange={handleChange}>
-            {INCONSISTENCIAS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          <TextField
+            select
+            fullWidth
+            label="Tipo de Inconsistencia"
+            name="inconsistencia"
+            value={form.inconsistencia}
+            onChange={handleChange}
+          >
+            {INCONSISTENCIAS.map((t) => (
+              <MenuItem key={t} value={t}>{t}</MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        {/* Provincia */}
+        <Grid item xs={12} sm={6}>
+          <TextField
+            select
+            fullWidth
+            label="Provincia"
+            name="provincia"
+            value={form.provincia}
+            onChange={handleChange}
+          >
+            {PROVINCIAS.map((p) => (
+              <MenuItem key={p} value={p}>{p}</MenuItem>
+            ))}
           </TextField>
         </Grid>
 
         {/* Programa */}
         <Grid item xs={12} sm={6}>
           <TextField
-            select fullWidth label="Programa" name="programa" value={form.programa ?? ''} onChange={handleChange}
+            select
+            fullWidth
+            label="Motivo/Inmueble"
+            name="programa"
+            value={form.programa ?? ''}
+            onChange={handleChange}
             disabled={programasDisponibles.length === 0}
             helperText={programasDisponibles.length === 0 ? 'Seleccione primero un Tipo de Inconsistencia' : ''}
           >
-            {programasDisponibles.map((p) => <MenuItem key={p.toLowerCase()} value={p}>{p}</MenuItem>)}
+            {programasDisponibles.map((p) => (
+              <MenuItem key={p.toLowerCase()} value={p}>{p}</MenuItem>
+            ))}
           </TextField>
         </Grid>
 
@@ -286,8 +343,13 @@ export const Priorizacion: React.FC = () => {
         {esAS && (
           <Grid item xs={12} md={6}>
             <TextField
-              select fullWidth label="Actividad Económica" name="actividadEconomica" value={form.actividadEconomica}
-              onChange={handleActividadesChange as any} disabled={!esAS || loadingAct}
+              select
+              fullWidth
+              label="Actividad Económica"
+              name="actividadEconomica"
+              value={form.actividadEconomica}
+              onChange={handleActividadesChange as any}
+              disabled={!esAS || loadingAct}
               SelectProps={{ multiple: true, renderValue: renderActividadChips }}
             >
               <MenuItem value={ALL_VALUE} disabled={loadingAct}>
@@ -307,10 +369,15 @@ export const Priorizacion: React.FC = () => {
         {/* Operador */}
         <Grid item xs={6} md={3}>
           <TextField
-            select fullWidth label="Operador" value={operadorSel}
+            select
+            fullWidth
+            label="Operador"
+            value={operadorSel}
             onChange={(e) => setOperadorSel(e.target.value as Operador)}
           >
-            {OPERADORES.map((op) => <MenuItem key={op} value={op}>{op}</MenuItem>)}
+            {OPERADORES.map((op) => (
+              <MenuItem key={op} value={op}>{op}</MenuItem>
+            ))}
           </TextField>
         </Grid>
 
@@ -332,17 +399,29 @@ export const Priorizacion: React.FC = () => {
         {/* Fechas */}
         <Grid item xs={12} md={6}>
           <TextField
-            fullWidth type="date" label="Fecha Inicial" name="periodoInicial" value={form.periodoInicial}
-            onChange={handleChange} InputLabelProps={{ shrink: true }}
-            required={requiereFechasFlag} error={requiereFechasFlag && !form.periodoInicial}
+            fullWidth
+            type="date"
+            label="Fecha Inicial"
+            name="periodoInicial"
+            value={form.periodoInicial}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            required={requiereFechasFlag}
+            error={requiereFechasFlag && !form.periodoInicial}
             helperText={requiereFechasFlag && !form.periodoInicial ? 'Obligatoria' : ''}
           />
         </Grid>
         <Grid item xs={12} md={6}>
           <TextField
-            fullWidth type="date" label="Fecha Final" name="periodoFinal" value={form.periodoFinal}
-            onChange={handleChange} InputLabelProps={{ shrink: true }}
-            required={requiereFechasFlag} error={requiereFechasFlag && !form.periodoFinal}
+            fullWidth
+            type="date"
+            label="Fecha Final"
+            name="periodoFinal"
+            value={form.periodoFinal}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            required={requiereFechasFlag}
+            error={requiereFechasFlag && !form.periodoFinal}
             helperText={requiereFechasFlag && !form.periodoFinal ? 'Obligatoria' : ''}
           />
         </Grid>
@@ -368,6 +447,9 @@ export const Priorizacion: React.FC = () => {
           periodoFinal={form.periodoFinal}
           operadorFiltro={operadorSel}
           valorFiltro={valorBalboas}
+          // 👇 si luego quieres usar provincia en el resultado,
+          // tendrás que agregar una prop `provincia` en PriorizacionForm
+          // provincia={form.provincia}
         />
       )}
 
