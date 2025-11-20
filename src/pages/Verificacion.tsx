@@ -1,33 +1,60 @@
-// src/pages/Verificacion.tsx
 import * as React from "react";
 import {
-  Box, Paper, Button, Chip, Typography, Grid,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableHead, TableRow, TableCell, TableBody, Tabs, Tab
+  Box,
+  Paper,
+  Button,
+  Chip,
+  Typography,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Tabs,
+  Tab,
+  TextField,
+  MenuItem,
+  Stack,
 } from "@mui/material";
+
 import {
-  DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
-  GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter, useGridApiRef,
+  DataGrid,
+  type GridColDef,
+  GridToolbarContainer,
+  GridToolbarColumnsButton,
+  GridToolbarDensitySelector,
+  GridToolbarExport,
+  GridToolbarQuickFilter,
+  useGridApiRef,
 } from "@mui/x-data-grid";
+
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
-import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import * as XLSX from "xlsx";
 
-/* =============== Tipos =============== */
+import { CASOS_KEY } from "../lib/aprobacionesStorage";
+import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import { getRolSimulado, type RolSimulado } from "../lib/rolSimulado";
+
+/* =============================================================================================
+ * TIPOS
+ * ============================================================================================= */
+
 type RowBase = {
   id: number | string;
   categoria: string;
   ruc: string;
   nombre: string;
-  provincia:any;
+  provincia: string;
   periodos: string;
   valor?: number | string | null;
   monto?: number | string | null;
   total?: number | string | null;
-  estado?: "Pendiente" | "Aprobado";
-  motivoDevolucion?: string | null;
-  motivoAmpliar?: string | null;
 };
 
 type RowMeta = {
@@ -37,67 +64,86 @@ type RowMeta = {
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
   metaPeriodoFinal?: string | null;
+  metaImpuesto?: string | null;
+  metaZonaEspecial?: string | null;
 };
 
-// 👉 fila de la tabla (+ número real para ordenar/mostrar + trazabilidad opcional)
-type Row = RowBase & RowMeta & {
-  valorNum: number;
-  trazas?: TrazaItem[];
-};
+type EstadoVerificacion =
+  | "Pendiente"
+  | "Verificado"
+  | "EnviadoAprobacion"
+  | "NoProductivo";
 
-/* =============== Utils =============== */
+type Row = RowBase &
+  RowMeta & {
+    valorNum: number;
+    trazas?: TrazaItem[];
+    detalleVisto?: boolean;
+    fechaAsignacionISO?: string;
+    esDoble?: boolean;
+    estadoVerif?: EstadoVerificacion;
+    motivoNoProductivo?: string | null;
+  };
+
+const MOTIVOS_NO_PROD = [
+  "Exento",
+  "Incentivo",
+  "Ingresos no representativos",
+  "Diferencias de monto no representativo",
+  "Otro",
+] as const;
+
+/* =============================================================================================
+ * UTILS
+ * ============================================================================================= */
+
 const toNumber = (v: any): number => {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  let s = String(v).trim();
-  if (!s) return 0;
-  s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
-  const lastDot = s.lastIndexOf(".");
-  const lastComma = s.lastIndexOf(",");
-  let decimalSep: "." | "," | null = null;
-  if (lastDot !== -1 || lastComma !== -1) decimalSep = lastComma > lastDot ? "," : ".";
-  if (decimalSep) {
-    const thousandSep = decimalSep === "." ? "," : ".";
-    s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
-    if (decimalSep === ",") s = s.replace(/,/g, ".");
-  } else {
-    s = s.replace(/[^\d\-]/g, "");
-  }
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+  if (v == null) return 0;
+  const n = Number(String(v).replace(/[^\d.-]/g, ""));
+  return isNaN(n) ? 0 : n;
 };
 
-// ✅ Formato 1,000,000.00
 const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
+const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"];
 
 function buildBreakdown(row: Row) {
   const total = row.valorNum || 0;
-  if (!total) {
-    return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
-  }
-  const seed =
-    (typeof row.id === "number"
-      ? row.id
-      : Number(String(row.id).replace(/\D/g, ""))) || 1;
-  const weights = PERIODOS_FIJOS.map((_, i) => (i + 1) * ((Number(seed) % 7) + 3));
-  const sumW = weights.reduce((a, b) => a + b, 0);
-  const items = PERIODOS_FIJOS.map((p, i) => ({
-    periodo: p,
-    monto: Math.round((total * weights[i]) / sumW),
-  }));
-  const ajuste = total - items.reduce((a, b) => a + b.monto, 0);
-  if (ajuste !== 0) items[items.length - 1].monto += ajuste;
-  return { items, total };
+  const cant = PERIODOS_FIJOS.length;
+  return {
+    items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: total / cant })),
+    total,
+  };
 }
+
+/* =============================================================================================
+ * SEMÁFORO
+ * ============================================================================================= */
+
+const diasDesdeAsignacion = (row: Row): number => {
+  if (!row.fechaAsignacionISO) return 0;
+  return Math.floor((Date.now() - new Date(row.fechaAsignacionISO).getTime()) / 86400000);
+};
+
+type ChipColor = "success" | "error";
+
+const getAlertaInfo = (row: Row): { color: ChipColor; label: string } => {
+  const d = diasDesdeAsignacion(row);
+  return d <= 1
+    ? { color: "success", label: "Día 1" }
+    : { color: "error", label: "Día 2" };
+};
+
+/* =============================================================================================
+ * TOOLBAR
+ * ============================================================================================= */
 
 function CustomToolbar() {
   return (
-    <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
+    <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
       <GridToolbarColumnsButton />
       <GridToolbarDensitySelector />
       <GridToolbarExport />
@@ -107,176 +153,327 @@ function CustomToolbar() {
   );
 }
 
-/* ===== Mock de trazas si la fila aún no las trae ===== */
+/* =============================================================================================
+ * MOCK TRAZABILIDAD
+ * ============================================================================================= */
+
 const mockTrazas = (ruc: string): TrazaItem[] => [
-  { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), actor: "Supervisor A", accion: "Revisión", estado: "PENDIENTE",  },
-  { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(), actor: "Auditor B", accion: "Análisis", estado: "APROBADO", },
+  {
+    id: `${ruc}-1`,
+    fechaISO: new Date().toISOString(),
+    actor: "Sistema",
+    accion: "Caso importado",
+    estado: "APROBADO",
+  },
 ];
 
-/* =============== Componente =============== */
+/* =============================================================================================
+ * COMPONENTE PRINCIPAL
+ * ============================================================================================= */
+
 const Verificacion: React.FC = () => {
   const apiRef = useGridApiRef();
 
   const [rows, setRows] = React.useState<Row[]>([]);
   const [selectedCount, setSelectedCount] = React.useState(0);
-
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const [tab, setTab] = React.useState(0);
 
-  const openDetail = (row: Row) => { setDetailRow(row); setTab(0); setDetailOpen(true); };
-  const closeDetail = () => setDetailOpen(false);
+  const [npOpen, setNpOpen] = React.useState(false);
+  const [npRow, setNpRow] = React.useState<Row | null>(null);
+  const [npMotivo, setNpMotivo] = React.useState(MOTIVOS_NO_PROD[0]);
+  const [npComentario, setNpComentario] = React.useState("");
 
-  const loadFromStorage = React.useCallback(() => {
-    try {
-      const texto = localStorage.getItem(CASOS_KEY);
-      const data: (RowBase & RowMeta)[] = texto ? JSON.parse(texto) : [];
-      const withNum: Row[] = data.map((r) => {
-        const n = toNumber(r.valor ?? r.monto ?? r.total);
-        return {
-          ...r,
-          estado: r.estado ?? "Pendiente",
-          valorNum: n,
-          // si ya viene con trazas, se respetan; si no, mock mín.
-          trazas: (r as any).trazas ?? mockTrazas(String(r.ruc)),
-        };
-      });
-      setRows(withNum);
-    } catch {
-      setRows([]);
-    }
+  const rol: RolSimulado = getRolSimulado();
+
+  /* =============================================================================================
+   * LOAD STORAGE
+   * ============================================================================================= */
+
+  const loadStorage = React.useCallback(() => {
+    const raw = localStorage.getItem(CASOS_KEY);
+    const arr: any[] = raw ? JSON.parse(raw) : [];
+
+    const mapped: Row[] = arr.map((r, idx) => ({
+      ...r,
+      valorNum: toNumber(r.valor ?? r.monto ?? r.total),
+      detalleVisto: r.detalleVisto ?? false,
+      estadoVerif: r.estadoVerif ?? "Pendiente",
+      fechaAsignacionISO:
+        r.fechaAsignacionISO ??
+        new Date(Date.now() - (idx + 1) * 86400000).toISOString(),
+      trazas: r.trazas ?? mockTrazas(r.ruc),
+    }));
+
+    setRows(mapped);
   }, []);
 
-  React.useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+  React.useEffect(() => loadStorage(), [loadStorage]);
 
   React.useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === CASOS_KEY) loadFromStorage(); };
-    const onCustom = () => loadFromStorage();
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("casosAprobacion:update", onCustom);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("casosAprobacion:update", onCustom);
-    };
-  }, [loadFromStorage]);
+    const h = () => loadStorage();
+    window.addEventListener("casosAprobacion:update", h);
+    return () => window.removeEventListener("casosAprobacion:update", h);
+  }, [loadStorage]);
+
+  /* =============================================================================================
+   * COLUMNAS (CORREGIDAS)
+   * ============================================================================================= */
 
   const columns: GridColDef<Row>[] = [
-    { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
-    { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
-    { field: "periodos", headerName: "Períodos (mm/aa)", flex: 0.9, minWidth: 160 },
-       { field: "provincia", headerName: "Provincia", flex: 1, minWidth: 140 },
+    {
+      field: "alerta",
+      headerName: "Alerta",
+      minWidth: 120,
+      renderCell: (params) => {
+        const info = getAlertaInfo(params.row);
+        return <Chip size="small" color={info.color} label={info.label} />;
+      },
+    },
+
+    { field: "ruc", headerName: "RUC", minWidth: 130 },
+    { field: "nombre", headerName: "Nombre", minWidth: 230 },
+    { field: "provincia", headerName: "Provincia", minWidth: 150 },
+
+    {
+      field: "metaCategoria",
+      headerName: "Categoría",
+      minWidth: 160,
+      valueGetter: (p: any) => {
+        const r = p?.row ?? {};
+        return r.metaCategoria || r.categoria || "";
+      },
+    },
+
+    {
+      field: "metaInconsistencia",
+      headerName: "Inconsistencia",
+      minWidth: 160,
+      valueGetter: (p: any) => {
+        const r = p?.row ?? {};
+        return r.metaInconsistencia || "";
+      },
+    },
+
+    {
+      field: "metaImpuesto",
+      headerName: "Impuesto",
+      minWidth: 150,
+      valueGetter: (p: any) => {
+        const r = p?.row ?? {};
+        return r.metaImpuesto || "";
+      },
+    },
+
+    {
+      field: "metaZonaEspecial",
+      headerName: "Zona Especial",
+      minWidth: 180,
+      valueGetter: (p: any) => {
+        const r = p?.row ?? {};
+        return r.metaZonaEspecial || "";
+      },
+    },
+
     {
       field: "valorNum",
       headerName: "Valor (B/.)",
-      type: "number",
-      flex: 0.8,
-      minWidth: 160,
-      sortable: true,
-      valueGetter: (params:any) => Number(params.row?.valorNum) ?? 0,
-      renderCell: (params) => {
-        const num = typeof params.row?.valorNum === "number"
-          ? params.row.valorNum
-          : Number(params.row?.valorNum) || 0;
-        return fmtMoneyUS.format(num);
-      },
-      sortComparator: (a, b) => (Number(a) || 0) - (Number(b) || 0),
+      minWidth: 140,
+      renderCell: (p) => fmtMoneyUS.format(p.row.valorNum ?? 0),
     },
+
+    {
+      field: "estadoVerif",
+      headerName: "Estado",
+      minWidth: 180,
+      renderCell: (p) => {
+        const r = p.row;
+
+        if (r.estadoVerif === "NoProductivo")
+          return <Chip size="small" label="No productivo" />;
+
+        if (r.estadoVerif === "EnviadoAprobacion")
+          return <Chip size="small" color="info" label="Enviado a aprobación" />;
+
+        if (r.estadoVerif === "Verificado")
+          return <Chip size="small" color="success" label="Verificado" />;
+
+        if (r.detalleVisto)
+          return <Chip size="small" label="Detalle visto" color="success" />;
+
+        return <Chip size="small" label="Pendiente" />;
+      },
+    },
+
     {
       field: "acciones",
       headerName: "Acciones",
-      sortable: false,
-      filterable: false,
-      align: "center",
-      headerAlign: "center",
-      minWidth: 140,
+      minWidth: 260,
       renderCell: (params) => (
-        <Button size="small" variant="contained" onClick={() => openDetail(params.row as Row)}>
-          DETALLE
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => {
+              setDetailRow(params.row);
+              setDetailOpen(true);
+            }}
+          >
+            DETALLE
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            onClick={() => {
+              setNpRow(params.row);
+              setNpOpen(true);
+            }}
+          >
+            NO PRODUCTIVO
+          </Button>
+        </Stack>
       ),
     },
   ];
 
-  const localeText = {
-    ...esES.components.MuiDataGrid.defaultProps.localeText,
-    toolbarQuickFilterPlaceholder: "Buscar…",
-  };
+  /* =============================================================================================
+   * PASAR A APROBACIÓN (BOTÓN)
+   * ============================================================================================= */
 
   const pasarAAprobacion = async () => {
     const api = apiRef.current;
     if (!api) return;
 
-    const seleccion = Array.from(api.getSelectedRows().values()) as Row[];
-    if (seleccion.length === 0) {
-      await Swal.fire({
-        icon: "info",
-        title: "Sin selección",
-        text: "Selecciona uno o más casos.",
-        confirmButtonText: "Ok",
-      });
+    const selected = Array.from(api.getSelectedRows().values()) as Row[];
+
+    if (!selected.length) {
+      Swal.fire("Sin selección", "Seleccione al menos un caso.", "info");
       return;
     }
 
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Pasar a Aprobación?",
-      html: `Se enviarán <b>${seleccion.length}</b> caso(s) a Aprobación.<br/>Esto reemplazará cualquier lista previa.`,
+      html: `Se enviarán <b>${selected.length}</b> caso(s) a Aprobación.`,
       showCancelButton: true,
-      confirmButtonText: "Sí, confirmar",
+      confirmButtonText: "Sí, continuar",
       cancelButtonText: "Cancelar",
       reverseButtons: true,
-      focusCancel: true,
     });
+
     if (!isConfirmed) return;
 
-    localStorage.setItem(CASOS_KEY, JSON.stringify(seleccion));
-    notifyAprobaciones();
+    const nuevos = rows.map((r:any) =>
+      selected.find((s) => s.ruc === r.ruc)
+        ? { ...r, estadoVerif: "EnviadoAprobacion" }
+        : r
+    );
 
-    await Swal.fire({
-      icon: "success",
-      title: "Enviado",
-      text: `Se enviaron ${seleccion.length} caso(s) a Aprobación.`,
-      confirmButtonText: "Listo",
-    });
+    localStorage.setItem(CASOS_KEY, JSON.stringify(nuevos));
+
+    Swal.fire("Éxito", "Casos enviados a Aprobación.", "success");
+
+    setRows(nuevos);
   };
+
+  /* =============================================================================================
+   * EXPORTAR
+   * ============================================================================================= */
+
+  const exportExcel = () => {
+    if (!rows.length) {
+      Swal.fire("Sin datos", "No hay datos para exportar.", "info");
+      return;
+    }
+
+    const data = rows.map((r) => ({
+      RUC: r.ruc,
+      Nombre: r.nombre,
+      Provincia: r.provincia,
+      Categoria: r.metaCategoria ?? r.categoria,
+      Inconsistencia: r.metaInconsistencia ?? "",
+      Impuesto: r.metaImpuesto ?? "",
+      ZonaEspecial: r.metaZonaEspecial ?? "",
+      Valor: r.valorNum,
+      Estado: r.estadoVerif,
+      FechaAsignacion: r.fechaAsignacionISO,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Verificación");
+    XLSX.writeFile(wb, "verificacion.xlsx");
+  };
+
+  /* =============================================================================================
+   * RENDER
+   * ============================================================================================= */
 
   return (
     <Box component={Paper} sx={{ p: 2 }}>
-      <Grid container alignItems="center" spacing={1} sx={{ mb: 1 }}>
-        <Grid item><Typography variant="h6">Verificación</Typography></Grid>
+      {/* HEADER */}
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
         <Grid item>
-          <Chip size="small" variant="outlined" color="primary" label={`Total: ${rows.length}`} />
+          <Typography variant="h6">Verificación</Typography>
         </Grid>
+
         <Grid item>
-          <Chip size="small" variant="outlined" label={`Seleccionados: ${selectedCount}`} />
+          <Chip size="small" variant="outlined" label={`Total: ${rows.length}`} />
+        </Grid>
+
+        <Grid item>
+          <Chip size="small" variant="outlined" color="info" label={`Seleccionados: ${selectedCount}`} />
+        </Grid>
+
+        <Grid item sx={{ ml: "auto" }}>
+          <Chip
+            size="small"
+            color="secondary"
+            label={
+              rol === "JEFE_SECCION"
+                ? "Rol: Jefe de Sección"
+                : "Rol: Jefe de Departamento"
+            }
+          />
         </Grid>
       </Grid>
 
+      {/* GRID */}
       <DataGrid
-        sx={{ height: 500 }}
+        sx={{ height: 520 }}
         apiRef={apiRef}
         rows={rows}
         columns={columns}
+        localeText={{
+          ...esES.components.MuiDataGrid.defaultProps.localeText,
+        }}
         checkboxSelection
         disableRowSelectionOnClick
-        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
-        onRowDoubleClick={(p) => openDetail(p.row as Row)}
+        onRowSelectionModelChange={(m) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
-        slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } } }}
-        pageSizeOptions={[5, 10, 25, 50]}
-        initialState={{ pagination: { paginationModel: { page: 0, pageSize: 10 } } }}
-        localeText={localeText}
       />
 
-      {/* Botón inferior alineado a la IZQUIERDA */}
-      <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-start" }}>
-        <Button size="small" variant="contained" color="success" onClick={pasarAAprobacion}>
+      {/* BOTONES INFERIORES */}
+      <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+        <Button variant="outlined" onClick={exportExcel}>
+          Exportar Excel
+        </Button>
+
+        <Button
+          variant="contained"
+          color="success"
+          disabled={selectedCount === 0}
+          onClick={pasarAAprobacion}
+        >
           Pasar a Aprobación
         </Button>
       </Box>
 
-      {/* Modal Detalle con Tabs */}
-      <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
+      {/* DETALLE */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Detalle del caso</DialogTitle>
         <DialogContent dividers>
           {detailRow && (
@@ -286,98 +483,153 @@ const Verificacion: React.FC = () => {
                 <Tab label="Trazabilidad" />
               </Tabs>
 
+              {/* INFO */}
               {tab === 0 && (
-                <Box>
-                  <Grid container spacing={2} sx={{ mb: 2 }}>
-                    <Grid item xs={12} md={4}>
-                      <Typography variant="caption">Categoría</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {detailRow.metaCategoria ?? detailRow.categoria ?? "—"}
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <Typography variant="caption">RUC</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.ruc}</Box>
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <Typography variant="caption">Nombre</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.nombre}</Box>
-                    </Grid>
-
-                    {!!detailRow.metaPrograma && (
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="caption">Programa</Typography>
-                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaPrograma}</Box>
-                      </Grid>
-                    )}
-                    {!!detailRow.metaInconsistencia && (
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="caption">Inconsistencia</Typography>
-                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaInconsistencia}</Box>
-                      </Grid>
-                    )}
-                    {!!detailRow.metaActividadEconomica?.length && (
-                      <Grid item xs={12}>
-                        <Typography variant="caption">Actividad(es) económica(s)</Typography>
-                        <Box component={Paper} sx={{ p: 1 }}>
-                          {detailRow.metaActividadEconomica.join(", ")}
-                        </Box>
-                      </Grid>
-                    )}
-                    {detailRow.motivoDevolucion && (
-                      <Grid item xs={12}>
-                        <Typography variant="caption">Motivo de devolución</Typography>
-                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoDevolucion}</Box>
-                      </Grid>
-                    )}
-                    {detailRow.motivoAmpliar && (
-                      <Grid item xs={12}>
-                        <Typography variant="caption">Motivo para ampliar</Typography>
-                        <Box component={Paper} sx={{ p: 1 }}>{detailRow.motivoAmpliar}</Box>
-                      </Grid>
-                    )}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption">Categoría</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaCategoria ?? detailRow.categoria ?? "—"}
+                    </Paper>
                   </Grid>
 
-                  {(() => {
-                    const bd = buildBreakdown(detailRow);
-                    return (
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            {PERIODOS_FIJOS.map((p) => <TableCell key={p} align="right">{p}</TableCell>)}
-                            <TableCell align="right"><b>Total</b></TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          <TableRow>
-                            {bd.items.map((it) => (
-                              <TableCell key={it.periodo} align="right">
-                                {fmtMoneyUS.format(it.monto)}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption">Inconsistencia</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaInconsistencia ?? "—"}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption">Provincia</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.provincia}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption">Impuesto</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaImpuesto ?? "—"}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption">Zona Especial</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaZonaEspecial ?? "—"}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="caption">Actividad Económica</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaActividadEconomica?.length
+                        ? detailRow.metaActividadEconomica.join(", ")
+                        : "—"}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption">Período Inicial</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaPeriodoInicial ?? "—"}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption">Período Final</Typography>
+                    <Paper sx={{ p: 1 }}>
+                      {detailRow.metaPeriodoFinal ?? "—"}
+                    </Paper>
+                  </Grid>
+
+                  {/* TABLA DE MONTOS */}
+                  <Grid item xs={12}>
+                    <Typography sx={{ mt: 2 }} variant="subtitle2">
+                      Distribución por períodos
+                    </Typography>
+
+                    {(() => {
+                      const bd = buildBreakdown(detailRow);
+                      return (
+                        <Table size="small" sx={{ mt: 1 }}>
+                          <TableHead>
+                            <TableRow>
+                              {bd.items.map((it) => (
+                                <TableCell key={it.periodo} align="right">
+                                  {it.periodo}
+                                </TableCell>
+                              ))}
+                              <TableCell align="right"><b>Total</b></TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            <TableRow>
+                              {bd.items.map((it) => (
+                                <TableCell key={it.periodo} align="right">
+                                  {fmtMoneyUS.format(it.monto)}
+                                </TableCell>
+                              ))}
+                              <TableCell align="right">
+                                <b>{fmtMoneyUS.format(bd.total)}</b>
                               </TableCell>
-                            ))}
-                            <TableCell align="right">
-                              <b>{fmtMoneyUS.format(bd.total)}</b>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    );
-                  })()}
-                </Box>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      );
+                    })()}
+                  </Grid>
+                </Grid>
               )}
 
+              {/* TRAZABILIDAD */}
               {tab === 1 && (
-                <Box>
-                  <Trazabilidad rows={detailRow.trazas ?? []} height={360} />
-                </Box>
+                <Trazabilidad rows={detailRow.trazas ?? []} height={360} />
               )}
             </>
           )}
         </DialogContent>
+
         <DialogActions>
-          <Button variant="contained" onClick={closeDetail}>CERRAR</Button>
+          <Button variant="contained" onClick={() => setDetailOpen(false)}>
+            CERRAR
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* NO PRODUCTIVO */}
+      <Dialog open={npOpen} onClose={() => setNpOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Marcar No Productivo</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            select
+            fullWidth
+            label="Motivo"
+            value={npMotivo}
+            onChange={(e:any) => setNpMotivo(e.target.value)}
+            sx={{ mb: 2 }}
+          >
+            {MOTIVOS_NO_PROD.map((m) => (
+              <MenuItem key={m} value={m}>{m}</MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            label="Comentario adicional"
+            value={npComentario}
+            onChange={(e) => setNpComentario(e.target.value)}
+          />
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setNpOpen(false)}>Cancelar</Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 };

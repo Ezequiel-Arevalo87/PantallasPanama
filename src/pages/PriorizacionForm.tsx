@@ -16,6 +16,7 @@ import {
   TableBody,
   Stack,
 } from "@mui/material";
+
 import {
   DataGrid,
   GridColDef,
@@ -26,31 +27,30 @@ import {
   GridToolbarQuickFilter,
   useGridApiRef,
 } from "@mui/x-data-grid";
+
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
-
-// 🔥 IMPORTANTE PARA RESTAURAR EL FLUJO DEL HOME
-import { saveCasoFlujo, uuid } from "../lib/workflowStorage";
+import * as XLSX from "xlsx";
 
 import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
-/* ===================== Tipos ===================== */
+/* ====================== TYPES ====================== */
 type Operador = ">=" | "<=" | "==" | "!=";
-type Condicion = { criterio: string; operador: Operador; valorBalboas: number };
 
 type Props = {
-  condiciones?: Condicion[];
   categoria?: string;
   inconsistencia?: string;
   actividadEconomica?: string[];
-  valoresDeclarados?: number | string;
+  impuesto?: string;
+  zonaEspecial?: string;
   programa?: string | null;
   periodoInicial?: string | null;
   periodoFinal?: string | null;
-  operadorFiltro?: Operador;
-  valorFiltro?: number | string;
-  provincia?: string; 
+  operador?: Operador;
+  valorMin?: string;
+  valorMax?: string;
+  provincia?: string;
 };
 
 type RawRow = {
@@ -71,8 +71,6 @@ type Row = {
   periodos: string;
   valor: number;
   valorInt: number;
-  monto?: number | string | null;
-  total?: number | string | null;
   provincia: string;
   trazas?: TrazaItem[];
 };
@@ -84,41 +82,21 @@ export type RowAprobacion = Row & {
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
   metaPeriodoFinal?: string | null;
+  metaImpuesto?: string | null;
+  metaZonaEspecial?: string | null;
+  fechaAsignacionISO?: string;
+  detalleVisto?: boolean;
 };
 
-/* ===================== Utils ===================== */
-const toNumber = (v: any): number => {
-  if (v == null) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  let s = String(v).trim();
-  if (!s) return 0;
-  s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
-  const lastDot = s.lastIndexOf(".");
-  const lastComma = s.lastIndexOf(",");
-  let decimalSep: "." | "," | null = null;
-  if (lastDot !== -1 || lastComma !== -1) {
-    decimalSep = lastComma > lastDot ? "," : ".";
-  }
-  if (decimalSep) {
-    const thousandSep = decimalSep === "." ? "," : ".";
-    s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
-    if (decimalSep === ",") s = s.replace(/,/g, ".");
-  } else {
-    s = s.replace(/[^\d\-]/g, "");
-  }
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const toInt = (v: any): number =>
-  Math.trunc(typeof v === "number" ? v : toNumber(v));
+/* ========================== UTILS =========================== */
+const toInt = (v: any): number => Math.trunc(Number(v || 0));
 
 const fmtMoney = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-/* ===================== Datos MOCK ===================== */
+/* ========================== MOCK DATA =========================== */
 const rawRows: RawRow[] = [
   { id: 1, categoria: "Fiscalización Masiva", ruc: "8-123-456", nombre: "Individual", periodos: "06/25", valor: 1250000, provincia: "Darién" },
   { id: 2, categoria: "Fiscalización Masiva", ruc: "8-654-321", nombre: "Individual", periodos: "05/25", valor: 236.23, provincia: "Darién" },
@@ -131,223 +109,211 @@ const rawRows: RawRow[] = [
   { id: 9, categoria: "Fiscalización Masiva", ruc: "100206", nombre: "Hoteles del Istmo", periodos: "10/24", valor: 978, provincia: "Bocas del Toro" },
   { id: 10, categoria: "Fiscalización Masiva", ruc: "100207", nombre: "Textiles del Istmo", periodos: "09/24", valor: 1505000, provincia: "Los Santos" },
 
+  // GC…
   { id: 11, categoria: "Grandes Contribuyentes", ruc: "200300", nombre: "Comercial ABC S.A.", periodos: "06/25", valor: 654, provincia: "Panamá" },
   { id: 12, categoria: "Grandes Contribuyentes", ruc: "200301", nombre: "Energía Nacional S.A.", periodos: "05/25", valor: 4123000.21, provincia: "Colón" },
   { id: 13, categoria: "Grandes Contribuyentes", ruc: "200302", nombre: "Telecom Panavisión", periodos: "04/25", valor: 158, provincia: "Panamá Oeste" },
   { id: 14, categoria: "Grandes Contribuyentes", ruc: "200303", nombre: "Aviación del Istmo", periodos: "03/25", valor: 2060000.45, provincia: "Chiriquí" },
   { id: 15, categoria: "Grandes Contribuyentes", ruc: "200304", nombre: "Finanzas Canal Group", periodos: "02/25", valor: 657, provincia: "Herrera" },
   { id: 16, categoria: "Grandes Contribuyentes", ruc: "200305", nombre: "Minería del Pacífico", periodos: "01/25", valor: 3100450.23, provincia: "Veraguas" },
-  { id: 17, categoria: "Grandes Contribuyentes", ruc: "200306", nombre: "Alimentos Global S.A.", periodos: "12/24", valor: 236, provincia: "Panamá" },
-  { id: 18, categoria: "Grandes Contribuyentes", ruc: "200307", nombre: "Logística Intermodal", periodos: "11/24", valor: 1299000, provincia: "Coclé" },
-  { id: 19, categoria: "Grandes Contribuyentes", ruc: "200308", nombre: "Farmacéutica Panamericana", periodos: "10/24", valor: 2365, provincia: "Bocas del Toro" },
-  { id: 20, categoria: "Grandes Contribuyentes", ruc: "200309", nombre: "Seguros del Istmo", periodos: "09/24", valor: 1080000, provincia: "Los Santos" },
-
-  { id: 21, categoria: "Auditoría Sectorial", ruc: "300400", nombre: "Servicios XYZ", periodos: "06/25", valor: 158, provincia: "Panamá" },
-  { id: 22, categoria: "Auditoría Sectorial", ruc: "300401", nombre: "AgroPanamá Ltda.", periodos: "05/25", valor: 1025, provincia: "Herrera" },
-  { id: 23, categoria: "Auditoría Sectorial", ruc: "300402", nombre: "Turismo & Viajes S.A.", periodos: "04/25", valor: 1350000, provincia: "Chiriquí" },
-  { id: 24, categoria: "Auditoría Sectorial", ruc: "300403", nombre: "Educación Privada del Sur", periodos: "03/25", valor: 2450000, provincia: "Coclé" },
-  { id: 25, categoria: "Auditoría Sectorial", ruc: "300404", nombre: "Salud Integral S.A.", periodos: "02/25", valor: 695, provincia: "Veraguas" },
-  { id: 26, categoria: "Auditoría Sectorial", ruc: "300405", nombre: "Tecnología Andina", periodos: "01/25", valor: 1789000, provincia: "Panamá" },
-  { id: 27, categoria: "Auditoría Sectorial", ruc: "300406", nombre: "Arquitectura Moderna", periodos: "12/24", valor: 320, provincia: "Bocas del Toro" },
-  { id: 28, categoria: "Auditoría Sectorial", ruc: "300407", nombre: "Transporte Urbano S.A.", periodos: "11/24", valor: 1250000, provincia: "Panamá Oeste" },
-  { id: 29, categoria: "Auditoría Sectorial", ruc: "300408", nombre: "Comercial Marítima", periodos: "10/24", valor: 236, provincia: "Colón" },
-  { id: 30, categoria: "Auditoría Sectorial", ruc: "300409", nombre: "Consultores del Istmo", periodos: "09/24", valor: 2110000, provincia: "Los Santos" },
 ];
 
-const BASE_ROWS: Row[] = rawRows.map((r, index) => {
-  const tieneProceso = index % 2 === 0;
+const BASE_ROWS: Row[] = rawRows.map((r) => ({
+  ...r,
+  valorInt: toInt(r.valor),
+  trazas: [],
+}));
 
-  const trazas: TrazaItem[] = tieneProceso
-    ? [
-        {
-          id: `${r.ruc}-1`,
-          fechaISO: new Date().toISOString(),
-          actor: "Supervisor A",
-          accion: "Creación",
-          estado: "PENDIENTE",
-        },
-        {
-          id: `${r.ruc}-2`,
-          fechaISO: new Date().toISOString(),
-          actor: "Auditor B",
-          accion: "Revisión",
-          estado: "APROBADO",
-        },
-      ]
-    : [];
-
-  return {
-    ...r,
-    valorInt: toInt(r.valor),
-    provincia: r.provincia,
-    trazas,
-  };
-});
-
-/* ===================== Componente ===================== */
+/* ========================== MAIN COMPONENT =========================== */
 export default function PriorizacionForm({
-  condiciones = [],
   categoria,
   inconsistencia,
   actividadEconomica,
-  valoresDeclarados,
+  impuesto,
+  zonaEspecial,
   programa,
   periodoInicial,
   periodoFinal,
-  operadorFiltro,
-  valorFiltro,
+  operador,
+  valorMin,
+  valorMax,
   provincia,
 }: Props) {
   const apiRef = useGridApiRef();
 
+  /* ========== RUCs ya enviados ========== */
+  const [rucsEnVerificacion, setRucsEnVerificacion] = React.useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CASOS_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+
+      const s = new Set<string>();
+      arr.forEach((r: any) => {
+        if (r?.ruc) s.add(String(r.ruc));
+      });
+      setRucsEnVerificacion(s);
+    } catch {
+      setRucsEnVerificacion(new Set());
+    }
+  }, []);
+
+  /* ========== FILTRO ========== */
   const rows = React.useMemo<Row[]>(() => {
     let base = BASE_ROWS;
 
-    if (provincia && provincia !== "Todos") {
+    if (provincia && provincia !== "Todos")
       base = base.filter((r) => r.provincia === provincia);
-    }
 
-    if (valorFiltro !== undefined && valorFiltro !== "" && operadorFiltro) {
-      const objetivo = toInt(valorFiltro);
-      base = base.filter((r) => evalCond(r.valorInt, operadorFiltro, objetivo));
-    }
+    const minVal = valorMin ? Number(valorMin) : null;
+    const maxVal = valorMax ? Number(valorMax) : null;
+
+    if (minVal != null) base = base.filter((r) => r.valorInt >= minVal);
+    if (maxVal != null) base = base.filter((r) => r.valorInt <= maxVal);
+
     return base;
-  }, [condiciones, operadorFiltro, valorFiltro, provincia]);
+  }, [provincia, valorMin, valorMax]);
 
-  const [paginationModel, setPaginationModel] = React.useState({
-    page: 0,
-    pageSize: 5,
-  });
   const [selectedCount, setSelectedCount] = React.useState(0);
 
+  /* ========== DETALLE ========== */
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const [tabSel, setTabSel] = React.useState(0);
 
   const openDetail = (row: Row) => {
     setDetailRow(row);
-    setDetailOpen(true);
     setTabSel(0);
+    setDetailOpen(true);
   };
-  const closeDetail = () => setDetailOpen(false);
 
+  /* ========== COLUMNAS ========== */
   const columns: GridColDef[] = [
-    { field: "ruc", headerName: "RUC", flex: 0.9, minWidth: 140 },
-    { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2, minWidth: 240 },
-    { field: "provincia", headerName: "Provincia", flex: 0.9, minWidth: 140 },
+    { field: "ruc", headerName: "RUC", flex: 0.8, minWidth: 130 },
+    { field: "nombre", headerName: "Nombre / Razón Social", flex: 1.1, minWidth: 220 },
+    { field: "provincia", headerName: "Provincia", flex: 0.7, minWidth: 110 },
+
+    { field: "zonaEspecial", headerName: "Zona Especial", minWidth: 150, valueGetter: () => zonaEspecial ?? "—" },
+    { field: "impuesto", headerName: "Impuesto", minWidth: 130, valueGetter: () => impuesto ?? "—" },
+
     {
       field: "valorInt",
       headerName: "Valor (B/.)",
-      type: "number",
-      flex: 0.8,
-      minWidth: 160,
-      renderCell: (params) => fmtMoney.format((params.row as Row).valorInt),
+      minWidth: 140,
+      renderCell: (params) => fmtMoney.format(params.row.valorInt),
     },
+
     {
       field: "acciones",
       headerName: "Acciones",
-      sortable: false,
-      filterable: false,
-      align: "center",
-      headerAlign: "center",
       minWidth: 140,
-      renderCell: (params) => {
-        const row = params.row as Row;
-
-        return (
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => openDetail(row)}
-          >
-            DETALLE
-          </Button>
-        );
-      },
+      renderCell: (params) => (
+        <Button size="small" variant="contained" onClick={() => openDetail(params.row as Row)}>
+          DETALLE
+        </Button>
+      ),
     },
   ];
 
+  /* ========== PASAR A VERIFICACIÓN ========== */
+  const handleAprobar = async () => {
+    const api = apiRef.current;
+    if (!api) return;
+
+    const selected = Array.from(api.getSelectedRows().values()) as Row[];
+
+    if (!selected.length) {
+      await Swal.fire("Sin selección", "Seleccione al menos un caso.", "info");
+      return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+      icon: "question",
+      title: "¿Enviar a Verificación?",
+      html: `Se enviarán <b>${selected.length}</b> caso(s).`,
+      showCancelButton: true,
+      confirmButtonText: "Sí, confirmar",
+      cancelButtonText: "Cancelar",
+      reverseButtons: true,
+    });
+
+    if (!isConfirmed) return;
+
+    const ahoraISO = new Date().toISOString();
+
+    const paquete: RowAprobacion[] = selected.map((r) => ({
+      ...r,
+      metaCategoria: categoria,
+      metaInconsistencia: inconsistencia,
+      metaPrograma: programa,
+      metaActividadEconomica: actividadEconomica ?? [],
+      metaPeriodoInicial: periodoInicial,
+      metaPeriodoFinal: periodoFinal,
+      metaImpuesto: impuesto,
+      metaZonaEspecial: zonaEspecial,
+      fechaAsignacionISO: ahoraISO,
+      detalleVisto: false,
+    }));
+
+    localStorage.setItem(CASOS_KEY, JSON.stringify(paquete));
+    notifyAprobaciones();
+
+    await Swal.fire("Éxito", "Casos enviados a Verificación.", "success");
+
+    const s = new Set(rucsEnVerificacion);
+    paquete.forEach((r) => s.add(String(r.ruc)));
+    setRucsEnVerificacion(s);
+  };
+
+  /* ========== EXPORT ========== */
+  const handleExportExcel = () => {
+    if (!rows.length) {
+      Swal.fire("Sin datos", "No hay datos que exportar.", "info");
+      return;
+    }
+
+    const data = rows.map((r) => ({
+      RUC: r.ruc,
+      Nombre: r.nombre,
+      Provincia: r.provincia,
+      Categoria: categoria ?? r.categoria,
+      Inconsistencia: inconsistencia ?? "",
+      Impuesto: impuesto ?? "",
+      ZonaEspecial: zonaEspecial ?? "",
+      Periodos: r.periodos,
+      Valor: r.valorInt,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Priorización");
+    XLSX.writeFile(wb, "selector_casos_priorizacion.xlsx");
+  };
+
+  /* ========== TOOLBAR ========== */
   const localeText = {
     ...esES.components.MuiDataGrid.defaultProps.localeText,
     toolbarQuickFilterPlaceholder: "Buscar…",
   };
 
-  /* ===========================================
-     🔥 PASAR A VERIFICACIÓN + ENVIAR AL HOME
-     =========================================== */
-  const handleAprobar = async () => {
-  const api = apiRef.current;
-  if (!api) return;
-  const selected = Array.from(api.getSelectedRows().values()) as Row[];
-
-  if (selected.length === 0) {
-    await Swal.fire({
-      icon: "info",
-      title: "Sin selección",
-      text: "No hay casos seleccionados para pasar a Verificación.",
-      confirmButtonText: "Ok",
-    });
-    return;
+  function CustomToolbar() {
+    return (
+      <GridToolbarContainer sx={{ p: 1 }}>
+        <GridToolbarColumnsButton />
+        <GridToolbarDensitySelector />
+        <GridToolbarExport />
+        <Box sx={{ flex: 1 }} />
+        <GridToolbarQuickFilter />
+      </GridToolbarContainer>
+    );
   }
 
-  const { isConfirmed } = await Swal.fire({
-    icon: "question",
-    title: "¿Pasar a Verificación?",
-    html: `Se enviarán <b>${selected.length}</b> caso(s).`,
-    showCancelButton: true,
-    confirmButtonText: "Sí, confirmar",
-    cancelButtonText: "Cancelar",
-  });
-  if (!isConfirmed) return;
-
-  // 🔥 AGREGAR METADATOS + PROVINCIA CORRECTA
-  const conMeta: RowAprobacion[] = selected.map((r) => ({
-    ...r,
-    provincia: r.provincia ?? "SIN PROVINCIA",
-    metaCategoria: categoria ?? r.categoria,
-    metaInconsistencia: inconsistencia ?? undefined,
-    metaPrograma: programa ?? null,
-    metaActividadEconomica: actividadEconomica ?? [],
-    metaPeriodoInicial: periodoInicial ?? null,
-    metaPeriodoFinal: periodoFinal ?? null,
-  }));
-
-  // 🔥 GUARDAR EN localStorage PARA VERIFICACIÓN (incluye provincia)
-  localStorage.setItem(CASOS_KEY, JSON.stringify(conMeta));
-  notifyAprobaciones();
-
-  // 🔥 GUARDAR TAMBIÉN PARA EL HOME
-  conMeta.forEach((c) => {
-    saveCasoFlujo({
-      id: `${c.ruc}-${Date.now()}`,
-      nombre: c.nombre,
-      ruc: c.ruc,
-      fase: "INICIO DE AUDITORIA",
-      estado: "Pendiente",
-      deadline: new Date().toISOString(),
-      history: [
-        {
-          idPaso: uuid(),
-          from: "ASIGNACIÓN",
-          to: "INICIO DE AUDITORIA",
-          by: "Sistema",
-          at: new Date().toISOString(),
-        },
-      ],
-    });
-  });
-
-  await Swal.fire({
-    icon: "success",
-    title: "Guardado",
-    text: `Se enviaron ${selected.length} caso(s) a Verificación.`,
-    confirmButtonText: "Listo",
-  });
-};
-
-
+  /* ========== RENDER ========== */
   return (
-    <Box component={Paper} sx={{ mt: 2, pb: 1 }}>
+    <Box component={Paper} sx={{ mt: 2, p: 1 }}>
+
       <DataGrid
         sx={{ height: 420 }}
         apiRef={apiRef}
@@ -355,77 +321,97 @@ export default function PriorizacionForm({
         columns={columns}
         checkboxSelection
         disableRowSelectionOnClick
-        isRowSelectable={(params) => !hasEstados(params.row as Row)}
-        onRowSelectionModelChange={(m: any) => setSelectedCount(m.length)}
+        isRowSelectable={(params) => !rucsEnVerificacion.has(String(params.row.ruc))}
+        onRowSelectionModelChange={(m) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
         localeText={localeText}
-        pagination
         pageSizeOptions={[5, 10, 25, 50]}
-        paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
+        initialState={{
+          pagination: { paginationModel: { page: 0, pageSize: 10 } },
+        }}
       />
 
-      {/* Dialog de Detalle */}
-      <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
-        <DialogTitle>Detalle del caso</DialogTitle>
+      {/* DETALLE */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Detalle del Caso</DialogTitle>
         <DialogContent dividers>
+
           {detailRow && (
             <>
-              <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-                <Stack direction="row" spacing={2}>
-                  <Button
-                    onClick={() => setTabSel(0)}
-                    variant={tabSel === 0 ? "contained" : "text"}
-                  >
-                    Información
-                  </Button>
-                  <Button
-                    onClick={() => setTabSel(1)}
-                    variant={tabSel === 1 ? "contained" : "text"}
-                  >
-                    Trazabilidad
-                  </Button>
-                </Stack>
-              </Box>
+              <Stack direction="row" spacing={2}>
+                <Button variant={tabSel === 0 ? "contained" : "text"} onClick={() => setTabSel(0)}>
+                  Información
+                </Button>
+                <Button variant={tabSel === 1 ? "contained" : "text"} onClick={() => setTabSel(1)}>
+                  Trazabilidad
+                </Button>
+              </Stack>
 
               {tabSel === 0 && (
                 <Box sx={{ mt: 2 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Categoría</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {categoria || detailRow.categoria}
-                      </Box>
+                      <Paper sx={{ p: 1 }}>{categoria}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Inconsistencia</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {inconsistencia || "—"}
-                      </Box>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                      <Typography variant="caption">Provincia</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {detailRow.provincia}
-                      </Box>
+                      <Paper sx={{ p: 1 }}>{inconsistencia}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">RUC</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {detailRow.ruc}
-                      </Box>
+                      <Paper sx={{ p: 1 }}>{detailRow.ruc}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={8}>
                       <Typography variant="caption">Nombre</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>
-                        {detailRow.nombre}
-                      </Box>
+                      <Paper sx={{ p: 1 }}>{detailRow.nombre}</Paper>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Typography variant="caption">Actividad Económica</Typography>
+                      <Paper sx={{ p: 1 }}>
+                        {actividadEconomica?.length ? actividadEconomica.join(", ") : "—"}
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                      <Typography variant="caption">Periodo Inicial</Typography>
+                      <Paper sx={{ p: 1 }}>{periodoInicial}</Paper>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                      <Typography variant="caption">Periodo Final</Typography>
+                      <Paper sx={{ p: 1 }}>{periodoFinal}</Paper>
                     </Grid>
                   </Grid>
+
+                  {/* Ejemplo tabla interna */}
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2">Períodos por monto</Typography>
+
+                    <Table size="small" sx={{ mt: 1 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell align="right">2025</TableCell>
+                          <TableCell align="right">2024</TableCell>
+                          <TableCell align="right">2023</TableCell>
+                          <TableCell align="right">Total</TableCell>
+                        </TableRow>
+                      </TableHead>
+
+                      <TableBody>
+                        <TableRow>
+                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.4)}</TableCell>
+                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.35)}</TableCell>
+                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.25)}</TableCell>
+                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </Box>
                 </Box>
               )}
 
@@ -436,51 +422,33 @@ export default function PriorizacionForm({
               )}
             </>
           )}
+
         </DialogContent>
 
         <DialogActions>
-          <Button variant="contained" onClick={closeDetail}>
+          <Button variant="contained" onClick={() => setDetailOpen(false)}>
             CERRAR
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Box sx={{ px: 2, py: 1 }}>
+      {/* BOTONES FINALES */}
+      <Box sx={{ px: 2, py: 1, display: "flex", gap: 1 }}>
+        <Button size="small" variant="outlined" onClick={handleExportExcel}>
+          Exportar Excel
+        </Button>
+
         <Button
           size="small"
           variant="contained"
           color="success"
-          onClick={handleAprobar}
           disabled={selectedCount === 0}
+          onClick={handleAprobar}
         >
           Pasar a Verificación
         </Button>
       </Box>
+
     </Box>
   );
 }
-
-/* ===================== Toolbar ===================== */
-function CustomToolbar() {
-  return (
-    <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
-      <GridToolbarColumnsButton />
-      <GridToolbarDensitySelector />
-      <GridToolbarExport />
-      <Box sx={{ flex: 1 }} />
-      <GridToolbarQuickFilter />
-    </GridToolbarContainer>
-  );
-}
-
-const evalCond = (valor: number, operador: Operador, objetivo: number) => {
-  switch (operador) {
-    case ">=": return valor >= objetivo;
-    case "<=": return valor <= objetivo;
-    case "==": return valor === objetivo;
-    case "!=": return valor !== objetivo;
-    default: return true;
-  }
-};
-
-const hasEstados = (row: Row) => !!row.trazas && row.trazas.length > 0;

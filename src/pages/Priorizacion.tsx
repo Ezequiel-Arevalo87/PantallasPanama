@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Box, Grid, TextField, MenuItem, Button, Stack, Chip,
-  InputAdornment, ListItemText, Checkbox
+  Box,
+  Grid,
+  TextField,
+  MenuItem,
+  Button,
+  Stack,
+  InputAdornment,
+  ListItemText,
+  Checkbox,
+  Chip,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import Swal from 'sweetalert2';
@@ -9,13 +17,12 @@ import PriorizacionForm from './PriorizacionForm';
 import { Actividad, loadActividades } from '../services/actividadesLoader';
 import { NumericFormat, type NumericFormatProps } from 'react-number-format';
 
-/** ===== Catálogos base ===== */
+/* ================= CATALOGOS BASE ================= */
 const CATEGORIAS = ['Fiscalización Masiva', 'Auditoría Sectorial', 'Grandes Contribuyentes', 'Todos'] as const;
 const INCONSISTENCIAS = ['Omiso', 'Inexacto', 'Extemporáneo', 'Todos'] as const;
 
-/** ===== Provincias ===== */
 const PROVINCIAS = [
-  'Todos',          // 👈 opción TODOS
+  'Todos',
   'Panamá',
   'Colón',
   'Darién',
@@ -28,7 +35,15 @@ const PROVINCIAS = [
   'Panamá Oeste',
 ] as const;
 
-/** ===== Programas unificados ===== */
+/* ===== HU: Zonas especiales ===== */
+const ZONAS_ESPECIALES = [
+  'Ninguna',
+  'Panamá Pacífico',
+  'Zona Franca',
+  'SEM',
+] as const;
+
+/* ===== Programas ===== */
 const PROGRAMAS_OMISO = [
   'Omisos vs retenciones 4331 ITBMS',
   'Omisos vs informes',
@@ -49,24 +64,13 @@ const PROGRAMAS_EXTEMPORANEO = [
   'Base contribuyentes VS Calendario retenciones ITBMS',
 ] as const;
 
-/** ===== Operadores de condición ===== */
 const OPERADORES = ['>=', '<=', '==', '!='] as const;
 
-/** ===== Tipos ===== */
-type Operador = (typeof OPERADORES)[number];
-
-type Condicion = {
-  criterio: string;
-  operador: Operador;
-  valorBalboas: number;
-};
-
-/** ===== Utils ===== */
 const ALL_VALUE = '__ALL__';
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values());
 
-// Input con máscara para MUI TextField
+/* ================= Input numérico ================= */
 const NumericFormatCustom = React.forwardRef<HTMLInputElement, NumericFormatProps>(
   function NumericFormatCustom(props, ref) {
     const { onChange, ...rest } = props as any;
@@ -79,7 +83,7 @@ const NumericFormatCustom = React.forwardRef<HTMLInputElement, NumericFormatProp
         allowNegative={false}
         onValueChange={(values) => {
           onChange?.({
-            target: { name: props.name, value: values.value }
+            target: { name: props.name, value: values.value },
           });
         }}
       />
@@ -87,33 +91,34 @@ const NumericFormatCustom = React.forwardRef<HTMLInputElement, NumericFormatProp
   }
 );
 
+/* =============================================================================
+ * COMPONENTE PRINCIPAL
+ * ============================================================================= */
 export const Priorizacion: React.FC = () => {
+
   const [form, setForm] = useState<any>({
-    periodo: '',
     categoria: 'Fiscalización Masiva',
     inconsistencia: 'Inexacto',
+    provincia: 'Todos',
+    impuesto: 'Todos',
+    zonaEspecial: 'Ninguna',
     actividadEconomica: [] as string[],
-    tipologia: '',
     programa: '',
-    valoresDeclarados: '',
+    operador: '>=',
+    valorMin: '',
+    valorMax: '',
     periodoInicial: '',
     periodoFinal: '',
-    provincia: 'Todos',      // 👈 valor inicial TODOS
   });
 
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
-  // operador y valor (filtro simple)
-  const [operadorSel, setOperadorSel] = useState<Operador>('>=');
-  const [valorBalboas, setValorBalboas] = useState<string>('');
-
-  // actividades
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingAct, setLoadingAct] = useState<boolean>(true);
-  const [condiciones] = useState<Condicion[]>([]);
 
   const esAS = form.categoria === 'Auditoría Sectorial';
 
+  /* ================= LOAD ACTIVIDADES ================= */
   useEffect(() => {
     loadActividades().then((arr) => {
       setActividades(arr ?? []);
@@ -129,13 +134,20 @@ export const Priorizacion: React.FC = () => {
 
   const programasDisponibles = useMemo(() => {
     switch (form.inconsistencia) {
-      case 'Omiso': return [...PROGRAMAS_OMISO];
-      case 'Inexacto': return [...PROGRAMAS_INEXACTO];
-      case 'Extemporáneo': return [...PROGRAMAS_EXTEMPORANEO];
-      case 'Todos': return uniqCaseInsensitive([
-        ...PROGRAMAS_OMISO, ...PROGRAMAS_INEXACTO, ...PROGRAMAS_EXTEMPORANEO,
-      ]);
-      default: return [];
+      case 'Omiso':
+        return [...PROGRAMAS_OMISO];
+      case 'Inexacto':
+        return [...PROGRAMAS_INEXACTO];
+      case 'Extemporáneo':
+        return [...PROGRAMAS_EXTEMPORANEO];
+      case 'Todos':
+        return uniqCaseInsensitive([
+          ...PROGRAMAS_OMISO,
+          ...PROGRAMAS_INEXACTO,
+          ...PROGRAMAS_EXTEMPORANEO,
+        ]);
+      default:
+        return [];
     }
   }, [form.inconsistencia]);
 
@@ -145,15 +157,16 @@ export const Priorizacion: React.FC = () => {
     }
   }, [programasDisponibles, form.programa]);
 
+  /* ================= HANDLERS ================= */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    // cuando cambia categoría: limpiar actividad si no es AS
     if (name === 'categoria') {
       setForm((prev: any) => ({
         ...prev,
         categoria: value,
-        actividadEconomica: value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
+        actividadEconomica:
+          value === 'Auditoría Sectorial' ? prev.actividadEconomica : [],
       }));
       setMostrarResultados(false);
       return;
@@ -175,65 +188,42 @@ export const Priorizacion: React.FC = () => {
     setMostrarResultados(false);
   };
 
-  // === Validaciones fecha ===
-  const requiereFechas = form.inconsistencia !== '';
+  /* ================= VALIDACIONES ================= */
   const parseISO = (s: string) => (s ? new Date(s + 'T00:00:00') : null);
 
   const handleConsultar = async () => {
-    if (requiereFechas) {
-      const dIni = parseISO(form.periodoInicial);
-      const dFin = parseISO(form.periodoFinal);
+    const dIni = parseISO(form.periodoInicial);
+    const dFin = parseISO(form.periodoFinal);
 
-      if (!dIni || !dFin) {
-        await Swal.fire({
-          title: 'Fechas requeridas',
-          text: 'La Fecha Inicial y la Fecha Final son obligatorias.',
-          icon: 'error',
-          confirmButtonText: 'Entendido',
-        });
-        return;
-      }
+    if (!dIni || !dFin) {
+      await Swal.fire('Fechas requeridas', 'Ambas fechas son obligatorias.', 'error');
+      return;
+    }
 
-      if (!(dIni < dFin)) {
-        await Swal.fire({
-          title: 'Rango inválido',
-          text: 'La fecha inicial debe ser estrictamente menor que la fecha final.',
-          icon: 'error',
-          confirmButtonText: 'Entendido',
-        });
-        return;
-      }
+    if (!(dIni < dFin)) {
+      await Swal.fire('Rango inválido', 'La fecha inicial debe ser menor que la final.', 'error');
+      return;
+    }
 
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      if (dFin.getTime() > hoy.getTime()) {
-        await Swal.fire({
-          title: 'Fecha No Permitida',
-          text: 'La fecha final no puede ser posterior a la fecha actual del sistema.',
-          icon: 'error',
-          confirmButtonText: 'Ok',
-        });
-        return;
-      }
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (dFin.getTime() > hoy.getTime()) {
+      await Swal.fire('Fecha no permitida', 'La fecha final no puede ser mayor que hoy.', 'error');
+      return;
+    }
 
-      const diffYears = (a: Date, b: Date) =>
-        Math.abs((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-
-      const years = diffYears(dIni, dFin);
-      if (years > 5) {
-        const { isConfirmed } = await Swal.fire({
-          title:
-            'Señor auditor de fiscalización, el período seleccionado supera los cinco años permitidos por el CPT',
-          text: '¿Desea continuar con el proceso?',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Continuar',
-          cancelButtonText: 'Cancelar',
-          reverseButtons: true,
-          focusCancel: true,
-        });
-        if (!isConfirmed) return;
-      }
+    const diffYears = Math.abs((dFin.getTime() - dIni.getTime()) / 31557600000);
+    if (diffYears > 5) {
+      const { isConfirmed } = await Swal.fire({
+        title: 'Advertencia',
+        text: 'El período supera 5 años. ¿Continuar?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+      });
+      if (!isConfirmed) return;
     }
 
     setMostrarResultados(true);
@@ -241,19 +231,19 @@ export const Priorizacion: React.FC = () => {
 
   const handleLimpiar = () => {
     setForm({
-      periodo: '',
       categoria: 'Fiscalización Masiva',
       inconsistencia: 'Inexacto',
+      provincia: 'Todos',
+      impuesto: 'Todos',
+      zonaEspecial: 'Ninguna',
       actividadEconomica: [] as string[],
-      tipologia: '',
       programa: '',
-      valoresDeclarados: '',
+      operador: '>=',
+      valorMin: '',
+      valorMax: '',
       periodoInicial: '',
       periodoFinal: '',
-      provincia: 'Todos',   // 👈 vuelve a TODOS
     });
-    setOperadorSel('>=');
-    setValorBalboas('');
     setMostrarResultados(false);
   };
 
@@ -269,16 +259,17 @@ export const Priorizacion: React.FC = () => {
     );
   };
 
-  const requiereFechasFlag = requiereFechas;
-
+  /* =============================================================================
+   * RENDER
+   * ============================================================================= */
   return (
     <Box>
       <Grid container spacing={2}>
+
         {/* Categoría */}
         <Grid item xs={12} sm={6}>
           <TextField
-            select
-            fullWidth
+            select fullWidth
             label="Categoría"
             name="categoria"
             value={form.categoria}
@@ -290,11 +281,10 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Tipo de Inconsistencia */}
+        {/* Inconsistencia */}
         <Grid item xs={12} sm={6}>
           <TextField
-            select
-            fullWidth
+            select fullWidth
             label="Tipo de Inconsistencia"
             name="inconsistencia"
             value={form.inconsistencia}
@@ -309,8 +299,7 @@ export const Priorizacion: React.FC = () => {
         {/* Provincia */}
         <Grid item xs={12} sm={6}>
           <TextField
-            select
-            fullWidth
+            select fullWidth
             label="Provincia"
             name="provincia"
             value={form.provincia}
@@ -322,41 +311,54 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Programa */}
+        {/* Zona Especial */}
         <Grid item xs={12} sm={6}>
           <TextField
-            select
-            fullWidth
-            label="Motivo/Impuesto"
-            name="programa"
-            value={form.programa ?? ''}
+            select fullWidth
+            label="Zona Especial"
+            name="zonaEspecial"
+            value={form.zonaEspecial}
             onChange={handleChange}
-            disabled={programasDisponibles.length === 0}
-            helperText={programasDisponibles.length === 0 ? 'Seleccione primero un Tipo de Inconsistencia' : ''}
           >
-            {programasDisponibles.map((p) => (
-              <MenuItem key={p.toLowerCase()} value={p}>{p}</MenuItem>
+            {ZONAS_ESPECIALES.map((z) => (
+              <MenuItem key={z} value={z}>{z}</MenuItem>
             ))}
           </TextField>
         </Grid>
 
-        {/* Actividad Económica (múltiple, SOLO en AS) */}
+        {/* Programa */}
+        <Grid item xs={12} sm={6}>
+          <TextField
+            select fullWidth
+            label="Impuesto"
+            name="programa"
+            value={form.programa}
+            onChange={handleChange}
+            disabled={programasDisponibles.length === 0}
+          >
+            {programasDisponibles.map((p) => (
+              <MenuItem key={p} value={p}>{p}</MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        {/* Actividad Económica */}
         {esAS && (
           <Grid item xs={12} md={6}>
             <TextField
-              select
-              fullWidth
+              select fullWidth
               label="Actividad Económica"
               name="actividadEconomica"
               value={form.actividadEconomica}
               onChange={handleActividadesChange as any}
-              disabled={!esAS || loadingAct}
               SelectProps={{ multiple: true, renderValue: renderActividadChips }}
+              disabled={loadingAct}
             >
-              <MenuItem value={ALL_VALUE} disabled={loadingAct}>
+              <MenuItem value={ALL_VALUE}>
                 <Checkbox checked={form.actividadEconomica.length === 0} />
                 <ListItemText primary="Todas" />
               </MenuItem>
+
               {actividades.map((a) => (
                 <MenuItem key={a.code} value={a.code}>
                   <Checkbox checked={form.actividadEconomica.includes(a.code)} />
@@ -370,11 +372,11 @@ export const Priorizacion: React.FC = () => {
         {/* Operador */}
         <Grid item xs={6} md={3}>
           <TextField
-            select
-            fullWidth
+            select fullWidth
             label="Operador"
-            value={operadorSel}
-            onChange={(e) => setOperadorSel(e.target.value as Operador)}
+            name="operador"
+            value={form.operador}
+            onChange={handleChange}
           >
             {OPERADORES.map((op) => (
               <MenuItem key={op} value={op}>{op}</MenuItem>
@@ -382,14 +384,29 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Valor (B/.) con máscara */}
+        {/* Valor MIN */}
         <Grid item xs={6} md={3}>
           <TextField
             fullWidth
-            label="Valor (B/.)"
-            name="valorBalboas"
-            value={valorBalboas}
-            onChange={(e) => setValorBalboas(e.target.value)}
+            label="Valor MIN (B/.)"
+            name="valorMin"
+            value={form.valorMin}
+            onChange={handleChange}
+            InputProps={{
+              startAdornment: <InputAdornment position="start">B/.</InputAdornment>,
+              inputComponent: NumericFormatCustom as any,
+            }}
+          />
+        </Grid>
+
+        {/* Valor MAX */}
+        <Grid item xs={6} md={3}>
+          <TextField
+            fullWidth
+            label="Valor MAX (B/.)"
+            name="valorMax"
+            value={form.valorMax}
+            onChange={handleChange}
             InputProps={{
               startAdornment: <InputAdornment position="start">B/.</InputAdornment>,
               inputComponent: NumericFormatCustom as any,
@@ -398,32 +415,25 @@ export const Priorizacion: React.FC = () => {
         </Grid>
 
         {/* Fechas */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={6} md={3}>
           <TextField
-            fullWidth
-            type="date"
+            fullWidth type="date"
             label="Fecha Inicial"
             name="periodoInicial"
             value={form.periodoInicial}
             onChange={handleChange}
             InputLabelProps={{ shrink: true }}
-            required={requiereFechasFlag}
-            error={requiereFechasFlag && !form.periodoInicial}
-            helperText={requiereFechasFlag && !form.periodoInicial ? 'Obligatoria' : ''}
           />
         </Grid>
-        <Grid item xs={12} md={6}>
+
+        <Grid item xs={6} md={3}>
           <TextField
-            fullWidth
-            type="date"
+            fullWidth type="date"
             label="Fecha Final"
             name="periodoFinal"
             value={form.periodoFinal}
             onChange={handleChange}
             InputLabelProps={{ shrink: true }}
-            required={requiereFechasFlag}
-            error={requiereFechasFlag && !form.periodoFinal}
-            helperText={requiereFechasFlag && !form.periodoFinal ? 'Obligatoria' : ''}
           />
         </Grid>
 
@@ -434,21 +444,24 @@ export const Priorizacion: React.FC = () => {
             <Button variant="contained" color="inherit" onClick={handleLimpiar}>LIMPIAR</Button>
           </Stack>
         </Grid>
+
       </Grid>
 
+      {/* RESULTADOS */}
       {mostrarResultados && (
         <PriorizacionForm
-          condiciones={[]}
           categoria={form.categoria}
           inconsistencia={form.inconsistencia}
           actividadEconomica={esAS ? form.actividadEconomica : []}
-          valoresDeclarados={form.valoresDeclarados}
+          impuesto={form.programa}
+          zonaEspecial={form.zonaEspecial}
           programa={form.programa}
           periodoInicial={form.periodoInicial}
           periodoFinal={form.periodoFinal}
-          operadorFiltro={operadorSel}
-          valorFiltro={valorBalboas}
-          provincia={form.provincia}   // 👈 se envía a la tabla
+          operador={form.operador}
+          valorMin={form.valorMin}
+          valorMax={form.valorMax}
+          provincia={form.provincia}
         />
       )}
 

@@ -1,14 +1,38 @@
 // src/pages/Aprobaciones.tsx
 import * as React from "react";
 import {
-  Box, Paper, Button, Chip, Typography, Grid,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableHead, TableRow, TableCell, TableBody, Stack,
-  Tooltip, IconButton, TextField, Tabs, Tab
+  Box,
+  Paper,
+  Button,
+  Chip,
+  Typography,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Stack,
+  Tooltip,
+  IconButton,
+  TextField,
+  Tabs,
+  Tab,
+  MenuItem,
 } from "@mui/material";
 import {
-  DataGrid, type GridColDef, GridToolbarContainer, GridToolbarColumnsButton,
-  GridToolbarDensitySelector, GridToolbarExport, GridToolbarQuickFilter, useGridApiRef,
+  DataGrid,
+  type GridColDef,
+  GridToolbarContainer,
+  GridToolbarColumnsButton,
+  GridToolbarDensitySelector,
+  GridToolbarExport,
+  GridToolbarQuickFilter,
+  useGridApiRef,
 } from "@mui/x-data-grid";
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
@@ -20,6 +44,12 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import OpenInFullOutlinedIcon from "@mui/icons-material/OpenInFullOutlined";
+
+import {
+  getRolSimulado,
+  setRolSimulado,
+  type RolSimulado,
+} from "../lib/rolSimulado";
 
 /* ===================== Tipos ===================== */
 type RowBase = {
@@ -45,10 +75,11 @@ type RowMeta = {
   metaPeriodoFinal?: string | null;
 };
 
-type Row = RowBase & RowMeta & {
-  valorNum: number;
-  trazas?: TrazaItem[];
-};
+type Row = RowBase &
+  RowMeta & {
+    valorNum: number;
+    trazas?: TrazaItem[];
+  };
 
 /* ===================== Utils ===================== */
 const toNumber = (v: any): number => {
@@ -60,7 +91,8 @@ const toNumber = (v: any): number => {
   const lastDot = s.lastIndexOf(".");
   const lastComma = s.lastIndexOf(",");
   let decimalSep: "." | "," | null = null;
-  if (lastDot !== -1 || lastComma !== -1) decimalSep = lastComma > lastDot ? "," : ".";
+  if (lastDot !== -1 || lastComma !== -1)
+    decimalSep = lastComma > lastDot ? "," : ".";
   if (decimalSep) {
     const thousandSep = decimalSep === "." ? "," : ".";
     s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
@@ -77,14 +109,29 @@ const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
+const PERIODOS_FIJOS = [
+  "dic-20",
+  "dic-21",
+  "dic-22",
+  "dic-23",
+  "dic-24",
+  "dic-25",
+] as const;
 
 const buildBreakdown = (row: Row) => {
   const total = row.valorNum || 0;
   if (!total)
-    return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
-  const seed = (typeof row.id === "number" ? row.id : Number(String(row.id).replace(/\D/g, ""))) || 1;
-  const weights = PERIODOS_FIJOS.map((_, i) => (i + 1) * ((seed % 7) + 3));
+    return {
+      items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })),
+      total: 0,
+    };
+  const seed =
+    (typeof row.id === "number"
+      ? row.id
+      : Number(String(row.id).replace(/\D/g, ""))) || 1;
+  const weights = PERIODOS_FIJOS.map(
+    (_, i) => (i + 1) * ((seed % 7) + 3)
+  );
   const sumW = weights.reduce((a, b) => a + b, 0);
   const items = PERIODOS_FIJOS.map((p, i) => ({
     periodo: p,
@@ -110,18 +157,38 @@ function CustomToolbar() {
 const normalize = (s?: string | null) => (s || "").toLowerCase();
 const inconsLabels = (inc?: string | null) => {
   switch (normalize(inc)) {
-    case "omiso": return { singular: "omiso", plural: "omisos" };
-    case "inexacto": return { singular: "inexacto", plural: "inexactos" };
+    case "omiso":
+      return { singular: "omiso", plural: "omisos" };
+    case "inexacto":
+      return { singular: "inexacto", plural: "inexactos" };
     case "extemporáneo":
-    case "extemporaneo": return { singular: "extemporáneo", plural: "extemporáneos" };
-    default: return { singular: "inconsistencia", plural: "inconsistencias" };
+    case "extemporaneo":
+      return { singular: "extemporáneo", plural: "extemporáneos" };
+    default:
+      return { singular: "inconsistencia", plural: "inconsistencias" };
   }
 };
 
 /* Mock de trazas */
 const mockTrazas = (ruc: string): TrazaItem[] => [
-  { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 86400000 * 7).toISOString(), actor: "Supervisor A", accion: "Revisión inicial", estado: "PENDIENTE" },
-  { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 86400000 * 2).toISOString(), actor: "Auditor B", accion: "Validación documental", estado: "APROBADO" },
+  {
+    id: `${ruc}-1`,
+    fechaISO: new Date(
+      Date.now() - 86400000 * 7
+    ).toISOString(),
+    actor: "Supervisor A",
+    accion: "Revisión inicial",
+    estado: "PENDIENTE",
+  },
+  {
+    id: `${ruc}-2`,
+    fechaISO: new Date(
+      Date.now() - 86400000 * 2
+    ).toISOString(),
+    actor: "Auditor B",
+    accion: "Validación documental",
+    estado: "APROBADO",
+  },
 ];
 
 /* ===================== Componente ===================== */
@@ -138,10 +205,27 @@ const Aprobaciones: React.FC = () => {
   // Motivo (Devolver/Ampliar)
   const [motivoOpen, setMotivoOpen] = React.useState(false);
   const [motivoText, setMotivoText] = React.useState("");
-  const [motivoAction, setMotivoAction] = React.useState<"Devolver" | "Ampliar" | null>(null);
+  const [motivoAction, setMotivoAction] = React.useState<
+    "Devolver" | "Ampliar" | null
+  >(null);
   const [motivoRow, setMotivoRow] = React.useState<Row | null>(null);
 
-  const openDetail = (row: Row) => { setDetailRow(row); setTab(0); setDetailOpen(true); };
+  // Rol simulado
+  const [rol, setRol] = React.useState<RolSimulado>(() => getRolSimulado());
+
+  const handleRolChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const value = e.target.value as RolSimulado;
+    setRol(value);
+    setRolSimulado(value);
+  };
+
+  const openDetail = (row: Row) => {
+    setDetailRow(row);
+    setTab(0);
+    setDetailOpen(true);
+  };
   const closeDetail = () => setDetailOpen(false);
 
   const loadFromStorage = React.useCallback(() => {
@@ -155,10 +239,14 @@ const Aprobaciones: React.FC = () => {
         trazas: (r as any).trazas ?? mockTrazas(String(r.ruc)),
       }));
       setRows(withNum);
-    } catch { setRows([]); }
+    } catch {
+      setRows([]);
+    }
   }, []);
 
-  React.useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+  React.useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
 
   const persist = (data: Row[]) => {
     localStorage.setItem(CASOS_KEY, JSON.stringify(data));
@@ -166,24 +254,42 @@ const Aprobaciones: React.FC = () => {
   };
 
   const aprobarUno = async (row: Row) => {
+    if (rol !== "JEFE_DEPARTAMENTO") return; // solo simulado
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Aprobar caso?",
-      html: `<b>${row.nombre}</b><br/>RUC: ${row.ruc}<br/>Valor: <b>B/. ${fmtMoneyUS.format(row.valorNum)}</b>`,
+      html: `<b>${row.nombre}</b><br/>RUC: ${row.ruc}<br/>Valor: <b>B/. ${fmtMoneyUS.format(
+        row.valorNum
+      )}</b>`,
       showCancelButton: true,
       confirmButtonText: "Sí, aprobar",
       cancelButtonText: "Cancelar",
       reverseButtons: true,
     });
     if (!isConfirmed) return;
-    persist(rows.map((r) => r.id === row.id ? { ...r, estado: "Aprobado" } : r));
-    Swal.fire({ icon: "success", title: "Aprobado", text: "Caso aprobado correctamente." });
+    persist(
+      rows.map((r) =>
+        r.id === row.id ? { ...r, estado: "Aprobado" } : r
+      )
+    );
+    Swal.fire({
+      icon: "success",
+      title: "Aprobado",
+      text: "Caso aprobado correctamente.",
+    });
   };
 
   const aprobarSeleccion = async () => {
-    const seleccion = Array.from(apiRef.current?.getSelectedRows().values() || []) as Row[];
+    if (rol !== "JEFE_DEPARTAMENTO") return;
+    const seleccion = Array.from(
+      apiRef.current?.getSelectedRows().values() || []
+    ) as Row[];
     if (!seleccion.length) {
-      return Swal.fire({ icon: "info", title: "Sin selección", text: "Selecciona uno o más casos." });
+      return Swal.fire({
+        icon: "info",
+        title: "Sin selección",
+        text: "Selecciona uno o más casos.",
+      });
     }
     const { isConfirmed } = await Swal.fire({
       icon: "question",
@@ -194,11 +300,20 @@ const Aprobaciones: React.FC = () => {
     });
     if (!isConfirmed) return;
     const ids = new Set(seleccion.map((r) => r.id));
-    persist(rows.map((r) => ids.has(r.id) ? { ...r, estado: "Aprobado" } : r));
-    Swal.fire({ icon: "success", title: "Aprobados", text: "Selección aprobada correctamente." });
+    persist(
+      rows.map((r) =>
+        ids.has(r.id) ? { ...r, estado: "Aprobado" } : r
+      )
+    );
+    Swal.fire({
+      icon: "success",
+      title: "Aprobados",
+      text: "Selección aprobada correctamente.",
+    });
   };
 
   const abrirMotivo = (accion: "Devolver" | "Ampliar", row: Row) => {
+    if (rol !== "JEFE_DEPARTAMENTO") return;
     setMotivoAction(accion);
     setMotivoRow(row);
     setMotivoText("");
@@ -215,7 +330,12 @@ const Aprobaciones: React.FC = () => {
   const confirmarMotivo = async () => {
     if (!motivoAction || !motivoRow) return;
     const texto = motivoText.trim();
-    if (!texto) return Swal.fire({ icon: "info", title: "Motivo requerido", text: "Escribe un motivo." });
+    if (!texto)
+      return Swal.fire({
+        icon: "info",
+        title: "Motivo requerido",
+        text: "Escribe un motivo.",
+      });
     const updated = rows.map((r) => {
       if (r.id !== motivoRow.id) return r;
       return motivoAction === "Devolver"
@@ -226,17 +346,34 @@ const Aprobaciones: React.FC = () => {
     cerrarMotivo();
     Swal.fire({
       icon: "success",
-      title: motivoAction === "Devolver" ? "Devuelto" : "Ampliación registrada",
-      text: motivoAction === "Devolver" ? "Se guardó el motivo de devolución." : "Se solicitó ampliar información.",
+      title:
+        motivoAction === "Devolver"
+          ? "Devuelto"
+          : "Ampliación registrada",
+      text:
+        motivoAction === "Devolver"
+          ? "Se guardó el motivo de devolución."
+          : "Se solicitó ampliar información.",
     });
   };
 
   const columns: GridColDef<Row>[] = [
     { field: "ruc", headerName: "RUC", flex: 0.9 },
-    { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2 },
-    { field: "valorNum", headerName: "Valor (B/.)", flex: 0.8, renderCell: (p) => fmtMoneyUS.format(p.row.valorNum) },
     {
-      field: "estado", headerName: "Estado", minWidth: 120,
+      field: "nombre",
+      headerName: "Nombre o Razón Social",
+      flex: 1.2,
+    },
+    {
+      field: "valorNum",
+      headerName: "Valor (B/.)",
+      flex: 0.8,
+      renderCell: (p) => fmtMoneyUS.format(p.row.valorNum),
+    },
+    {
+      field: "estado",
+      headerName: "Estado",
+      minWidth: 120,
       renderCell: (p) => (
         <Chip
           size="small"
@@ -244,12 +381,16 @@ const Aprobaciones: React.FC = () => {
           color={p.row.estado === "Aprobado" ? "success" : "default"}
           variant={p.row.estado === "Aprobado" ? "filled" : "outlined"}
         />
-      )
+      ),
     },
     {
-      field: "acciones", headerName: "Acciones", sortable: false, width: 260,
+      field: "acciones",
+      headerName: "Acciones",
+      sortable: false,
+      width: 260,
       renderCell: (p) => {
         const r = p.row;
+        const disabledPorRol = rol !== "JEFE_DEPARTAMENTO";
         return (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title="Detalle">
@@ -257,25 +398,58 @@ const Aprobaciones: React.FC = () => {
                 <InfoOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Aprobar">
-              <IconButton size="small" color="success" disabled={r.estado === "Aprobado"} onClick={() => aprobarUno(r)}>
+            <Tooltip
+              title={
+                disabledPorRol
+                  ? "Solo Jefe de Departamento (simulado)"
+                  : "Aprobar"
+              }
+            >
+              <IconButton
+                size="small"
+                color="success"
+                disabled={r.estado === "Aprobado" || disabledPorRol}
+                onClick={() => aprobarUno(r)}
+              >
                 <CheckCircleOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Devolver (motivo)">
-              <IconButton size="small" color="warning" onClick={() => abrirMotivo("Devolver", r)}>
+            <Tooltip
+              title={
+                disabledPorRol
+                  ? "Solo Jefe de Departamento (simulado)"
+                  : "Devolver (motivo)"
+              }
+            >
+              <IconButton
+                size="small"
+                color="warning"
+                disabled={disabledPorRol}
+                onClick={() => abrirMotivo("Devolver", r)}
+              >
                 <UndoOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Ampliar información">
-              <IconButton size="small" color="primary" onClick={() => abrirMotivo("Ampliar", r)}>
+            <Tooltip
+              title={
+                disabledPorRol
+                  ? "Solo Jefe de Departamento (simulado)"
+                  : "Ampliar información"
+              }
+            >
+              <IconButton
+                size="small"
+                color="primary"
+                disabled={disabledPorRol}
+                onClick={() => abrirMotivo("Ampliar", r)}
+              >
                 <OpenInFullOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Stack>
         );
-      }
-    }
+      },
+    },
   ];
 
   const inc = inconsLabels(detailRow?.metaInconsistencia);
@@ -283,11 +457,35 @@ const Aprobaciones: React.FC = () => {
   return (
     <Box component={Paper} sx={{ p: 2 }}>
       <Grid container alignItems="center" spacing={1} sx={{ mb: 1 }}>
-        <Grid item><Typography variant="h6">Aprobaciones</Typography></Grid>
+        <Grid item>
+          <Typography variant="h6">Aprobaciones</Typography>
+        </Grid>
         <Grid item sx={{ ml: "auto" }}>
-          <Button size="small" variant="contained" color="success" onClick={aprobarSeleccion} disabled={!selectedCount}>
-            Aprobar selección
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              select
+              size="small"
+              label="Rol simulado"
+              value={rol}
+              onChange={handleRolChange}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="JEFE_SECCION">Jefe de Sección</MenuItem>
+              <MenuItem value="JEFE_DEPARTAMENTO">
+                Jefe de Departamento
+              </MenuItem>
+            </TextField>
+
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={aprobarSeleccion}
+              disabled={!selectedCount || rol !== "JEFE_DEPARTAMENTO"}
+            >
+              Aprobar selección
+            </Button>
+          </Stack>
         </Grid>
       </Grid>
 
@@ -309,7 +507,11 @@ const Aprobaciones: React.FC = () => {
         <DialogContent dividers>
           {detailRow && (
             <>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                sx={{ mb: 2 }}
+              >
                 <Tab label="Información" />
                 <Tab label="Trazabilidad" />
               </Tabs>
@@ -319,15 +521,21 @@ const Aprobaciones: React.FC = () => {
                   <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Categoría</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.metaCategoria ?? detailRow.categoria}</Box>
+                      <Box component={Paper} sx={{ p: 1 }}>
+                        {detailRow.metaCategoria ?? detailRow.categoria}
+                      </Box>
                     </Grid>
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">RUC</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.ruc}</Box>
+                      <Box component={Paper} sx={{ p: 1 }}>
+                        {detailRow.ruc}
+                      </Box>
                     </Grid>
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Nombre</Typography>
-                      <Box component={Paper} sx={{ p: 1 }}>{detailRow.nombre}</Box>
+                      <Box component={Paper} sx={{ p: 1 }}>
+                        {detailRow.nombre}
+                      </Box>
                     </Grid>
                   </Grid>
 
@@ -340,8 +548,14 @@ const Aprobaciones: React.FC = () => {
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            {PERIODOS_FIJOS.map((p) => <TableCell key={p} align="right">{p}</TableCell>)}
-                            <TableCell align="right"><b>Total</b></TableCell>
+                            {PERIODOS_FIJOS.map((p) => (
+                              <TableCell key={p} align="right">
+                                {p}
+                              </TableCell>
+                            ))}
+                            <TableCell align="right">
+                              <b>Total</b>
+                            </TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -351,7 +565,9 @@ const Aprobaciones: React.FC = () => {
                                 {fmtMoneyUS.format(it.monto)}
                               </TableCell>
                             ))}
-                            <TableCell align="right"><b>{fmtMoneyUS.format(bd.total)}</b></TableCell>
+                            <TableCell align="right">
+                              <b>{fmtMoneyUS.format(bd.total)}</b>
+                            </TableCell>
                           </TableRow>
                         </TableBody>
                       </Table>
@@ -370,23 +586,39 @@ const Aprobaciones: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Stack direction="row" spacing={1} sx={{ mr: "auto", pl: 1 }}>
-            <Button variant="outlined" size="small">EXCEL</Button>
-            <Button variant="outlined" size="small">WORD</Button>
-            <Button variant="outlined" size="small">PDF</Button>
+            <Button variant="outlined" size="small">
+              EXCEL
+            </Button>
+            <Button variant="outlined" size="small">
+              WORD
+            </Button>
+            <Button variant="outlined" size="small">
+              PDF
+            </Button>
           </Stack>
-          <Button variant="contained" onClick={closeDetail}>CERRAR</Button>
+          <Button variant="contained" onClick={closeDetail}>
+            CERRAR
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* === Dialog Motivo === */}
       <Dialog open={motivoOpen} onClose={cerrarMotivo} maxWidth="sm" fullWidth>
-        <DialogTitle>{motivoAction === "Devolver" ? "Motivo de devolución" : "Motivo para ampliar información"}</DialogTitle>
+        <DialogTitle>
+          {motivoAction === "Devolver"
+            ? "Motivo de devolución"
+            : "Motivo para ampliar información"}
+        </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1}>
             {motivoRow && (
               <>
-                <Typography variant="body2"><b>RUC:</b> {motivoRow.ruc}</Typography>
-                <Typography variant="body2"><b>Nombre:</b> {motivoRow.nombre}</Typography>
+                <Typography variant="body2">
+                  <b>RUC:</b> {motivoRow.ruc}
+                </Typography>
+                <Typography variant="body2">
+                  <b>Nombre:</b> {motivoRow.nombre}
+                </Typography>
               </>
             )}
             <TextField
@@ -402,7 +634,9 @@ const Aprobaciones: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={cerrarMotivo}>Cancelar</Button>
-          <Button variant="contained" onClick={confirmarMotivo}>Guardar motivo</Button>
+          <Button variant="contained" onClick={confirmarMotivo}>
+            Guardar motivo
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Paper,
@@ -16,20 +16,25 @@ import {
   Tabs,
   Tab,
   Button,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
-
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-
 import {
   readCasosOrdenados,
-  uuid,
-  CasoFlujo,
+  getNextFase,
   FaseFlujo,
+  CasoFlujo,
+  uuid,
 } from "../lib/workflowStorage";
+import AdvanceToNext from "../components/AdvanceToNext";
 
 /* ==========================================================
-   Home
+   Home con:
+   - Pestañas: "Tareas sin realizar", "Tareas realizadas",
+               "Próximos a vencer (≤2 días)" y "Casos por notificar"
    ========================================================== */
 
 type Props = {
@@ -37,6 +42,7 @@ type Props = {
 };
 
 const UNREAD_KEY = "casosUnread";
+const asKey = (id: string | number) => String(id);
 
 const mkDeadline = (daysFromNow: number) => {
   const d = new Date();
@@ -44,13 +50,13 @@ const mkDeadline = (daysFromNow: number) => {
   return d.toISOString();
 };
 
-// ================= DEMO ==================
+// 🔹 Todos los ejemplos, incluyendo los nuevos "Por Notificar"
 const demoCasos: CasoFlujo[] = [
+  // AUDITOR
   {
     id: "A-001",
     nombre: "Panamá Retail S.A.",
     ruc: "RUC-100200",
-    provincia: "Panamá",
     fase: "INICIO DE AUDITORIA",
     estado: "Pendiente",
     deadline: mkDeadline(7),
@@ -68,7 +74,6 @@ const demoCasos: CasoFlujo[] = [
     id: "A-002",
     nombre: "Construcciones Istmo S.A.",
     ruc: "RUC-100201",
-    provincia: "Panamá Oeste",
     fase: "INICIO DE AUDITORIA",
     estado: "Pendiente",
     deadline: mkDeadline(2),
@@ -79,66 +84,174 @@ const demoCasos: CasoFlujo[] = [
         to: "INICIO DE AUDITORIA",
         by: "J. Supervisor",
         at: new Date().toISOString(),
+        note: "Prioridad alta",
       },
     ],
   },
 
+  // SUPERVISOR
   {
-    id: "N-301",
-    nombre: "GlobalTech S.A.",
-    ruc: "RUC-400500",
-    provincia: "Colón",
-    fase: "NOTIFICACIÓN ACTA DE INICIO",
-    estado: "Por Notificar",
+    id: "S-101",
+    nombre: "Servicios del Istmo",
+    ruc: "8-654-321",
+    fase: "REVISIÓN SUPERVISOR",
+    estado: "Pendiente",
+    deadline: mkDeadline(4),
+    history: [
+      {
+        idPaso: uuid(),
+        from: "INICIO DE AUDITORIA",
+        to: "REVISIÓN SUPERVISOR",
+        by: "Auditor A. Pérez",
+        at: new Date().toISOString(),
+      },
+    ],
+  },
+
+  // DIRECTOR
+  {
+    id: "D-201",
+    nombre: "TransLog S.A.",
+    ruc: "8-123-456",
+    fase: "REVISIÓN JEFE DE SECCIÓN",
+    estado: "Pendiente",
     deadline: mkDeadline(1),
     history: [
       {
         idPaso: uuid(),
-        from: "ASIGNACIÓN",
-        to: "NOTIFICACIÓN ACTA DE INICIO",
+        from: "REVISIÓN SUPERVISOR",
+        to: "REVISIÓN JEFE DE SECCIÓN",
+        by: "Supervisor M. Lara",
+        at: new Date().toISOString(),
+      },
+    ],
+  },
+
+  // APROBADOS
+  {
+    id: "OK-01",
+    nombre: "Café del Barrio",
+    ruc: "RUC-200300",
+    fase: "CIERRE",
+    estado: "Aprobado",
+    deadline: mkDeadline(10),
+    history: [
+      {
+        idPaso: uuid(),
+        from: "REVISIÓN JEFE DE SECCIÓN",
+        to: "CIERRE",
+        by: "Director L. Gómez",
+        at: new Date().toISOString(),
+        note: "Aprobado",
+      },
+    ],
+  },
+  {
+    id: "OK-02",
+    nombre: "Electro Hogar",
+    ruc: "RUC-300400",
+    fase: "CIERRE",
+    estado: "Aprobado",
+    deadline: mkDeadline(12),
+    history: [
+      {
+        idPaso: uuid(),
+        from: "REVISIÓN SUPERVISOR",
+        to: "CIERRE",
+        by: "Director L. Gómez",
+        at: new Date().toISOString(),
+        note: "Aprobado sin observaciones",
+      },
+    ],
+  },
+
+  // 🟢 NUEVOS: CASOS POR NOTIFICAR (plazo 1 día)
+  {
+    id: "N-301",
+    nombre: "GlobalTech S.A.",
+    ruc: "RUC-400500",
+    fase: "NOTIFICACIÓN ACTA DE INICIO" as FaseFlujo,
+    estado: "Por Notificar",
+    deadline: mkDeadline(1), // día actual → verde
+    history: [
+      {
+        idPaso: uuid(),
+        from: "ASIGNACIÓN" as FaseFlujo,
+        to: "NOTIFICACIÓN ACTA DE INICIO" as FaseFlujo,
         by: "Sistema",
         at: new Date().toISOString(),
       },
     ],
   },
+  {
+    id: "N-302",
+    nombre: "Alimentos del Norte S.A.",
+    ruc: "RUC-400501",
+    fase: "NOTIFICACIÓN ACTA DE INICIO" as FaseFlujo,
+    estado: "Por Notificar",
+    deadline: mkDeadline(-1), // ya vencido → rojo
+    history: [
+      {
+        idPaso: uuid(),
+        from: "ASIGNACIÓN" as FaseFlujo,
+        to: "NOTIFICACIÓN ACTA DE INICIO" as FaseFlujo,
+        by: "Supervisor M. Lara",
+        at: new Date().toISOString(),
+        note: "No contactado",
+      },
+    ],
+  },
 ];
 
-// ================ Helpers ======================
 function loadUnread(): Set<string> {
   try {
     const raw = localStorage.getItem(UNREAD_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    if (!raw) return new Set<string>();
+    return new Set(JSON.parse(raw));
   } catch {
-    return new Set();
+    return new Set<string>();
   }
+}
+function saveUnread(s: Set<string>) {
+  localStorage.setItem(UNREAD_KEY, JSON.stringify(Array.from(s)));
 }
 
 export const Home: React.FC<Props> = ({ onGo }) => {
   const [tab, setTab] = useState<0 | 1 | 2 | 3>(0);
   const [casos, setCasos] = useState<CasoFlujo[]>([]);
   const [modoDemo, setModoDemo] = useState(false);
-
-  useEffect(() => {
-    if (!modoDemo) setCasos(readCasosOrdenados());
-  }, [modoDemo]);
+  const [unread, setUnread] = useState<Set<string>>(loadUnread());
 
   const getDiasRestantes = (c: CasoFlujo): number | null => {
     if (!c.deadline) return null;
     const hoy = new Date();
     const fin = new Date(c.deadline);
-    return Math.ceil((fin.getTime() - hoy.getTime()) / 86400000);
+    return Math.ceil((fin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const pendientes = casos.filter((c) => c.estado === "Pendiente");
-  const realizadas = casos.filter((c) => c.estado === "Aprobado");
-  const casosNotificar = casos.filter((c) => c.estado === "Por Notificar");
+  const pendientes = useMemo(
+    () => casos.filter((c) => c.estado === "Pendiente"),
+    [casos]
+  );
+  const realizadas = useMemo(
+    () => casos.filter((c) => c.estado === "Aprobado"),
+    [casos]
+  );
+  const casosPorNotificar = useMemo(
+    () => casos.filter((c) => c.estado === "Por Notificar"),
+    [casos]
+  );
 
-  const proximosAVencer = pendientes
-    .filter((c) => {
+  const proximosAVencer = useMemo(() => {
+    const list = pendientes.filter((c) => {
       const d = getDiasRestantes(c);
       return d !== null && d <= 2;
-    })
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+    });
+    return list.sort(
+      (a, b) =>
+        new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime()
+    );
+  }, [pendientes]);
 
   const activos =
     tab === 0
@@ -147,13 +260,13 @@ export const Home: React.FC<Props> = ({ onGo }) => {
       ? realizadas
       : tab === 2
       ? proximosAVencer
-      : casosNotificar;
+      : casosPorNotificar;
 
-  // ============= LÍNEA DE CADA CASO (CON IR A LA TAREA + PROVINCIA) =============
   const renderLinea = (c: CasoFlujo) => {
     const last = c.history?.[c.history.length - 1];
     const diasRestantes = getDiasRestantes(c);
 
+    // 🔹 Color especial para los casos por notificar
     const colorTexto =
       c.estado === "Por Notificar"
         ? diasRestantes !== null && diasRestantes <= 0
@@ -167,30 +280,17 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
     return (
       <React.Fragment key={String(c.id)}>
-        <ListItem
-          disableGutters
-          alignItems="flex-start"
-          sx={{
-            pr: 1.5,
-            display: "flex",
-          }}
-        >
+        <ListItem disableGutters alignItems="flex-start" sx={{ pr: 1.5 }}>
           <ListItemAvatar>
             <Avatar>
               <MailOutlineIcon />
             </Avatar>
           </ListItemAvatar>
-
-          {/* INFO PRINCIPAL */}
           <ListItemText
             primary={
-              <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography fontWeight={700}>{c.nombre}</Typography>
                 <Typography color="text.secondary">• {c.ruc}</Typography>
-
-                {/* 🔵 PROVINCIA */}
-                <Typography color="text.secondary">• {c.provincia}</Typography>
-
                 {c.estado === "Por Notificar" && (
                   <Chip size="small" color="warning" label="Por Notificar" />
                 )}
@@ -203,6 +303,7 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                     {last.from ? `De ${last.from} → ` : ""}
                     <b>{last.to}</b> • asignó <b>{last.by}</b> •{" "}
                     {new Date(last.at).toLocaleString()}
+                    {last.note ? ` • “${last.note}”` : ""}
                   </Typography>
                 )}
 
@@ -210,27 +311,15 @@ export const Home: React.FC<Props> = ({ onGo }) => {
                   <Typography variant="body2" sx={{ mt: 0.5, color: colorTexto }}>
                     Fecha límite:{" "}
                     <b>
-                      {new Date(c.deadline!).toLocaleDateString()} ({diasRestantes} días)
+                      {new Date(c.deadline!).toLocaleDateString()} (
+                      {diasRestantes} días restantes)
                     </b>
                   </Typography>
                 )}
               </Box>
             }
           />
-
-          {/* 🔥 BOTÓN IR A LA TAREA – DINÁMICO POR FASE */}
-          <Box sx={{ ml: "auto" }}>
-            <Tooltip title="Ir a la tarea">
-              <IconButton
-                color="primary"
-                onClick={() => onGo?.(c.fase ?? "HOME")}
-              >
-                <VisibilityRoundedIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
         </ListItem>
-
         <Divider component="li" />
       </React.Fragment>
     );
@@ -238,7 +327,7 @@ export const Home: React.FC<Props> = ({ onGo }) => {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-      {/* Modo demo */}
+      {/* DEMO */}
       <Stack direction="row" justifyContent="flex-end" mb={1}>
         {!modoDemo ? (
           <Button
@@ -271,18 +360,30 @@ export const Home: React.FC<Props> = ({ onGo }) => {
           <Tab label={`Tareas sin realizar (${pendientes.length})`} />
           <Tab label={`Tareas realizadas (${realizadas.length})`} />
           <Tab label={`Próximos a vencer (≤2 días) (${proximosAVencer.length})`} />
-          <Tab label={`Casos por notificar (${casosNotificar.length})`} />
+          <Tab label={`Casos por notificar (${casosPorNotificar.length})`} />
         </Tabs>
       </Paper>
 
-      {/* Lista */}
+      {tab === 3 && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Typography variant="h6" fontWeight={700}>
+            Casos por notificar
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Estos casos tienen 1 día de plazo.  
+            <b style={{ color: "green" }}> Verde</b> = dentro del día.  
+            <b style={{ color: "red" }}> Rojo</b> = vencido.
+          </Typography>
+        </Paper>
+      )}
+
       <Paper variant="outlined">
         <List disablePadding>
           {activos.length ? (
             activos.map(renderLinea)
           ) : (
             <Box p={3}>
-              <Typography align="center" color="text.secondary">
+              <Typography color="text.secondary" align="center">
                 {tab === 3
                   ? "No hay casos por notificar."
                   : tab === 2
