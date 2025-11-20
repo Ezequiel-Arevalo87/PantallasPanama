@@ -322,7 +322,10 @@ export default function PriorizacionForm({
         checkboxSelection
         disableRowSelectionOnClick
         isRowSelectable={(params) => !rucsEnVerificacion.has(String(params.row.ruc))}
-        onRowSelectionModelChange={(m) => setSelectedCount(m.length)}
+       onRowSelectionModelChange={(m) => {
+  const count = Array.isArray(m) ? m.length : (m as Set<any>).size;
+  setSelectedCount(count);
+}}
         slots={{ toolbar: CustomToolbar }}
         localeText={localeText}
         pageSizeOptions={[5, 10, 25, 50]}
