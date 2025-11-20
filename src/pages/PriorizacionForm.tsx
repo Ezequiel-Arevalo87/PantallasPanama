@@ -322,7 +322,7 @@ export default function PriorizacionForm({
         checkboxSelection
         disableRowSelectionOnClick
         isRowSelectable={(params) => !rucsEnVerificacion.has(String(params.row.ruc))}
-       onRowSelectionModelChange={(m) => {
+       onRowSelectionModelChange={(m:any) => {
   const count = Array.isArray(m) ? m.length : (m as Set<any>).size;
   setSelectedCount(count);
 }}

@@ -453,7 +453,7 @@ const columns: GridColDef<Row>[] = [
         checkboxSelection
         disableRowSelectionOnClick
         isRowSelectable={(params) => params.row.estadoVerif !== "NoProductivo"}
-        onRowSelectionModelChange={(m) => {
+        onRowSelectionModelChange={(m:any) => {
   const count = Array.isArray(m) ? m.length : (m as Set<any>).size;
   setSelectedCount(count);
 }}
