@@ -384,7 +384,7 @@ const columns: GridColDef<Row>[] = [
    * ============================================================================================= */
 
   const exportExcel = () => {
-    if (!rows.length) {
+    if (!rows) {
       Swal.fire("Sin datos", "No hay datos para exportar.", "info");
       return;
     }
