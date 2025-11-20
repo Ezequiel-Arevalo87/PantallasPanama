@@ -460,7 +460,7 @@ const columns: GridColDef<Row>[] = [
         slots={{ toolbar: CustomToolbar }}
       />
 
-      {/* BOTONES */}
+    
       <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
         <Button variant="outlined" onClick={exportExcel}>
           Exportar Excel
