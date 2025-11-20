@@ -23,6 +23,7 @@ import Home from './Home'; // ✅ import correcto (no el ícono)
 import TrazabilidadBusqueda from './TrazabilidadBusqueda';
 import ConsultasDeEstado from './ConsultasDeEstado';
 import PantallaControNotificacion from '../components/PantallaControNotificacion';
+import VerificacionPage from './VerificacionPage';
 
 
 const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
@@ -61,14 +62,14 @@ export const Layout: React.FC = () => {
 
   const renderContent = () => {
     switch (leaf) {
-      case 'HOME':
-        return <Home onGo={handleSelect} />; 
+  case 'HOME':
+  return <Home onGo={handleSelect} />;
         case 'TRAZABILIDAD':
   return <TrazabilidadBusqueda />;  // ✅ se pasa el callback
       case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
         return <Priorizacion />;
       case 'VERIFICACIÓN':
-        return <Verificacion />;
+        return <VerificacionPage />;
       case 'APROBACIÓN':
         return <Aprobaciones />;
       case 'ASIGNACIÓN':

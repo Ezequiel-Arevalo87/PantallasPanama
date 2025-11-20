@@ -20,6 +20,7 @@ import {
   TextField,
   MenuItem,
   Stack,
+  IconButton,
 } from "@mui/material";
 
 import {
@@ -32,6 +33,9 @@ import {
   GridToolbarQuickFilter,
   useGridApiRef,
 } from "@mui/x-data-grid";
+
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import BlockIcon from "@mui/icons-material/Block";
 
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
@@ -83,6 +87,7 @@ type Row = RowBase &
     esDoble?: boolean;
     estadoVerif?: EstadoVerificacion;
     motivoNoProductivo?: string | null;
+    comentarioNoProductivo?: string | null;
   };
 
 const MOTIVOS_NO_PROD = [
@@ -218,129 +223,124 @@ const Verificacion: React.FC = () => {
   }, [loadStorage]);
 
   /* =============================================================================================
-   * COLUMNAS (CORREGIDAS)
+   * COLUMNAS
    * ============================================================================================= */
 
-  const columns: GridColDef<Row>[] = [
-    {
-      field: "alerta",
-      headerName: "Alerta",
-      minWidth: 120,
-      renderCell: (params) => {
-        const info = getAlertaInfo(params.row);
-        return <Chip size="small" color={info.color} label={info.label} />;
-      },
+const columns: GridColDef<Row>[] = [
+  {
+    field: "alerta",
+    headerName: "Alerta",
+    minWidth: 120,
+    renderCell: (params) => {
+      const info = getAlertaInfo(params.row);
+      return <Chip size="small" color={info.color} label={info.label} />;
     },
+  },
 
-    { field: "ruc", headerName: "RUC", minWidth: 130 },
-    { field: "nombre", headerName: "Nombre", minWidth: 230 },
-    { field: "provincia", headerName: "Provincia", minWidth: 150 },
+  { field: "ruc", headerName: "RUC", minWidth: 130 },
+  { field: "nombre", headerName: "Nombre", minWidth: 230 },
+  { field: "provincia", headerName: "Provincia", minWidth: 150 },
 
-    {
-      field: "metaCategoria",
-      headerName: "Categoría",
-      minWidth: 160,
-      valueGetter: (p: any) => {
-        const r = p?.row ?? {};
-        return r.metaCategoria || r.categoria || "";
-      },
+  {
+    field: "metaCategoria",
+    headerName: "Categoría",
+    minWidth: 160,
+    renderCell: (p) =>
+      p.row.metaCategoria ?? p.row.categoria ?? "",
+  },
+
+  {
+    field: "metaInconsistencia",
+    headerName: "Inconsistencia",
+    minWidth: 160,
+    renderCell: (p) =>
+      p.row.metaInconsistencia ?? "",
+  },
+
+  {
+    field: "metaImpuesto",
+    headerName: "Impuesto",
+    minWidth: 150,
+    renderCell: (p) => p.row.metaImpuesto ?? "",
+  },
+
+  {
+    field: "metaZonaEspecial",
+    headerName: "Zona Especial",
+    minWidth: 180,
+    renderCell: (p) => p.row.metaZonaEspecial ?? "",
+  },
+
+  {
+    field: "valorNum",
+    headerName: "Valor (B/.)",
+    minWidth: 140,
+    renderCell: (p) => fmtMoneyUS.format(p.row.valorNum ?? 0),
+  },
+
+  {
+    field: "estadoVerif",
+    headerName: "Estado",
+    minWidth: 180,
+    renderCell: (p) => {
+      const r = p.row;
+
+      if (r.estadoVerif === "NoProductivo")
+        return <Chip size="small" color="warning" label="No productivo" />;
+
+      if (r.estadoVerif === "EnviadoAprobacion")
+        return <Chip size="small" color="info" label="Enviado a aprobación" />;
+
+      if (r.estadoVerif === "Verificado")
+        return <Chip size="small" color="success" label="Verificado" />;
+
+      if (r.detalleVisto)
+        return <Chip size="small" label="Detalle visto" color="success" />;
+
+      return <Chip size="small" label="Pendiente" />;
     },
+  },
 
-    {
-      field: "metaInconsistencia",
-      headerName: "Inconsistencia",
-      minWidth: 160,
-      valueGetter: (p: any) => {
-        const r = p?.row ?? {};
-        return r.metaInconsistencia || "";
-      },
-    },
+  // ÍCONOS DE ACCIONES
+  {
+    field: "acciones",
+    headerName: "Acciones",
+    minWidth: 160,
+    renderCell: (params) => (
+      <Stack direction="row" spacing={1}>
+        <IconButton
+          size="small"
+          color="primary"
+          onClick={() => {
+            setDetailRow(params.row);
+            setDetailOpen(true);
+          }}
+          title="Ver detalle"
+        >
+          <VisibilityIcon fontSize="small" />
+        </IconButton>
 
-    {
-      field: "metaImpuesto",
-      headerName: "Impuesto",
-      minWidth: 150,
-      valueGetter: (p: any) => {
-        const r = p?.row ?? {};
-        return r.metaImpuesto || "";
-      },
-    },
+        <IconButton
+          size="small"
+          color="warning"
+          onClick={() => {
+            setNpRow(params.row);
+            setNpOpen(true);
+            setNpComentario("");
+            setNpMotivo(MOTIVOS_NO_PROD[0]);
+          }}
+          title="Marcar No Productivo"
+        >
+          <BlockIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+    ),
+  },
+];
 
-    {
-      field: "metaZonaEspecial",
-      headerName: "Zona Especial",
-      minWidth: 180,
-      valueGetter: (p: any) => {
-        const r = p?.row ?? {};
-        return r.metaZonaEspecial || "";
-      },
-    },
-
-    {
-      field: "valorNum",
-      headerName: "Valor (B/.)",
-      minWidth: 140,
-      renderCell: (p) => fmtMoneyUS.format(p.row.valorNum ?? 0),
-    },
-
-    {
-      field: "estadoVerif",
-      headerName: "Estado",
-      minWidth: 180,
-      renderCell: (p) => {
-        const r = p.row;
-
-        if (r.estadoVerif === "NoProductivo")
-          return <Chip size="small" label="No productivo" />;
-
-        if (r.estadoVerif === "EnviadoAprobacion")
-          return <Chip size="small" color="info" label="Enviado a aprobación" />;
-
-        if (r.estadoVerif === "Verificado")
-          return <Chip size="small" color="success" label="Verificado" />;
-
-        if (r.detalleVisto)
-          return <Chip size="small" label="Detalle visto" color="success" />;
-
-        return <Chip size="small" label="Pendiente" />;
-      },
-    },
-
-    {
-      field: "acciones",
-      headerName: "Acciones",
-      minWidth: 260,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={1}>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => {
-              setDetailRow(params.row);
-              setDetailOpen(true);
-            }}
-          >
-            DETALLE
-          </Button>
-
-          <Button
-            size="small"
-            variant="outlined"
-            color="warning"
-            onClick={() => {
-              setNpRow(params.row);
-              setNpOpen(true);
-            }}
-          >
-            NO PRODUCTIVO
-          </Button>
-        </Stack>
-      ),
-    },
-  ];
 
   /* =============================================================================================
-   * PASAR A APROBACIÓN (BOTÓN)
+   * PASAR A APROBACIÓN
    * ============================================================================================= */
 
   const pasarAAprobacion = async () => {
@@ -366,7 +366,7 @@ const Verificacion: React.FC = () => {
 
     if (!isConfirmed) return;
 
-    const nuevos = rows.map((r:any) =>
+    const nuevos = rows.map((r: any) =>
       selected.find((s) => s.ruc === r.ruc)
         ? { ...r, estadoVerif: "EnviadoAprobacion" }
         : r
@@ -452,11 +452,12 @@ const Verificacion: React.FC = () => {
         }}
         checkboxSelection
         disableRowSelectionOnClick
+        isRowSelectable={(params) => params.row.estadoVerif !== "NoProductivo"}
         onRowSelectionModelChange={(m) => setSelectedCount(m.length)}
         slots={{ toolbar: CustomToolbar }}
       />
 
-      {/* BOTONES INFERIORES */}
+      {/* BOTONES */}
       <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
         <Button variant="outlined" onClick={exportExcel}>
           Exportar Excel
@@ -593,7 +594,7 @@ const Verificacion: React.FC = () => {
 
         <DialogActions>
           <Button variant="contained" onClick={() => setDetailOpen(false)}>
-            CERRAR
+            Cerrar
           </Button>
         </DialogActions>
       </Dialog>
@@ -607,7 +608,7 @@ const Verificacion: React.FC = () => {
             fullWidth
             label="Motivo"
             value={npMotivo}
-            onChange={(e:any) => setNpMotivo(e.target.value)}
+            onChange={(e: any) => setNpMotivo(e.target.value)}
             sx={{ mb: 2 }}
           >
             {MOTIVOS_NO_PROD.map((m) => (
@@ -627,6 +628,37 @@ const Verificacion: React.FC = () => {
 
         <DialogActions>
           <Button onClick={() => setNpOpen(false)}>Cancelar</Button>
+
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={() => {
+              if (!npRow) return;
+
+              const nuevos:any = rows.map((r) =>
+                r.id === npRow.id
+                  ? {
+                      ...r,
+                      estadoVerif: "NoProductivo",
+                      motivoNoProductivo: npMotivo,
+                      comentarioNoProductivo: npComentario,
+                    }
+                  : r
+              );
+
+              localStorage.setItem(CASOS_KEY, JSON.stringify(nuevos));
+              setRows(nuevos);
+              setNpOpen(false);
+
+              Swal.fire(
+                "Marcado como No Productivo",
+                "El caso fue marcado correctamente y ya no podrá enviarse a Aprobación.",
+                "success"
+              );
+            }}
+          >
+            Aceptar
+          </Button>
         </DialogActions>
       </Dialog>
 
