@@ -43,11 +43,11 @@ import Swal from "sweetalert2";
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
-// ICONS
+// ICONOS
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
-import OpenInFullOutlinedIcon from "@mui/icons-material/OpenInFullOutlined";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 
 import {
   getRolSimulado,
@@ -67,8 +67,8 @@ type RowBase = {
   total?: number | string | null;
   estado?: "Pendiente" | "Aprobado";
   motivoDevolucion?: string | null;
-  motivoAmpliar?: string | null;
-  estadoVerif?: string | null; // ← NUEVO
+  motivoRechazo?: string | null; // ← NUEVO
+  estadoVerif?: string | null;
 };
 
 type RowMeta = {
@@ -138,6 +138,7 @@ function CustomToolbar() {
 }
 
 const normalize = (s?: string | null) => (s || "").toLowerCase();
+
 const inconsLabels = (inc?: string | null) => {
   switch (normalize(inc)) {
     case "omiso":
@@ -183,7 +184,7 @@ const Aprobaciones: React.FC = () => {
   const [motivoOpen, setMotivoOpen] = React.useState(false);
   const [motivoText, setMotivoText] = React.useState("");
   const [motivoAction, setMotivoAction] =
-    React.useState<"Devolver" | "Ampliar" | null>(null);
+    React.useState<"Devolver" | "Rechazar" | null>(null);
   const [motivoRow, setMotivoRow] = React.useState<Row | null>(null);
 
   const [rol, setRol] = React.useState<RolSimulado>(() => getRolSimulado());
@@ -287,7 +288,7 @@ const Aprobaciones: React.FC = () => {
     Swal.fire("Aprobados", "Selección aprobada correctamente.", "success");
   };
 
-  const abrirMotivo = (accion: "Devolver" | "Ampliar", row: Row) => {
+  const abrirMotivo = (accion: "Devolver" | "Rechazar", row: Row) => {
     if (rol !== "JEFE_DEPARTAMENTO") return;
     setMotivoAction(accion);
     setMotivoRow(row);
@@ -319,20 +320,19 @@ const Aprobaciones: React.FC = () => {
           }
         : {
             ...r,
-            motivoAmpliar: texto,
-            estadoVerif: "Ampliar",
+            motivoRechazo: texto,
+            estadoVerif: "Rechazado",
           };
     });
 
     persist(updated);
-
     cerrarMotivo();
 
     Swal.fire(
-      motivoAction === "Devolver" ? "Devuelto" : "Ampliación registrada",
+      motivoAction === "Devolver" ? "Devuelto" : "Rechazado",
       motivoAction === "Devolver"
         ? "Se guardó el motivo de devolución."
-        : "Se solicitó ampliar información.",
+        : "Se rechazó el caso correctamente.",
       "success"
     );
   };
@@ -356,7 +356,7 @@ const Aprobaciones: React.FC = () => {
         const map: Record<string, any> = {
           Aprobado: { color: "success", label: "Aprobado" },
           Devuelto: { color: "warning", label: "Devuelto" },
-          Ampliar: { color: "info", label: "Ampliar" },
+          Rechazado: { color: "error", label: "Rechazado" },
           Pendiente: { color: "default", label: "Pendiente" },
         };
         const cfg = map[est ?? "Pendiente"] || map["Pendiente"];
@@ -374,12 +374,14 @@ const Aprobaciones: React.FC = () => {
 
         return (
           <Stack direction="row" spacing={0.5}>
+            {/* Detalle */}
             <Tooltip title="Detalle">
               <IconButton size="small" onClick={() => openDetail(r)}>
                 <InfoOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
 
+            {/* Aprobar */}
             <Tooltip title="Aprobar">
               <IconButton
                 size="small"
@@ -391,6 +393,7 @@ const Aprobaciones: React.FC = () => {
               </IconButton>
             </Tooltip>
 
+            {/* Devolver */}
             <Tooltip title="Devolver">
               <IconButton
                 size="small"
@@ -402,14 +405,15 @@ const Aprobaciones: React.FC = () => {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Ampliar">
+            {/* Rechazar (nuevo) */}
+            <Tooltip title="Rechazar">
               <IconButton
                 size="small"
-                color="primary"
+                color="error"
                 disabled={disabled}
-                onClick={() => abrirMotivo("Ampliar", r)}
+                onClick={() => abrirMotivo("Rechazar", r)}
               >
-                <OpenInFullOutlinedIcon fontSize="small" />
+                <CancelOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Stack>
@@ -564,7 +568,7 @@ const Aprobaciones: React.FC = () => {
         <DialogTitle>
           {motivoAction === "Devolver"
             ? "Motivo de devolución"
-            : "Motivo para ampliar información"}
+            : "Motivo de rechazo"}
         </DialogTitle>
 
         <DialogContent dividers>
@@ -596,7 +600,7 @@ const Aprobaciones: React.FC = () => {
         <DialogActions>
           <Button onClick={cerrarMotivo}>Cancelar</Button>
 
-          <Button variant="contained" onClick={confirmarMotivo}>
+          <Button variant="contained" color="error" onClick={confirmarMotivo}>
             Guardar motivo
           </Button>
         </DialogActions>
