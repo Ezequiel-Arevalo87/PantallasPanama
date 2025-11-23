@@ -342,32 +342,34 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Actividad Económica */}
-        {esAS && (
-          <Grid item xs={12} md={6}>
-            <TextField
-              select fullWidth
-              label="Actividad Económica"
-              name="actividadEconomica"
-              value={form.actividadEconomica}
-              onChange={handleActividadesChange as any}
-              SelectProps={{ multiple: true, renderValue: renderActividadChips }}
-              disabled={loadingAct}
-            >
-              <MenuItem value={ALL_VALUE}>
-                <Checkbox checked={form.actividadEconomica.length === 0} />
-                <ListItemText primary="Todas" />
-              </MenuItem>
+     {/* Actividad Económica */}
 
-              {actividades.map((a) => (
-                <MenuItem key={a.code} value={a.code}>
-                  <Checkbox checked={form.actividadEconomica.includes(a.code)} />
-                  <ListItemText primary={`${a.code} — ${a.label}`} />
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-        )}
+  <Grid item xs={12} md={6}>
+    <TextField
+      select
+      fullWidth
+      label="Actividad Económica"
+      name="actividadEconomica"
+      value={form.actividadEconomica}
+      onChange={handleActividadesChange as any}
+      SelectProps={{ multiple: true, renderValue: renderActividadChips }}
+      disabled={loadingAct}
+    >
+      <MenuItem value={ALL_VALUE}>
+        <Checkbox checked={form.actividadEconomica.length === 0} />
+        <ListItemText primary="Todas" />
+      </MenuItem>
+
+      {actividades.map((a) => (
+        <MenuItem key={a.code} value={a.code}>
+          <Checkbox checked={form.actividadEconomica.includes(a.code)} />
+          <ListItemText primary={`${a.code} — ${a.label}`} />
+        </MenuItem>
+      ))}
+    </TextField>
+  </Grid>
+
+
 
         {/* Operador */}
         <Grid item xs={6} md={3}>
@@ -388,7 +390,7 @@ export const Priorizacion: React.FC = () => {
         <Grid item xs={6} md={3}>
           <TextField
             fullWidth
-            label="Valor MIN (B/.)"
+            label="Valor  (B/.)"
             name="valorMin"
             value={form.valorMin}
             onChange={handleChange}
@@ -399,20 +401,7 @@ export const Priorizacion: React.FC = () => {
           />
         </Grid>
 
-        {/* Valor MAX */}
-        <Grid item xs={6} md={3}>
-          <TextField
-            fullWidth
-            label="Valor MAX (B/.)"
-            name="valorMax"
-            value={form.valorMax}
-            onChange={handleChange}
-            InputProps={{
-              startAdornment: <InputAdornment position="start">B/.</InputAdornment>,
-              inputComponent: NumericFormatCustom as any,
-            }}
-          />
-        </Grid>
+ 
 
         {/* Fechas */}
         <Grid item xs={6} md={3}>

@@ -1,3 +1,6 @@
+// ==========================================
+// src/pages/VerificacionPage.tsx
+// ==========================================
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -31,9 +34,9 @@ import DetalleCasoModal from "../components/DetalleCasoModal";
 import NoProductivoModal from "../components/NoProductivoModal";
 import ReporteVerificacionModal from "../components/ReporteVerificacionModal";
 
-// ============================================================================
-// UTIL: Cargar casos enviados desde SELECTOR
-// ============================================================================
+// =======================================================
+// Cargar casos desde localStorage
+// =======================================================
 const loadCasosFromStorage = () => {
   try {
     const raw = localStorage.getItem(CASOS_KEY);
@@ -43,9 +46,9 @@ const loadCasosFromStorage = () => {
   }
 };
 
-// ============================================================================
+// =======================================================
 // SEMAFORIZACIÓN DÍA 1 / DÍA 2
-// ============================================================================
+// =======================================================
 function calcularDias(fechaISO: string) {
   return dayjs().diff(dayjs(fechaISO), "day");
 }
@@ -62,14 +65,12 @@ function Semaforo({ fecha }: { fecha: string }) {
   );
 }
 
-// ============================================================================
-// PÁGINA PRINCIPAL
-// ============================================================================
+// =======================================================
+// COMPONENTE PRINCIPAL
+// =======================================================
 export default function VerificacionPage() {
-  // === Datos reales desde selector ===
   const [rows, setRows] = useState(loadCasosFromStorage());
 
-  // === Estados para modales ===
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRow, setDetailRow] = useState<any>(null);
 
@@ -78,47 +79,42 @@ export default function VerificacionPage() {
 
   const [reporteOpen, setReporteOpen] = useState(false);
 
-  // === Actualizar cuando SELECTOR manda casos ===
   useEffect(() => {
     const listener = () => setRows(loadCasosFromStorage());
     window.addEventListener("casosAprobacion:update", listener);
     return () => window.removeEventListener("casosAprobacion:update", listener);
   }, []);
 
-  // ========================================================================
-  // COLUMNAS DEL GRID
-  // ========================================================================
+  // =======================================================
+  // COLUMNAS DE LA TABLA
+  // =======================================================
   const columns: GridColDef[] = [
     {
       field: "semaforo",
       headerName: "Tiempo",
-      width: 200,
+      width: 160,
       renderCell: (params) => (
         <Semaforo fecha={params.row.fechaAsignacionISO} />
       ),
     },
-    { field: "ruc", headerName: "RUC", width: 300 },
+    { field: "ruc", headerName: "RUC", width: 180 },
     { field: "nombre", headerName: "Nombre", width: 220 },
-    { field: "metaInconsistencia", headerName: "Inconsistencia", width: 160 },
-    { field: "provincia", headerName: "Provincia", width: 300 },
+    { field: "metaInconsistencia", headerName: "Inconsistencia", width: 180 },
+    { field: "provincia", headerName: "Provincia", width: 160 },
     {
       field: "valor",
       headerName: "Valor",
-      width: 300,
+      width: 180,
       renderCell: (p) =>
         p.row.valor ? `B/. ${Number(p.row.valor).toLocaleString()}` : "—",
     },
 
-    // === ACCIONES ===
     {
       field: "acciones",
       headerName: "Acciones",
-      width: 200,
-      sortable: false,
-      filterable: false,
+      width: 180,
       renderCell: (params) => (
         <Stack direction="row" spacing={1}>
-          {/* DETALLE */}
           <IconButton
             size="small"
             color="info"
@@ -130,7 +126,6 @@ export default function VerificacionPage() {
             <InfoOutlinedIcon fontSize="small" />
           </IconButton>
 
-          {/* NO PRODUCTIVO */}
           <IconButton
             size="small"
             color="warning"
@@ -146,33 +141,33 @@ export default function VerificacionPage() {
     },
   ];
 
-  // ========================================================================
-  // PASAR A APROBACIÓN
-  // ========================================================================
-  const enviarAprobacion = () => {
-    Swal.fire("Procesado", "Los casos fueron enviados a Aprobación", "success");
+  // =======================================================
+  // PASAR A APROBACIÓN (CORREGIDO)
+  // =======================================================
+const enviarAprobacion = () => {
+  Swal.fire("Procesado", "Los casos fueron enviados a Aprobación", "success");
 
-    const actualizados = rows.map((r: any) =>
-      r.estadoVerif === "Pendiente" || !r.estadoVerif
-        ? { ...r, estadoVerif: "EnviadoAprobacion" }
-        : r
-    );
+  const actualizados = rows.map((r:any) =>
+    r.estadoVerif !== "NoProductivo"
+      ? { ...r, estadoVerif: "ParaAprobacion" }
+      : r
+  );
 
-    localStorage.setItem(CASOS_KEY, JSON.stringify(actualizados));
-    setRows(actualizados);
-    window.dispatchEvent(new Event("casosAprobacion:update"));
-  };
+  localStorage.setItem(CASOS_KEY, JSON.stringify(actualizados));
+  setRows(actualizados);
 
-  // ========================================================================
-  // MARCAR NO PRODUCTIVO
-  // ========================================================================
+  window.dispatchEvent(new Event("casosAprobacion:update"));
+};
+
+
+  // =======================================================
+  // MARCAR COMO NO PRODUCTIVO
+  // =======================================================
   const marcarNoProductivo = () => {
     if (!npRow) return;
 
     const nuevos = rows.map((r: any) =>
-      r.id === npRow.id
-        ? { ...r, estadoVerif: "NoProductivo" }
-        : r
+      r.id === npRow.id ? { ...r, estadoVerif: "NoProductivo" } : r
     );
 
     localStorage.setItem(CASOS_KEY, JSON.stringify(nuevos));
@@ -185,12 +180,12 @@ export default function VerificacionPage() {
     );
   };
 
-  // ========================================================================
-  // TOOLBAR
-  // ========================================================================
+  // =======================================================
+  // TOOLBAR PERSONALIZADO
+  // =======================================================
   function CustomToolbar() {
     return (
-      <GridToolbarContainer sx={{ p: 1, gap: 1 }}>
+      <GridToolbarContainer sx={{ p: 1 }}>
         <GridToolbarColumnsButton />
         <GridToolbarDensitySelector />
         <GridToolbarExport />
@@ -200,9 +195,9 @@ export default function VerificacionPage() {
     );
   }
 
-  // ========================================================================
+  // =======================================================
   // RENDER
-  // ========================================================================
+  // =======================================================
   return (
     <>
       <Box sx={{ width: "100%" }}>
@@ -210,11 +205,9 @@ export default function VerificacionPage() {
           rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
-          autoHeight={false}
           sx={{
             height: 520,
             width: "100%",
-            borderColor: "#e0e0e0",
             backgroundColor: "#fff",
           }}
           checkboxSelection
@@ -224,22 +217,12 @@ export default function VerificacionPage() {
         />
       </Box>
 
-      {/* BOTONES */}
       <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <Button
-          variant="contained"
-          color="success"
-          onClick={enviarAprobacion}
-          sx={{ textTransform: "none", fontWeight: "bold" }}
-        >
+        <Button variant="contained" color="success" onClick={enviarAprobacion}>
           ENVIAR PARA APROBACIÓN
         </Button>
 
-        <Button
-          variant="outlined"
-          onClick={() => setReporteOpen(true)}
-          sx={{ textTransform: "none", fontWeight: "bold" }}
-        >
+        <Button variant="outlined" onClick={() => setReporteOpen(true)}>
           REPORTE VERIFICACIÓN
         </Button>
       </Stack>

@@ -1,4 +1,6 @@
+// ==========================================
 // src/pages/Aprobaciones.tsx
+// ==========================================
 import * as React from "react";
 import {
   Box,
@@ -24,6 +26,7 @@ import {
   Tab,
   MenuItem,
 } from "@mui/material";
+
 import {
   DataGrid,
   type GridColDef,
@@ -34,12 +37,13 @@ import {
   GridToolbarQuickFilter,
   useGridApiRef,
 } from "@mui/x-data-grid";
+
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
-// Icons
+// ICONS
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
@@ -51,7 +55,7 @@ import {
   type RolSimulado,
 } from "../lib/rolSimulado";
 
-/* ===================== Tipos ===================== */
+// ===================== Tipos =====================
 type RowBase = {
   id: number | string;
   categoria: string;
@@ -64,6 +68,7 @@ type RowBase = {
   estado?: "Pendiente" | "Aprobado";
   motivoDevolucion?: string | null;
   motivoAmpliar?: string | null;
+  estadoVerif?: string | null; // ← NUEVO
 };
 
 type RowMeta = {
@@ -81,26 +86,11 @@ type Row = RowBase &
     trazas?: TrazaItem[];
   };
 
-/* ===================== Utils ===================== */
+// ===================== Utils =====================
 const toNumber = (v: any): number => {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  let s = String(v).trim();
-  if (!s) return 0;
-  s = s.replace(/\s+/g, "").replace(/[^\d.,\-]/g, "");
-  const lastDot = s.lastIndexOf(".");
-  const lastComma = s.lastIndexOf(",");
-  let decimalSep: "." | "," | null = null;
-  if (lastDot !== -1 || lastComma !== -1)
-    decimalSep = lastComma > lastDot ? "," : ".";
-  if (decimalSep) {
-    const thousandSep = decimalSep === "." ? "," : ".";
-    s = s.replace(new RegExp("\\" + thousandSep, "g"), "");
-    if (decimalSep === ",") s = s.replace(/,/g, ".");
-  } else {
-    s = s.replace(/[^\d\-]/g, "");
-  }
-  const n = Number(s);
+  if (!v) return 0;
+  if (typeof v === "number") return v;
+  const n = Number(String(v).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
 
@@ -109,42 +99,35 @@ const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const PERIODOS_FIJOS = [
-  "dic-20",
-  "dic-21",
-  "dic-22",
-  "dic-23",
-  "dic-24",
-  "dic-25",
-] as const;
+const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
 
 const buildBreakdown = (row: Row) => {
   const total = row.valorNum || 0;
   if (!total)
-    return {
-      items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })),
-      total: 0,
-    };
+    return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
+
   const seed =
     (typeof row.id === "number"
       ? row.id
       : Number(String(row.id).replace(/\D/g, ""))) || 1;
-  const weights = PERIODOS_FIJOS.map(
-    (_, i) => (i + 1) * ((seed % 7) + 3)
-  );
+
+  const weights = PERIODOS_FIJOS.map((_, i) => (i + 1) * ((seed % 7) + 3));
   const sumW = weights.reduce((a, b) => a + b, 0);
+
   const items = PERIODOS_FIJOS.map((p, i) => ({
     periodo: p,
     monto: Math.round((total * weights[i]) / sumW),
   }));
+
   const ajuste = total - items.reduce((a, b) => a + b.monto, 0);
-  if (ajuste !== 0) items[items.length - 1].monto += ajuste;
+  items[items.length - 1].monto += ajuste;
+
   return { items, total };
 };
 
 function CustomToolbar() {
   return (
-    <GridToolbarContainer sx={{ p: 1, display: "flex", alignItems: "center" }}>
+    <GridToolbarContainer sx={{ p: 1 }}>
       <GridToolbarColumnsButton />
       <GridToolbarDensitySelector />
       <GridToolbarExport />
@@ -169,29 +152,24 @@ const inconsLabels = (inc?: string | null) => {
   }
 };
 
-/* Mock de trazas */
 const mockTrazas = (ruc: string): TrazaItem[] => [
   {
     id: `${ruc}-1`,
-    fechaISO: new Date(
-      Date.now() - 86400000 * 7
-    ).toISOString(),
+    fechaISO: new Date(Date.now() - 86400000 * 7).toISOString(),
     actor: "Supervisor A",
     accion: "Revisión inicial",
     estado: "PENDIENTE",
   },
   {
     id: `${ruc}-2`,
-    fechaISO: new Date(
-      Date.now() - 86400000 * 2
-    ).toISOString(),
+    fechaISO: new Date(Date.now() - 86400000 * 2).toISOString(),
     actor: "Auditor B",
     accion: "Validación documental",
     estado: "APROBADO",
   },
 ];
 
-/* ===================== Componente ===================== */
+// ===================== Componente =====================
 const Aprobaciones: React.FC = () => {
   const apiRef = useGridApiRef();
 
@@ -202,20 +180,15 @@ const Aprobaciones: React.FC = () => {
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const [tab, setTab] = React.useState(0);
 
-  // Motivo (Devolver/Ampliar)
   const [motivoOpen, setMotivoOpen] = React.useState(false);
   const [motivoText, setMotivoText] = React.useState("");
-  const [motivoAction, setMotivoAction] = React.useState<
-    "Devolver" | "Ampliar" | null
-  >(null);
+  const [motivoAction, setMotivoAction] =
+    React.useState<"Devolver" | "Ampliar" | null>(null);
   const [motivoRow, setMotivoRow] = React.useState<Row | null>(null);
 
-  // Rol simulado
   const [rol, setRol] = React.useState<RolSimulado>(() => getRolSimulado());
 
-  const handleRolChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleRolChange = (e: any) => {
     const value = e.target.value as RolSimulado;
     setRol(value);
     setRolSimulado(value);
@@ -230,11 +203,12 @@ const Aprobaciones: React.FC = () => {
 
   const loadFromStorage = React.useCallback(() => {
     try {
-      const texto = localStorage.getItem(CASOS_KEY);
-      const data: (RowBase & RowMeta)[] = texto ? JSON.parse(texto) : [];
+      const raw = localStorage.getItem(CASOS_KEY);
+      const data: (RowBase & RowMeta)[] = raw ? JSON.parse(raw) : [];
       const withNum: Row[] = data.map((r) => ({
         ...r,
         estado: r.estado ?? "Pendiente",
+        estadoVerif: r.estadoVerif ?? "Pendiente",
         valorNum: toNumber(r.valor ?? r.monto ?? r.total),
         trazas: (r as any).trazas ?? mockTrazas(String(r.ruc)),
       }));
@@ -251,65 +225,66 @@ const Aprobaciones: React.FC = () => {
   const persist = (data: Row[]) => {
     localStorage.setItem(CASOS_KEY, JSON.stringify(data));
     setRows(data);
+    window.dispatchEvent(new Event("casosAprobacion:update"));
   };
 
+  // ===================== Acciones =====================
   const aprobarUno = async (row: Row) => {
-    if (rol !== "JEFE_DEPARTAMENTO") return; // solo simulado
+    if (rol !== "JEFE_DEPARTAMENTO") return;
+
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Aprobar caso?",
       html: `<b>${row.nombre}</b><br/>RUC: ${row.ruc}<br/>Valor: <b>B/. ${fmtMoneyUS.format(
         row.valorNum
       )}</b>`,
-      showCancelButton: true,
       confirmButtonText: "Sí, aprobar",
-      cancelButtonText: "Cancelar",
-      reverseButtons: true,
+      showCancelButton: true,
     });
+
     if (!isConfirmed) return;
+
     persist(
       rows.map((r) =>
-        r.id === row.id ? { ...r, estado: "Aprobado" } : r
+        r.id === row.id
+          ? { ...r, estado: "Aprobado", estadoVerif: "Aprobado" }
+          : r
       )
     );
-    Swal.fire({
-      icon: "success",
-      title: "Aprobado",
-      text: "Caso aprobado correctamente.",
-    });
+
+    Swal.fire("Aprobado", "Caso aprobado correctamente.", "success");
   };
 
   const aprobarSeleccion = async () => {
     if (rol !== "JEFE_DEPARTAMENTO") return;
+
     const seleccion = Array.from(
       apiRef.current?.getSelectedRows().values() || []
     ) as Row[];
-    if (!seleccion.length) {
-      return Swal.fire({
-        icon: "info",
-        title: "Sin selección",
-        text: "Selecciona uno o más casos.",
-      });
-    }
+
+    if (!seleccion.length)
+      return Swal.fire("Sin selección", "Selecciona uno o más casos.", "info");
+
     const { isConfirmed } = await Swal.fire({
       icon: "question",
       title: "¿Aprobar selección?",
       html: `Se aprobarán <b>${seleccion.length}</b> caso(s).`,
-      showCancelButton: true,
       confirmButtonText: "Sí, aprobar",
+      showCancelButton: true,
     });
+
     if (!isConfirmed) return;
+
     const ids = new Set(seleccion.map((r) => r.id));
     persist(
       rows.map((r) =>
-        ids.has(r.id) ? { ...r, estado: "Aprobado" } : r
+        ids.has(r.id)
+          ? { ...r, estado: "Aprobado", estadoVerif: "Aprobado" }
+          : r
       )
     );
-    Swal.fire({
-      icon: "success",
-      title: "Aprobados",
-      text: "Selección aprobada correctamente.",
-    });
+
+    Swal.fire("Aprobados", "Selección aprobada correctamente.", "success");
   };
 
   const abrirMotivo = (accion: "Devolver" | "Ampliar", row: Row) => {
@@ -323,47 +298,49 @@ const Aprobaciones: React.FC = () => {
   const cerrarMotivo = () => {
     setMotivoOpen(false);
     setMotivoText("");
-    setMotivoAction(null);
     setMotivoRow(null);
+    setMotivoAction(null);
   };
 
   const confirmarMotivo = async () => {
     if (!motivoAction || !motivoRow) return;
     const texto = motivoText.trim();
     if (!texto)
-      return Swal.fire({
-        icon: "info",
-        title: "Motivo requerido",
-        text: "Escribe un motivo.",
-      });
+      return Swal.fire("Motivo requerido", "Debes escribir un motivo.", "info");
+
     const updated = rows.map((r) => {
       if (r.id !== motivoRow.id) return r;
+
       return motivoAction === "Devolver"
-        ? { ...r, motivoDevolucion: texto }
-        : { ...r, motivoAmpliar: texto };
+        ? {
+            ...r,
+            motivoDevolucion: texto,
+            estadoVerif: "Devuelto",
+          }
+        : {
+            ...r,
+            motivoAmpliar: texto,
+            estadoVerif: "Ampliar",
+          };
     });
+
     persist(updated);
+
     cerrarMotivo();
-    Swal.fire({
-      icon: "success",
-      title:
-        motivoAction === "Devolver"
-          ? "Devuelto"
-          : "Ampliación registrada",
-      text:
-        motivoAction === "Devolver"
-          ? "Se guardó el motivo de devolución."
-          : "Se solicitó ampliar información.",
-    });
+
+    Swal.fire(
+      motivoAction === "Devolver" ? "Devuelto" : "Ampliación registrada",
+      motivoAction === "Devolver"
+        ? "Se guardó el motivo de devolución."
+        : "Se solicitó ampliar información.",
+      "success"
+    );
   };
 
+  // ===================== Columnas =====================
   const columns: GridColDef<Row>[] = [
     { field: "ruc", headerName: "RUC", flex: 0.9 },
-    {
-      field: "nombre",
-      headerName: "Nombre o Razón Social",
-      flex: 1.2,
-    },
+    { field: "nombre", headerName: "Nombre o Razón Social", flex: 1.2 },
     {
       field: "valorNum",
       headerName: "Valor (B/.)",
@@ -371,17 +348,20 @@ const Aprobaciones: React.FC = () => {
       renderCell: (p) => fmtMoneyUS.format(p.row.valorNum),
     },
     {
-      field: "estado",
-      headerName: "Estado",
-      minWidth: 120,
-      renderCell: (p) => (
-        <Chip
-          size="small"
-          label={p.row.estado ?? "Pendiente"}
-          color={p.row.estado === "Aprobado" ? "success" : "default"}
-          variant={p.row.estado === "Aprobado" ? "filled" : "outlined"}
-        />
-      ),
+      field: "estadoVerif",
+      headerName: "Estado Verificación",
+      width: 160,
+      renderCell: (p) => {
+        const est = p.row.estadoVerif;
+        const map: Record<string, any> = {
+          Aprobado: { color: "success", label: "Aprobado" },
+          Devuelto: { color: "warning", label: "Devuelto" },
+          Ampliar: { color: "info", label: "Ampliar" },
+          Pendiente: { color: "default", label: "Pendiente" },
+        };
+        const cfg = map[est ?? "Pendiente"] || map["Pendiente"];
+        return <Chip size="small" {...cfg} />;
+      },
     },
     {
       field: "acciones",
@@ -390,7 +370,8 @@ const Aprobaciones: React.FC = () => {
       width: 260,
       renderCell: (p) => {
         const r = p.row;
-        const disabledPorRol = rol !== "JEFE_DEPARTAMENTO";
+        const disabled = rol !== "JEFE_DEPARTAMENTO";
+
         return (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title="Detalle">
@@ -398,49 +379,34 @@ const Aprobaciones: React.FC = () => {
                 <InfoOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip
-              title={
-                disabledPorRol
-                  ? "Solo Jefe de Departamento (simulado)"
-                  : "Aprobar"
-              }
-            >
+
+            <Tooltip title="Aprobar">
               <IconButton
                 size="small"
                 color="success"
-                disabled={r.estado === "Aprobado" || disabledPorRol}
+                disabled={disabled}
                 onClick={() => aprobarUno(r)}
               >
                 <CheckCircleOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip
-              title={
-                disabledPorRol
-                  ? "Solo Jefe de Departamento (simulado)"
-                  : "Devolver (motivo)"
-              }
-            >
+
+            <Tooltip title="Devolver">
               <IconButton
                 size="small"
                 color="warning"
-                disabled={disabledPorRol}
+                disabled={disabled}
                 onClick={() => abrirMotivo("Devolver", r)}
               >
                 <UndoOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip
-              title={
-                disabledPorRol
-                  ? "Solo Jefe de Departamento (simulado)"
-                  : "Ampliar información"
-              }
-            >
+
+            <Tooltip title="Ampliar">
               <IconButton
                 size="small"
                 color="primary"
-                disabled={disabledPorRol}
+                disabled={disabled}
                 onClick={() => abrirMotivo("Ampliar", r)}
               >
                 <OpenInFullOutlinedIcon fontSize="small" />
@@ -460,6 +426,7 @@ const Aprobaciones: React.FC = () => {
         <Grid item>
           <Typography variant="h6">Aprobaciones</Typography>
         </Grid>
+
         <Grid item sx={{ ml: "auto" }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <TextField
@@ -471,9 +438,7 @@ const Aprobaciones: React.FC = () => {
               sx={{ minWidth: 220 }}
             >
               <MenuItem value="JEFE_SECCION">Jefe de Sección</MenuItem>
-              <MenuItem value="JEFE_DEPARTAMENTO">
-                Jefe de Departamento
-              </MenuItem>
+              <MenuItem value="JEFE_DEPARTAMENTO">Jefe de Departamento</MenuItem>
             </TextField>
 
             <Button
@@ -501,17 +466,13 @@ const Aprobaciones: React.FC = () => {
         localeText={esES.components.MuiDataGrid.defaultProps.localeText}
       />
 
-      {/* === Dialog Detalle con Tabs === */}
+      {/* === DETAIL DIALOG === */}
       <Dialog open={detailOpen} onClose={closeDetail} maxWidth="md" fullWidth>
         <DialogTitle>Detalle del caso</DialogTitle>
         <DialogContent dividers>
           {detailRow && (
             <>
-              <Tabs
-                value={tab}
-                onChange={(_, v) => setTab(v)}
-                sx={{ mb: 2 }}
-              >
+              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
                 <Tab label="Información" />
                 <Tab label="Trazabilidad" />
               </Tabs>
@@ -525,12 +486,14 @@ const Aprobaciones: React.FC = () => {
                         {detailRow.metaCategoria ?? detailRow.categoria}
                       </Box>
                     </Grid>
+
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">RUC</Typography>
                       <Box component={Paper} sx={{ p: 1 }}>
                         {detailRow.ruc}
                       </Box>
                     </Grid>
+
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Nombre</Typography>
                       <Box component={Paper} sx={{ p: 1 }}>
@@ -542,6 +505,7 @@ const Aprobaciones: React.FC = () => {
                   <Typography sx={{ mb: 1 }} variant="subtitle2">
                     Cantidad de períodos {inc.singular}
                   </Typography>
+
                   {(() => {
                     const bd = buildBreakdown(detailRow);
                     return (
@@ -558,6 +522,7 @@ const Aprobaciones: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         </TableHead>
+
                         <TableBody>
                           <TableRow>
                             {bd.items.map((it) => (
@@ -565,6 +530,7 @@ const Aprobaciones: React.FC = () => {
                                 {fmtMoneyUS.format(it.monto)}
                               </TableCell>
                             ))}
+
                             <TableCell align="right">
                               <b>{fmtMoneyUS.format(bd.total)}</b>
                             </TableCell>
@@ -576,6 +542,7 @@ const Aprobaciones: React.FC = () => {
                 </Box>
               )}
 
+              {/* ---------------- TRAZABILIDAD ---------------- */}
               {tab === 1 && (
                 <Box sx={{ mt: 2 }}>
                   <Trazabilidad rows={detailRow.trazas ?? []} height={360} />
@@ -584,31 +551,22 @@ const Aprobaciones: React.FC = () => {
             </>
           )}
         </DialogContent>
+
         <DialogActions>
-          <Stack direction="row" spacing={1} sx={{ mr: "auto", pl: 1 }}>
-            <Button variant="outlined" size="small">
-              EXCEL
-            </Button>
-            <Button variant="outlined" size="small">
-              WORD
-            </Button>
-            <Button variant="outlined" size="small">
-              PDF
-            </Button>
-          </Stack>
           <Button variant="contained" onClick={closeDetail}>
             CERRAR
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* === Dialog Motivo === */}
+      {/* === MOTIVO === */}
       <Dialog open={motivoOpen} onClose={cerrarMotivo} maxWidth="sm" fullWidth>
         <DialogTitle>
           {motivoAction === "Devolver"
             ? "Motivo de devolución"
             : "Motivo para ampliar información"}
         </DialogTitle>
+
         <DialogContent dividers>
           <Stack spacing={1}>
             {motivoRow && (
@@ -616,11 +574,13 @@ const Aprobaciones: React.FC = () => {
                 <Typography variant="body2">
                   <b>RUC:</b> {motivoRow.ruc}
                 </Typography>
+
                 <Typography variant="body2">
                   <b>Nombre:</b> {motivoRow.nombre}
                 </Typography>
               </>
             )}
+
             <TextField
               label="Escribe el motivo"
               value={motivoText}
@@ -632,8 +592,10 @@ const Aprobaciones: React.FC = () => {
             />
           </Stack>
         </DialogContent>
+
         <DialogActions>
           <Button onClick={cerrarMotivo}>Cancelar</Button>
+
           <Button variant="contained" onClick={confirmarMotivo}>
             Guardar motivo
           </Button>
