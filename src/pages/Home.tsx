@@ -3,23 +3,13 @@
 // ==========================================
 import React, { useEffect, useState } from "react";
 import {
-  Box,
-  Paper,
-  Typography,
-  Stack,
-  Button,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Grid,
-  Chip,
+  Box, Paper, Typography, Stack, IconButton, Dialog,
+  DialogTitle, DialogContent, DialogActions, Button, Grid, Chip
 } from "@mui/material";
 
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { CASOS_KEY } from "../lib/aprobacionesStorage";
 import dayjs from "dayjs";
+import { CASOS_KEY } from "../lib/aprobacionesStorage";
 
 type CasoVerif = {
   id: string | number;
@@ -29,7 +19,7 @@ type CasoVerif = {
   metaInconsistencia?: string;
   valor?: number;
   fechaAsignacionISO: string;
-  estadoVerif?: string;
+  estadoVerif: string;
 };
 
 export default function Home({ onGo }: { onGo?: (p: string) => void }) {
@@ -37,21 +27,17 @@ export default function Home({ onGo }: { onGo?: (p: string) => void }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<CasoVerif | null>(null);
 
-  // ===================== CARGAR TODOS =====================
   useEffect(() => {
     const load = () => {
       try {
         const raw = localStorage.getItem(CASOS_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
+        const arr: CasoVerif[] = raw ? JSON.parse(raw) : [];
 
-        // 🔥 Home solo muestra los casos que AÚN están en el flujo
-        const vivos = arr.filter((c: any) =>
-          ["Pendiente", "Devuelto", "Ampliar", "ParaAprobacion"].includes(
-            c.estadoVerif
-          )
+        const filtered = arr.filter((r) =>
+          r.estadoVerif !== "Aprobado" && r.estadoVerif !== "NoProductivo"
         );
 
-        setCasos(vivos);
+        setCasos(filtered);
       } catch {
         setCasos([]);
       }
@@ -63,199 +49,114 @@ export default function Home({ onGo }: { onGo?: (p: string) => void }) {
       window.removeEventListener("casosAprobacion:update", load);
   }, []);
 
-  // ===================== SEMÁFORO =====================
-  const calcularDias = (fechaISO: string) =>
-    dayjs().diff(dayjs(fechaISO), "day");
+  const calcularDias = (f: string) => dayjs().diff(dayjs(f), "day");
 
-  const renderSemaforo = (fechaISO: string) => {
-    const d = calcularDias(fechaISO);
-    const verde = d <= 1;
-
+  const renderSemaforo = (f: string) => {
+    const d = calcularDias(f);
     return (
       <Chip
         size="small"
-        color={verde ? "success" : "error"}
-        label={verde ? "Día 1" : "Día 2"}
+        color={d <= 1 ? "success" : "error"}
+        label={d <= 1 ? "Día 1" : "Día 2"}
       />
     );
   };
 
-  // ===================== BOTÓN DINÁMICO =====================
-  const nextStepFor = (c: CasoVerif) => {
-    switch (c.estadoVerif) {
-      case "Pendiente":
-      case "Devuelto":
-      case "Ampliar":
-        return { txt: "IR A VERIFICACIÓN", ruta: "VERIFICACIÓN" };
+  const chipEstado = (e: string) => {
+    const map: any = {
+      Pendiente: <Chip size="small" label="Pendiente" />,
+      ParaAprobacion: <Chip size="small" color="info" label="Para Aprobación" />,
+      Devuelto: <Chip size="small" color="warning" label="Devuelto" />,
+      Ampliar: <Chip size="small" color="secondary" label="Ampliar" />,
+    };
 
-      case "ParaAprobacion":
-        return { txt: "IR A APROBACIÓN", ruta: "APROBACIÓN" };
-
-      default:
-        return { txt: "CERRAR", ruta: null };
-    }
+    return map[e] ?? <Chip size="small" label="Pendiente" />;
   };
 
-  const chipEstado = (estado?: string) => {
-    switch (estado) {
-      case "Aprobado":
-        return <Chip size="small" color="success" label="Aprobado" />;
-      case "Devuelto":
-        return <Chip size="small" color="warning" label="Devuelto" />;
-      case "Ampliar":
-        return <Chip size="small" color="info" label="Ampliar" />;
-      case "ParaAprobacion":
-        return <Chip size="small" color="primary" label="Para aprobación" />;
-      default:
-        return <Chip size="small" label="Pendiente" />;
-    }
-  };
-
-  // ===================== RENDER =====================
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 2 }}>
       <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
         <Typography variant="h6" fontWeight={700}>
-          Notificación de casos pendientes del flujo
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Casos provenientes de Priorización, Verificación y Aprobación.
+          Notificación de Casos
         </Typography>
       </Paper>
 
       <Paper variant="outlined">
         <Box sx={{ p: 2 }}>
-          <Typography fontWeight={600} sx={{ mb: 2 }}>
-            Casos activos del flujo ({casos.length})
-          </Typography>
+          <Typography fontWeight={600}>Casos pendientes ({casos.length})</Typography>
 
-          {casos.map((c) => {
-            const step = nextStepFor(c);
+          {casos.map((c) => (
+            <Paper key={c.id} sx={{ p: 2, mb: 2 }}>
+              <Stack direction="row" justifyContent="space-between">
+                <Box>
+                  <Stack direction="row" spacing={1}>
+                    <Typography fontWeight={700}>{c.nombre}</Typography>
+                    {renderSemaforo(c.fechaAsignacionISO)}
+                    {chipEstado(c.estadoVerif)}
+                  </Stack>
 
-            return (
-              <Paper
-                key={c.id}
-                sx={{
-                  p: 2,
-                  mb: 2,
-                  border: "1px solid #e0e0e0",
-                  borderRadius: 1,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={2}
+                  <Typography>RUC: {c.ruc}</Typography>
+                  <Typography>Inconsistencia: {c.metaInconsistencia}</Typography>
+                </Box>
+
+                <IconButton
+                  onClick={() => {
+                    setSelected(c);
+                    setDetailOpen(true);
+                  }}
                 >
-                  <Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontWeight={700}>{c.nombre}</Typography>
+                  <InfoOutlinedIcon />
+                </IconButton>
+              </Stack>
 
-                      {/* SEMÁFORO */}
-                      {renderSemaforo(c.fechaAsignacionISO)}
-
-                      {/* ESTADO */}
-                      {chipEstado(c.estadoVerif)}
-                    </Stack>
-
-                    <Typography variant="body2">RUC: {c.ruc}</Typography>
-                    <Typography variant="body2">
-                      Inconsistencia: <b>{c.metaInconsistencia || "—"}</b>
-                    </Typography>
-                  </Box>
-
-                  <IconButton
-                    color="primary"
-                    onClick={() => {
-                      setSelected(c);
-                      setDetailOpen(true);
-                    }}
-                  >
-                    <InfoOutlinedIcon />
-                  </IconButton>
-                </Stack>
-              </Paper>
-            );
-          })}
-
-          {!casos.length && (
-            <Typography color="text.secondary">
-              No hay casos pendientes.
-            </Typography>
-          )}
+              {/* BOTÓN DE IR */}
+              <Button
+                fullWidth
+                sx={{ mt: 1 }}
+                variant="contained"
+                onClick={() =>
+                  onGo?.(
+                    c.estadoVerif === "ParaAprobacion"
+                      ? "APROBACIÓN"
+                      : "VERIFICACIÓN"
+                  )
+                }
+              >
+                {c.estadoVerif === "ParaAprobacion"
+                  ? "Ir a Aprobación"
+                  : "Ir a Verificación"}
+              </Button>
+            </Paper>
+          ))}
         </Box>
       </Paper>
 
-      {/* === DETALLE === */}
-      <Dialog
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      {/* DETALLE */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Detalle del caso</DialogTitle>
-
         <DialogContent dividers>
           {selected && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Typography>
-                  <b>Nombre:</b> {selected.nombre}
-                </Typography>
+                <Typography><b>Nombre:</b> {selected.nombre}</Typography>
               </Grid>
-
               <Grid item xs={6}>
-                <Typography>
-                  <b>RUC:</b> {selected.ruc}
-                </Typography>
+                <Typography><b>RUC:</b> {selected.ruc}</Typography>
               </Grid>
-
               <Grid item xs={6}>
-                <Typography>
-                  <b>Provincia:</b> {selected.provincia}
-                </Typography>
+                <Typography><b>Provincia:</b> {selected.provincia}</Typography>
               </Grid>
-
               <Grid item xs={6}>
-                <Typography>
-                  <b>Valor:</b> B/.{" "}
-                  {selected.valor?.toLocaleString()}
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12}>
-                <Typography>
-                  <b>Fecha asignación:</b>{" "}
-                  {dayjs(selected.fechaAsignacionISO).format("DD/MM/YYYY")}
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12}>
-                <Typography>
-                  <b>Semaforización:</b>
-                </Typography>
-                {renderSemaforo(selected.fechaAsignacionISO)}
+                <Typography><b>Valor:</b> B/. {selected.valor}</Typography>
               </Grid>
             </Grid>
           )}
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={() => setDetailOpen(false)}>Cerrar</Button>
-
-          {selected && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                const step = nextStepFor(selected);
-                if (step?.ruta) onGo?.(step.ruta);
-                setDetailOpen(false);
-              }}
-            >
-              {nextStepFor(selected).txt}
-            </Button>
-          )}
+          <Button variant="contained" onClick={() => setDetailOpen(false)}>
+            Cerrar
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
