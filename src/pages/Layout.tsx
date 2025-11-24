@@ -63,7 +63,8 @@ export const Layout: React.FC = () => {
   const renderContent = () => {
     switch (leaf) {
   case 'HOME':
-  return <Home onGo={handleSelect} />;
+case "HOME":
+  return <Home onGo={handleSelect} contexto={selectedPath} />;
         case 'TRAZABILIDAD':
   return <TrazabilidadBusqueda />;  // ✅ se pasa el callback
       case 'SELECTOR DE CASOS Y PRIORIZACIÓN':

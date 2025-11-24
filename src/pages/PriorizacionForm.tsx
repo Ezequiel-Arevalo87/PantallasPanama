@@ -243,19 +243,23 @@ export default function PriorizacionForm({
 
     const ahoraISO = new Date().toISOString();
 
-    const paquete: RowAprobacion[] = selected.map((r) => ({
-      ...r,
-      metaCategoria: categoria,
-      metaInconsistencia: inconsistencia,
-      metaPrograma: programa,
-      metaActividadEconomica: actividadEconomica ?? [],
-      metaPeriodoInicial: periodoInicial,
-      metaPeriodoFinal: periodoFinal,
-      metaImpuesto: impuesto,
-      metaZonaEspecial: zonaEspecial,
-      fechaAsignacionISO: ahoraISO,
-      detalleVisto: false,
-    }));
+   const paquete: RowAprobacion[] = selected.map((r) => ({
+  ...r,
+  metaCategoria: categoria,
+  metaInconsistencia: inconsistencia,
+  metaPrograma: programa,
+  metaActividadEconomica: actividadEconomica ?? [],
+  metaPeriodoInicial: periodoInicial,
+  metaPeriodoFinal: periodoFinal,
+  metaImpuesto: impuesto,
+  metaZonaEspecial: zonaEspecial,
+  fechaAsignacionISO: ahoraISO,
+  detalleVisto: false,
+
+  // ⭐ NUEVO ⭐
+  estadoVerif: "Pendiente",
+}));
+
 
     localStorage.setItem(CASOS_KEY, JSON.stringify(paquete));
     notifyAprobaciones();
