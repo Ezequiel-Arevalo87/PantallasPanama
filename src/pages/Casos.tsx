@@ -1,10 +1,25 @@
-// src/pages/Casos.tsx
+// ==========================================
+// src/pages/Casos.tsx  (VERSIÓN COMPLETA)
+// ==========================================
 import * as React from "react";
 import {
-  Box, Paper, Button, Chip, Typography, Grid,
-  Table, TableHead, TableRow, TableCell, TableBody,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Tabs, Tab
+  Box,
+  Paper,
+  Button,
+  Chip,
+  Typography,
+  Grid,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
@@ -83,22 +98,6 @@ const DEFAULT_AUDITORES = ["Auditor 1", "Auditor 2", "Auditor 3", "Auditor 4"];
 const auditorOf = (r: Caso) => r.auditorAsignado ?? r.auditor ?? "Sin auditor";
 const categoriaOf = (r: Caso) => r.metaCategoria ?? r.categoria ?? "Sin categoría";
 
-const buildCounters = (rows: Caso[]) => {
-  const counters = new Map<string, { [cat: string]: number; total: number }>();
-  for (const r of rows) {
-    const aud = auditorOf(r);
-    const cat = categoriaOf(r);
-    const row = counters.get(aud) ?? { total: 0 };
-    row[cat] = (row[cat] ?? 0) + 1;
-    row.total += 1;
-    counters.set(aud, row);
-  }
-  for (const [, row] of counters) {
-    for (const c of CATS) if (row[c] == null) row[c] = 0;
-  }
-  return counters;
-};
-
 function randomFutureDate(isoStart: string, minDays = 1, maxDays = 30): string {
   const base = new Date(isoStart);
   if (Number.isNaN(base.getTime())) {
@@ -126,7 +125,10 @@ function distribuirPorIguales(rows: Caso[], targetAuditores: string[]): Caso[] {
     let min = Infinity;
     for (const a of targetAuditores) {
       const c = carga.get(a) ?? 0;
-      if (c < min) { min = c; elegido = a; }
+      if (c < min) {
+        min = c;
+        elegido = a;
+      }
     }
     return elegido;
   };
@@ -150,7 +152,7 @@ function distribuirPorIguales(rows: Caso[], targetAuditores: string[]): Caso[] {
   });
 }
 
-/* Mock de trazas (estados válidos con Trazabilidad.tsx) */
+/* Mock de trazas */
 const mockTrazas = (ruc: string): TrazaItem[] => [
   {
     id: `${ruc}-1`,
@@ -169,37 +171,38 @@ const mockTrazas = (ruc: string): TrazaItem[] => [
 ];
 
 /* ===================== Componente ===================== */
-const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, onRegresar }) => {
+const Casos: React.FC<Props> = ({
+  casos = [],
+  auditoresUI = DEFAULT_AUDITORES,
+  onRegresar,
+}) => {
   const [rows, setRows] = React.useState<Caso[]>([]);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailAuditor, setDetailAuditor] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState(0);
 
-  // Evitar bucle de rebalanceo
   const balanceDoneRef = React.useRef(false);
 
   const reload = React.useCallback(() => {
     const storage = readStorage();
     const base = casos.length > 0 ? casos : storage;
     setRows(mergeWithStorage(base, storage));
-    // al recargar permitimos un rebalanceo (si de verdad hace falta)
     balanceDoneRef.current = false;
   }, [casos]);
 
-  React.useEffect(() => { reload(); }, [reload]);
+  React.useEffect(() => {
+    reload();
+  }, [reload]);
 
-  const counters = React.useMemo(() => buildCounters(rows), [rows]);
   const allAuditors = React.useMemo(
-    () => Array.from(new Set([...auditoresUI, ...Array.from(counters.keys())])),
-    [auditoresUI, counters]
+    () => Array.from(new Set([...auditoresUI])),
+    [auditoresUI]
   );
 
-  const targetAuditores = React.useMemo(
-    () => allAuditors.filter((a) => a && a.trim() && a !== "Sin auditor"),
-    [allAuditors]
+  const targetAuditores = allAuditors.filter(
+    (a) => a && a.trim() && a !== "Sin auditor"
   );
 
-  // ---- FIX bucle infinito: rebalancear una sola vez, y solo si hay cambios reales
   React.useEffect(() => {
     if (balanceDoneRef.current) return;
     if (!rows.length || !targetAuditores.length) return;
@@ -213,18 +216,15 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
     }
 
     const balanced = distribuirPorIguales(rows, targetAuditores);
-
-    const changed =
-      balanced.length !== rows.length ||
-      balanced.some((b, i) => {
-        const a = rows[i];
-        return (
-          b.auditorAsignado !== a?.auditorAsignado ||
-          b.fechaAsignacion !== a?.fechaAsignacion ||
-          b.fechaAuditoria !== a?.fechaAuditoria ||
-          b.asignado !== a?.asignado
-        );
-      });
+    const changed = balanced.some((b, i) => {
+      const a = rows[i];
+      return (
+        b.auditorAsignado !== a?.auditorAsignado ||
+        b.fechaAsignacion !== a?.fechaAsignacion ||
+        b.fechaAuditoria !== a?.fechaAuditoria ||
+        b.asignado !== a?.asignado
+      );
+    });
 
     if (changed) {
       setRows(balanced);
@@ -234,15 +234,11 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
     balanceDoneRef.current = true;
   }, [rows, targetAuditores]);
 
-  const reBalancear = () => {
-    if (!rows.length || !targetAuditores.length) return;
-    const balanced = distribuirPorIguales(rows, targetAuditores);
-    setRows(balanced);
-    saveStorage(balanced);
-    balanceDoneRef.current = true; // ya balanceamos manualmente
+  const openDetail = (aud: string) => {
+    setDetailAuditor(aud);
+    setTab(0);
+    setDetailOpen(true);
   };
-
-  const openDetail = (aud: string) => { setDetailAuditor(aud); setTab(0); setDetailOpen(true); };
   const closeDetail = () => setDetailOpen(false);
 
   const detailRows = React.useMemo(
@@ -253,42 +249,85 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
   return (
     <Box component={Paper} sx={{ p: 2 }}>
       <Grid container alignItems="center" spacing={1} sx={{ mb: 2 }}>
-        <Grid item><Typography variant="h6">Asignación automática</Typography></Grid>
-        <Grid item><Chip size="small" color="primary" variant="outlined" label={`Total casos: ${rows.length}`} /></Grid>
-        <Grid item><Button size="small" variant="outlined" onClick={reBalancear}>Rebalancear</Button></Grid>
+        <Grid item>
+          <Typography variant="h6">Asignación automática</Typography>
+        </Grid>
+        <Grid item>
+          <Chip
+            size="small"
+            color="primary"
+            variant="outlined"
+            label={`Total casos: ${rows.length}`}
+          />
+        </Grid>
       </Grid>
 
-      <Box sx={{ border: "1px solid #CFD8DC", borderRadius: 1, overflow: "hidden" }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Auditor</TableCell>
-              {CATS.map((c) => <TableCell key={c} align="center">{c}</TableCell>)}
-              <TableCell align="center">TOTAL</TableCell>
-              <TableCell align="center">ACCIÓN</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {Array.from(new Set([...allAuditors])).map((aud) => {
-              const row = counters.get(aud) ?? { total: 0, [CATS[0]]: 0, [CATS[1]]: 0, [CATS[2]]: 0 };
-              return (
-                <TableRow key={aud}>
-                  <TableCell>{aud}</TableCell>
-                  {CATS.map((c) => <TableCell key={c} align="center">{row[c] ?? 0}</TableCell>)}
-                  <TableCell align="center">{row.total ?? 0}</TableCell>
-                  <TableCell align="center">
-                    <Button size="small" variant="contained" onClick={() => openDetail(aud)}>DETALLE</Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Box>
+      {/* ================= TABLAS POR CATEGORÍA ================= */}
+      {CATS.map((cat) => {
+        const rowsCat = rows.filter((r) => categoriaOf(r) === cat);
 
-      <Box mt={2}>
-        <Button variant="contained" onClick={onRegresar}>REGRESAR</Button>
-      </Box>
+        return (
+          <Box key={cat} sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              {cat}
+            </Typography>
+
+            <Box
+              sx={{
+                border: "1px solid #CFD8DC",
+                borderRadius: 1,
+                overflow: "hidden",
+              }}
+            >
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>RUC</TableCell>
+                    <TableCell>Nombre o Razón Social</TableCell>
+                    <TableCell>Auditor asignado</TableCell>
+                    <TableCell>Fecha asignación</TableCell>
+                    <TableCell>Fecha auditoría</TableCell>
+                    <TableCell>Estado</TableCell>
+                    <TableCell>Acción</TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {rowsCat.map((r) => (
+                    <TableRow key={String(r.id) + String(r.ruc)}>
+                      <TableCell>{r.ruc}</TableCell>
+                      <TableCell>{r.nombre}</TableCell>
+                      <TableCell>{auditorOf(r)}</TableCell>
+                      <TableCell>{r.fechaAsignacion ?? "—"}</TableCell>
+                      <TableCell>{r.fechaAuditoria ?? "—"}</TableCell>
+                      <TableCell>
+                        {r.asignado ? "Asignado" : "Pendiente"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => openDetail(auditorOf(r))}
+                        >
+                          DETALLE
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {rowsCat.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        Sin casos para esta categoría
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
+          </Box>
+        );
+      })}
 
       {/* === Dialog Detalle con Tabs === */}
       <Dialog open={detailOpen} onClose={closeDetail} maxWidth="lg" fullWidth>
@@ -308,11 +347,10 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
                   <TableCell>Categoría</TableCell>
                   <TableCell>Fecha asignación</TableCell>
                   <TableCell>Fecha auditoría</TableCell>
-                  <TableCell>Bloquear</TableCell>
-                  <TableCell>Red</TableCell>
                   <TableCell>Estado</TableCell>
                 </TableRow>
               </TableHead>
+
               <TableBody>
                 {detailRows.map((r) => (
                   <TableRow key={String(r.id) + String(r.ruc)}>
@@ -321,14 +359,17 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
                     <TableCell>{categoriaOf(r)}</TableCell>
                     <TableCell>{r.fechaAsignacion ?? "—"}</TableCell>
                     <TableCell>{r.fechaAuditoria ?? "—"}</TableCell>
-                    <TableCell>{r.bloquear ? "Sí" : "No"}</TableCell>
-                    <TableCell>{r.red ?? "—"}</TableCell>
-                    <TableCell>{r.asignado ? "Asignado" : "Pendiente"}</TableCell>
+                    <TableCell>
+                      {r.asignado ? "Asignado" : "Pendiente"}
+                    </TableCell>
                   </TableRow>
                 ))}
+
                 {detailRows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">Sin casos</TableCell>
+                    <TableCell colSpan={6} align="center">
+                      Sin casos
+                    </TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -341,8 +382,11 @@ const Casos: React.FC<Props> = ({ casos = [], auditoresUI = DEFAULT_AUDITORES, o
             </Box>
           )}
         </DialogContent>
+
         <DialogActions>
-          <Button variant="contained" onClick={closeDetail}>CERRAR</Button>
+          <Button variant="contained" onClick={closeDetail}>
+            CERRAR
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

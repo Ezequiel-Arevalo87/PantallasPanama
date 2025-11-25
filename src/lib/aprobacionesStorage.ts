@@ -2,14 +2,14 @@
 // src/lib/aprobacionesStorage.ts
 // ==========================================
 
-// Clave única para localStorage
+// Clave única
 export const CASOS_KEY = "casosAprobacion" as const;
 
-// Notificar cambio a todas las pantallas (Home, Verificación, Aprobaciones…)
+// Notificar cambios globales
 export const notifyAprobaciones = () =>
   window.dispatchEvent(new Event("casosAprobacion:update"));
 
-// Leer todos los casos del storage
+// Leer storage
 export const readCasos = <T = any>(): T[] => {
   try {
     const raw = localStorage.getItem(CASOS_KEY);
@@ -19,13 +19,13 @@ export const readCasos = <T = any>(): T[] => {
   }
 };
 
-// Guardar lista completa de casos
+// Guardar lista completa
 export const writeCasos = (rows: any[]) => {
   localStorage.setItem(CASOS_KEY, JSON.stringify(rows));
   notifyAprobaciones();
 };
 
-// Actualizar uno o más casos con una función de transformación
+// Actualizar registros
 export const updateCasos = (fn: (row: any) => any) => {
   const rows = readCasos<any>();
   const updated = rows.map(fn);
@@ -33,20 +33,18 @@ export const updateCasos = (fn: (row: any) => any) => {
   return updated;
 };
 
-// Devuelve solo los casos aprobados según estadoVerif
+// Casos aprobados por estadoVerif
 export const readAprobados = <T = any>(): T[] =>
   readCasos<T>().filter(
     (r: any) => (r?.estadoVerif ?? "Pendiente") === "Aprobado"
   );
 
-// Devuelve solo los pendientes de verificación
-export const readPendientesVerif = <T = any>(): T[] =>
-  readCasos<T>().filter(
-    (r: any) => (r?.estadoVerif ?? "Pendiente") === "Pendiente"
-  );
+// Generador incremental de AUTO DE APERTURA
+export const nextNumeroAuto = (): string => {
+  const key = "AUTO_APERTURA_SEQ";
+  const current = Number(localStorage.getItem(key) || "0") + 1;
+  localStorage.setItem(key, String(current));
 
-// Devuelve los que ya pasaron verificación y van a aprobación
-export const readParaAprobacion = <T = any>(): T[] =>
-  readCasos<T>().filter(
-    (r: any) => (r?.estadoVerif ?? "Pendiente") === "ParaAprobacion"
-  );
+  const year = new Date().getFullYear();
+  return `AA-${year}-${String(current).padStart(4, "0")}`;
+};

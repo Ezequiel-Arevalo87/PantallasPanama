@@ -40,7 +40,7 @@ import {
 
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
-import { CASOS_KEY } from "../lib/aprobacionesStorage";
+import { CASOS_KEY, nextNumeroAuto } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
 // ICONOS
@@ -67,8 +67,9 @@ type RowBase = {
   total?: number | string | null;
   estado?: "Pendiente" | "Aprobado";
   motivoDevolucion?: string | null;
-  motivoRechazo?: string | null; // ← NUEVO
+  motivoRechazo?: string | null;
   estadoVerif?: string | null;
+  numeroAuto?: string | null; // ← NUEVO: número de Auto de Apertura
 };
 
 type RowMeta = {
@@ -99,12 +100,22 @@ const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const PERIODOS_FIJOS = ["dic-20", "dic-21", "dic-22", "dic-23", "dic-24", "dic-25"] as const;
+const PERIODOS_FIJOS = [
+  "dic-20",
+  "dic-21",
+  "dic-22",
+  "dic-23",
+  "dic-24",
+  "dic-25",
+] as const;
 
 const buildBreakdown = (row: Row) => {
   const total = row.valorNum || 0;
   if (!total)
-    return { items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })), total: 0 };
+    return {
+      items: PERIODOS_FIJOS.map((p) => ({ periodo: p, monto: 0 })),
+      total: 0,
+    };
 
   const seed =
     (typeof row.id === "number"
@@ -245,13 +256,20 @@ const Aprobaciones: React.FC = () => {
 
     if (!isConfirmed) return;
 
-    persist(
-      rows.map((r) =>
-        r.id === row.id
-          ? { ...r, estado: "Aprobado", estadoVerif: "Aprobado" }
-          : r
-      )
-    );
+    const updated:any = rows.map((r) => {
+      if (r.id !== row.id) return r;
+
+      const numeroAuto = r.numeroAuto || nextNumeroAuto();
+
+      return {
+        ...r,
+        estado: "Aprobado",
+        estadoVerif: "Aprobado",
+        numeroAuto, // ← guardamos el número de Auto
+      };
+    });
+
+    persist(updated);
 
     Swal.fire("Aprobado", "Caso aprobado correctamente.", "success");
   };
@@ -264,7 +282,11 @@ const Aprobaciones: React.FC = () => {
     ) as Row[];
 
     if (!seleccion.length)
-      return Swal.fire("Sin selección", "Selecciona uno o más casos.", "info");
+      return Swal.fire(
+        "Sin selección",
+        "Selecciona uno o más casos.",
+        "info"
+      );
 
     const { isConfirmed } = await Swal.fire({
       icon: "question",
@@ -277,13 +299,20 @@ const Aprobaciones: React.FC = () => {
     if (!isConfirmed) return;
 
     const ids = new Set(seleccion.map((r) => r.id));
-    persist(
-      rows.map((r) =>
-        ids.has(r.id)
-          ? { ...r, estado: "Aprobado", estadoVerif: "Aprobado" }
-          : r
-      )
-    );
+    const updated:any = rows.map((r) => {
+      if (!ids.has(r.id)) return r;
+
+      const numeroAuto = r.numeroAuto || nextNumeroAuto();
+
+      return {
+        ...r,
+        estado: "Aprobado",
+        estadoVerif: "Aprobado",
+        numeroAuto,
+      };
+    });
+
+    persist(updated);
 
     Swal.fire("Aprobados", "Selección aprobada correctamente.", "success");
   };
@@ -405,7 +434,7 @@ const Aprobaciones: React.FC = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Rechazar (nuevo) */}
+            {/* Rechazar */}
             <Tooltip title="Rechazar">
               <IconButton
                 size="small"

@@ -260,8 +260,16 @@ export default function PriorizacionForm({
   estadoVerif: "Pendiente",
 }));
 
+const existentes = JSON.parse(localStorage.getItem(CASOS_KEY) || "[]");
 
-    localStorage.setItem(CASOS_KEY, JSON.stringify(paquete));
+// quitar cualquier duplicado por RUC
+const sinDuplicados = existentes.filter(
+  (x: any) => !paquete.some((p) => p.ruc === x.ruc)
+);
+
+// fusionar
+localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
+
     notifyAprobaciones();
 
     await Swal.fire("Éxito", "Casos enviados a Verificación.", "success");

@@ -1,5 +1,5 @@
 // ==========================================
-// src/pages/Home.tsx  (VERSIÓN FINAL COMPLETA)
+// src/pages/Home.tsx (VERSIÓN FINAL CORREGIDA)
 // ==========================================
 import React, { useEffect, useState } from "react";
 import {
@@ -31,7 +31,7 @@ type CasoVerif = {
   metaInconsistencia?: string;
   valor?: number;
   fechaAsignacionISO: string;
-  estadoVerif: string; // Pendiente, ParaAprobacion, Aprobado, NoProductivo
+  estadoVerif: string; 
 };
 
 export default function Home({
@@ -46,48 +46,62 @@ export default function Home({
   const [selected, setSelected] = useState<CasoVerif | null>(null);
 
   // ------------------------------------------
-  // CARGA INTELIGENTE SEGÚN CONTEXTO
+  // CARGA SEGÚN CONTEXTO
   // ------------------------------------------
-  useEffect(() => {
-    const load = () => {
-      try {
-        const raw = localStorage.getItem(CASOS_KEY);
-        const arr: CasoVerif[] = raw ? JSON.parse(raw) : [];
+// ------------------------------------------
+// CARGA INTELIGENTE SEGÚN CONTEXTO
+// ------------------------------------------
+useEffect(() => {
+  const load = () => {
+    try {
+      const raw = localStorage.getItem(CASOS_KEY);
+      const arr: CasoVerif[] = raw ? JSON.parse(raw) : [];
 
-        let filtrados: CasoVerif[] = [];
+      let filtrados: CasoVerif[] = [];
 
-        // 🟦 MODO VERIFICADOR → ver no aprobados ni no productivos
-        if (contexto?.includes("VERIFICACION")) {
-          filtrados = arr.filter(
-            (r) =>
-              r.estadoVerif !== "Aprobado" &&
-              r.estadoVerif !== "NoProductivo"
-          );
-        }
-        // 🟩 MODO APROBADOR → ver solo ParaAprobacion
-        else if (contexto?.includes("APROBACION")) {
-          filtrados = arr.filter((r) => r.estadoVerif === "ParaAprobacion");
-        }
-        // 🟨 HOME normal → actuar como Verificación
-        else {
-          filtrados = arr.filter(
-            (r) =>
-              r.estadoVerif !== "Aprobado" &&
-              r.estadoVerif !== "NoProductivo"
-          );
-        }
-
-        setCasos(filtrados);
-      } catch {
-        setCasos([]);
+      // 🟦 VERIFICACIÓN: mostrar solo Pendientes
+      if (contexto?.includes("VERIFICACION")) {
+        filtrados = arr.filter(
+          (r) => r.estadoVerif === "Pendiente"
+        );
       }
-    };
 
-    load();
-    window.addEventListener("casosAprobacion:update", load);
-    return () =>
-      window.removeEventListener("casosAprobacion:update", load);
-  }, [contexto]);
+      // 🟩 APROBACIÓN: mostrar solo los ParaAprobacion
+      else if (contexto?.includes("APROBACION")) {
+        filtrados = arr.filter(
+          (r) => r.estadoVerif === "ParaAprobacion"
+        );
+      }
+
+      // 🟧 ASIGNACIÓN: mostrar los que ya tienen aprobado
+      else if (contexto?.includes("ASIGNACION")) {
+        filtrados = arr.filter(
+          (r) => r.estadoVerif === "Aprobado"
+        );
+      }
+
+      // 🟨 HOME general: mostrar TODO lo que esté pendiente en etapa actual
+      else {
+        filtrados = arr.filter(
+          (r) =>
+            r.estadoVerif === "Pendiente" ||
+            r.estadoVerif === "ParaAprobacion" ||
+            r.estadoVerif === "Aprobado"
+        );
+      }
+
+      setCasos(filtrados);
+    } catch {
+      setCasos([]);
+    }
+  };
+
+  load();
+  window.addEventListener("casosAprobacion:update", load);
+  return () =>
+    window.removeEventListener("casosAprobacion:update", load);
+}, [contexto]);
+
 
   const calcularDias = (f: string) => dayjs().diff(dayjs(f), "day");
 
@@ -108,17 +122,18 @@ export default function Home({
       ParaAprobacion: (
         <Chip size="small" color="info" label="Para Aprobación" />
       ),
+      Aprobado: <Chip size="small" color="success" label="Aprobado" />,
       Devuelto: <Chip size="small" color="warning" label="Devuelto" />,
-      Ampliar: <Chip size="small" color="secondary" label="Ampliar" />
+      Rechazado: <Chip size="small" color="error" label="Rechazado" />
     };
 
     return map[e] ?? <Chip size="small" label="Pendiente" />;
   };
 
-  // -----------------------------------------------------------
-  // DESTINO AL HACER CLICK EN "Ir a la tarea"
-  // -----------------------------------------------------------
   const getDestino = () => {
+    if (contexto?.includes("ASIGNACION")) {
+      return "/acta-inicio/" + selected?.id;
+    }
     if (selected?.estadoVerif === "ParaAprobacion") return "APROBACIÓN";
     return "VERIFICACIÓN";
   };
@@ -127,7 +142,9 @@ export default function Home({
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 2 }}>
       <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
         <Typography variant="h6" fontWeight={700}>
-          {contexto?.includes("APROBACION")
+          {contexto?.includes("ASIGNACION")
+            ? "Casos Aprobados para Asignación"
+            : contexto?.includes("APROBACION")
             ? "Casos Pendientes por Aprobación"
             : "Casos Pendientes por Verificación"}
         </Typography>
@@ -136,16 +153,11 @@ export default function Home({
       <Paper variant="outlined">
         <Box sx={{ p: 2 }}>
           <Typography fontWeight={600}>
-            {(() => {
-              if (contexto?.includes("APROBACION"))
-                return `Casos enviados por Verificación (${casos.length})`;
-
-              if (contexto?.includes("VERIFICACION"))
-                return `Casos enviados desde Priorización (${casos.length})`;
-
-              // HOME default → similar a verificación
-              return `Casos enviados desde Priorización (${casos.length})`;
-            })()}
+            {contexto?.includes("ASIGNACION")
+              ? `Casos Aprobados (${casos.length})`
+              : contexto?.includes("APROBACION")
+              ? `Casos enviados por Verificación (${casos.length})`
+              : `Casos enviados desde Priorización (${casos.length})`}
           </Typography>
 
           {casos.map((c) => (
@@ -178,7 +190,7 @@ export default function Home({
         </Box>
       </Paper>
 
-      {/* DETALLE DEL CASO */}
+      {/* DETALLE */}
       <Dialog
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
