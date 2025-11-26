@@ -1,3 +1,6 @@
+// ==========================================
+// src/pages/PriorizacionForm.tsx  (CORREGIDO)
+// ==========================================
 import * as React from "react";
 import {
   Box,
@@ -20,8 +23,8 @@ import {
 import {
   DataGrid,
   GridColDef,
-  GridToolbarColumnsButton,
   GridToolbarContainer,
+  GridToolbarColumnsButton,
   GridToolbarDensitySelector,
   GridToolbarExport,
   GridToolbarQuickFilter,
@@ -86,6 +89,9 @@ export type RowAprobacion = Row & {
   metaZonaEspecial?: string | null;
   fechaAsignacionISO?: string;
   detalleVisto?: boolean;
+
+  // 🔹 Añadimos estadoVerif
+  estadoVerif: "Pendiente" | "ParaAprobacion" | "Aprobado" | "NoProductivo" | "Devuelto";
 };
 
 /* ========================== UTILS =========================== */
@@ -243,32 +249,34 @@ export default function PriorizacionForm({
 
     const ahoraISO = new Date().toISOString();
 
-   const paquete: RowAprobacion[] = selected.map((r) => ({
-  ...r,
-  metaCategoria: categoria,
-  metaInconsistencia: inconsistencia,
-  metaPrograma: programa,
-  metaActividadEconomica: actividadEconomica ?? [],
-  metaPeriodoInicial: periodoInicial,
-  metaPeriodoFinal: periodoFinal,
-  metaImpuesto: impuesto,
-  metaZonaEspecial: zonaEspecial,
-  fechaAsignacionISO: ahoraISO,
-  detalleVisto: false,
+    const paquete: RowAprobacion[] = selected.map((r) => ({
+      ...r,
+      metaCategoria: categoria,
+      metaInconsistencia: inconsistencia,
+      metaPrograma: programa,
+      metaActividadEconomica: actividadEconomica ?? [],
+      metaPeriodoInicial: periodoInicial,
+      metaPeriodoFinal: periodoFinal,
+      metaImpuesto: impuesto,
+      metaZonaEspecial: zonaEspecial,
+      fechaAsignacionISO: ahoraISO,
+      detalleVisto: false,
 
-  // ⭐ NUEVO ⭐
-  estadoVerif: "Pendiente",
-}));
+      // ⭐ Correcto para flujo
+      estadoVerif: "Pendiente",
+    }));
 
-const existentes = JSON.parse(localStorage.getItem(CASOS_KEY) || "[]");
+    const existentes = JSON.parse(localStorage.getItem(CASOS_KEY) || "[]");
 
-// quitar cualquier duplicado por RUC
-const sinDuplicados = existentes.filter(
-  (x: any) => !paquete.some((p) => p.ruc === x.ruc)
-);
+    // quitar duplicados
+    const sinDuplicados = existentes.filter(
+      (x: any) => !paquete.some((p) => p.ruc === x.ruc)
+    );
 
-// fusionar
-localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
+    // fusionar
+    const nuevos = [...sinDuplicados, ...paquete];
+
+    localStorage.setItem(CASOS_KEY, JSON.stringify(nuevos));
 
     notifyAprobaciones();
 
@@ -325,7 +333,6 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
   /* ========== RENDER ========== */
   return (
     <Box component={Paper} sx={{ mt: 2, p: 1 }}>
-
       <DataGrid
         sx={{ height: 420 }}
         apiRef={apiRef}
@@ -334,10 +341,10 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
         checkboxSelection
         disableRowSelectionOnClick
         isRowSelectable={(params) => !rucsEnVerificacion.has(String(params.row.ruc))}
-       onRowSelectionModelChange={(m:any) => {
-  const count = Array.isArray(m) ? m.length : (m as Set<any>).size;
-  setSelectedCount(count);
-}}
+        onRowSelectionModelChange={(m: any) => {
+          const count = Array.isArray(m) ? m.length : (m as Set<any>).size;
+          setSelectedCount(count);
+        }}
         slots={{ toolbar: CustomToolbar }}
         localeText={localeText}
         pageSizeOptions={[5, 10, 25, 50]}
@@ -350,7 +357,6 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Detalle del Caso</DialogTitle>
         <DialogContent dividers>
-
           {detailRow && (
             <>
               <Stack direction="row" spacing={2}>
@@ -403,7 +409,6 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
                     </Grid>
                   </Grid>
 
-                  {/* Ejemplo tabla interna */}
                   <Box sx={{ mt: 3 }}>
                     <Typography variant="subtitle2">Períodos por monto</Typography>
 
@@ -437,7 +442,6 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
               )}
             </>
           )}
-
         </DialogContent>
 
         <DialogActions>
@@ -463,7 +467,6 @@ localStorage.setItem(CASOS_KEY, JSON.stringify([...sinDuplicados, ...paquete]));
           Pasar a Verificación
         </Button>
       </Box>
-
     </Box>
   );
 }

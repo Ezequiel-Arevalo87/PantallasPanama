@@ -26,6 +26,8 @@ export const NuevosCasos: React.FC<Props> = ({ casosAprobados }) => {
     return first?.metaCategoria || first?.categoria || "(Listado aprobado)";
   }, [casosAprobados]);
 
+  console.log({casosAprobados})
+
   return (
     <Box>
       {/* SOLO BOTÓN DE ASIGNACIÓN MANUAL */}

@@ -1,5 +1,5 @@
 // ==========================================
-// src/pages/Home.tsx (VERSIÓN FINAL CORREGIDA)
+// src/pages/Home.tsx (VERSIÓN FINAL COMPLETA)
 // ==========================================
 import React, { useEffect, useState } from "react";
 import {
@@ -23,6 +23,9 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import dayjs from "dayjs";
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
 
+/* ==========================================
+   TIPOS
+========================================== */
 type CasoVerif = {
   id: string | number;
   ruc: string;
@@ -31,9 +34,13 @@ type CasoVerif = {
   metaInconsistencia?: string;
   valor?: number;
   fechaAsignacionISO: string;
-  estadoVerif: string; 
+  estadoVerif: string;
+  numeroAutoApertura?: string; // ✅ para ActaInicio
 };
 
+/* ==========================================
+   COMPONENTE HOME
+========================================== */
 export default function Home({
   onGo,
   contexto
@@ -45,64 +52,47 @@ export default function Home({
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<CasoVerif | null>(null);
 
-  // ------------------------------------------
-  // CARGA SEGÚN CONTEXTO
-  // ------------------------------------------
-// ------------------------------------------
-// CARGA INTELIGENTE SEGÚN CONTEXTO
-// ------------------------------------------
-useEffect(() => {
-  const load = () => {
-    try {
-      const raw = localStorage.getItem(CASOS_KEY);
-      const arr: CasoVerif[] = raw ? JSON.parse(raw) : [];
+  /* ==========================================
+     CARGA SEGÚN CONTEXTO
+  ========================================== */
+  useEffect(() => {
+    const load = () => {
+      try {
+        const raw = localStorage.getItem(CASOS_KEY);
+        const arr: CasoVerif[] = raw ? JSON.parse(raw) : [];
 
-      let filtrados: CasoVerif[] = [];
+        let filtrados: CasoVerif[] = [];
 
-      // 🟦 VERIFICACIÓN: mostrar solo Pendientes
-      if (contexto?.includes("VERIFICACION")) {
-        filtrados = arr.filter(
-          (r) => r.estadoVerif === "Pendiente"
-        );
+        if (contexto?.includes("VERIFICACION")) {
+          filtrados = arr.filter((r) => r.estadoVerif === "Pendiente");
+        } else if (contexto?.includes("APROBACION")) {
+          filtrados = arr.filter((r) => r.estadoVerif === "ParaAprobacion");
+        } else if (contexto?.includes("ASIGNACION")) {
+          filtrados = arr.filter((r) => r.estadoVerif === "Asignado"); // ✅ CORRECTO
+        } else {
+          filtrados = arr.filter(
+            (r) =>
+              r.estadoVerif === "Pendiente" ||
+              r.estadoVerif === "ParaAprobacion" ||
+              r.estadoVerif === "Aprobado" ||
+              r.estadoVerif === "Asignado"
+          );
+        }
+
+        setCasos(filtrados);
+      } catch {
+        setCasos([]);
       }
+    };
 
-      // 🟩 APROBACIÓN: mostrar solo los ParaAprobacion
-      else if (contexto?.includes("APROBACION")) {
-        filtrados = arr.filter(
-          (r) => r.estadoVerif === "ParaAprobacion"
-        );
-      }
+    load();
+    window.addEventListener("casosAprobacion:update", load);
+    return () => window.removeEventListener("casosAprobacion:update", load);
+  }, [contexto]);
 
-      // 🟧 ASIGNACIÓN: mostrar los que ya tienen aprobado
-      else if (contexto?.includes("ASIGNACION")) {
-        filtrados = arr.filter(
-          (r) => r.estadoVerif === "Aprobado"
-        );
-      }
-
-      // 🟨 HOME general: mostrar TODO lo que esté pendiente en etapa actual
-      else {
-        filtrados = arr.filter(
-          (r) =>
-            r.estadoVerif === "Pendiente" ||
-            r.estadoVerif === "ParaAprobacion" ||
-            r.estadoVerif === "Aprobado"
-        );
-      }
-
-      setCasos(filtrados);
-    } catch {
-      setCasos([]);
-    }
-  };
-
-  load();
-  window.addEventListener("casosAprobacion:update", load);
-  return () =>
-    window.removeEventListener("casosAprobacion:update", load);
-}, [contexto]);
-
-
+  /* ==========================================
+     SEMÁFORO
+  ========================================== */
   const calcularDias = (f: string) => dayjs().diff(dayjs(f), "day");
 
   const renderSemaforo = (f: string) => {
@@ -116,13 +106,15 @@ useEffect(() => {
     );
   };
 
+  /* ==========================================
+     CHIP DE ESTADO
+  ========================================== */
   const chipEstado = (e: string) => {
     const map: any = {
       Pendiente: <Chip size="small" label="Pendiente" />,
-      ParaAprobacion: (
-        <Chip size="small" color="info" label="Para Aprobación" />
-      ),
+      ParaAprobacion: <Chip size="small" color="info" label="Para Aprobación" />,
       Aprobado: <Chip size="small" color="success" label="Aprobado" />,
+      Asignado: <Chip size="small" color="secondary" label="Asignado" />, // ✅ NUEVO
       Devuelto: <Chip size="small" color="warning" label="Devuelto" />,
       Rechazado: <Chip size="small" color="error" label="Rechazado" />
     };
@@ -130,31 +122,37 @@ useEffect(() => {
     return map[e] ?? <Chip size="small" label="Pendiente" />;
   };
 
-  const getDestino = () => {
-    if (contexto?.includes("ASIGNACION")) {
-      return "/acta-inicio/" + selected?.id;
-    }
-    if (selected?.estadoVerif === "ParaAprobacion") return "APROBACIÓN";
+  /* ==========================================
+     DESTINO SEGÚN ESTADO
+  ========================================== */
+  const destinoPorEstado = (estado: string) => {
+    if (estado === "ParaAprobacion") return "APROBACIÓN";
+    if (estado === "Aprobado") return "ASIGNACIÓN";
+    if (estado === "Asignado") return "ACTA DE INICIO"; // ✅ CLAVE
     return "VERIFICACIÓN";
   };
 
+  /* ==========================================
+     RENDER PRINCIPAL
+  ========================================== */
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 2 }}>
       <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
         <Typography variant="h6" fontWeight={700}>
           {contexto?.includes("ASIGNACION")
-            ? "Casos Aprobados para Asignación"
+            ? "Casos Asignados con AUTO"
             : contexto?.includes("APROBACION")
             ? "Casos Pendientes por Aprobación"
             : "Casos Pendientes por Verificación"}
         </Typography>
       </Paper>
 
+      {/* LISTADO */}
       <Paper variant="outlined">
         <Box sx={{ p: 2 }}>
           <Typography fontWeight={600}>
             {contexto?.includes("ASIGNACION")
-              ? `Casos Aprobados (${casos.length})`
+              ? `Casos Asignados (${casos.length})`
               : contexto?.includes("APROBACION")
               ? `Casos enviados por Verificación (${casos.length})`
               : `Casos enviados desde Priorización (${casos.length})`}
@@ -171,6 +169,13 @@ useEffect(() => {
                   </Stack>
 
                   <Typography>RUC: {c.ruc}</Typography>
+
+                  {c.numeroAutoApertura && (
+                    <Typography>
+                      AUTO Nº: <b>{c.numeroAutoApertura}</b>
+                    </Typography>
+                  )}
+
                   <Typography>
                     Inconsistencia: {c.metaInconsistencia}
                   </Typography>
@@ -190,7 +195,7 @@ useEffect(() => {
         </Box>
       </Paper>
 
-      {/* DETALLE */}
+      {/* DIALOG DETALLE */}
       <Dialog
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
@@ -198,6 +203,7 @@ useEffect(() => {
         maxWidth="sm"
       >
         <DialogTitle>Detalle del caso</DialogTitle>
+
         <DialogContent dividers>
           {selected && (
             <Grid container spacing={2}>
@@ -216,6 +222,15 @@ useEffect(() => {
                   <b>Provincia:</b> {selected.provincia}
                 </Typography>
               </Grid>
+
+              {selected.numeroAutoApertura && (
+                <Grid item xs={12}>
+                  <Typography>
+                    <b>AUTO Nº:</b> {selected.numeroAutoApertura}
+                  </Typography>
+                </Grid>
+              )}
+
               <Grid item xs={6}>
                 <Typography>
                   <b>Valor:</b> B/. {selected.valor ?? 0}
@@ -230,7 +245,6 @@ useEffect(() => {
             Cerrar
           </Button>
 
-          {/* IR A LA TAREA */}
           <Tooltip title="Ir a la Tarea">
             <Button
               variant="contained"
@@ -238,7 +252,8 @@ useEffect(() => {
               endIcon={<ArrowForwardIosIcon />}
               onClick={() => {
                 setDetailOpen(false);
-                onGo?.(getDestino());
+                if (selected)
+                  onGo?.(destinoPorEstado(selected.estadoVerif));
               }}
             >
               Ir a la tarea

@@ -1,5 +1,5 @@
 // ==========================================
-// src/pages/Casos.tsx  (VERSIÓN COMPLETA)
+// src/pages/Casos.tsx  (VERSIÓN COMPLETA + ICONOS + AUTO APERTURA)
 // ==========================================
 import * as React from "react";
 import {
@@ -20,8 +20,17 @@ import {
   DialogActions,
   Tabs,
   Tab,
+  IconButton,
+  Tooltip,
+  Stack,
 } from "@mui/material";
-import { CASOS_KEY } from "../lib/aprobacionesStorage";
+
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
+
+import Swal from "sweetalert2";
+
+import { CASOS_KEY, nextNumeroAuto } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 
 /* ===================== Tipos ===================== */
@@ -35,6 +44,7 @@ type Caso = {
   auditorAsignado?: string;
   fechaAsignacion?: string;
   fechaAuditoria?: string;
+  numeroAutoApertura?: string;
   bloquear?: boolean;
   red?: string;
   asignado?: boolean;
@@ -83,6 +93,7 @@ function mergeWithStorage(base: Caso[], storage: Caso[]): Caso[] {
       auditorAsignado: s.auditorAsignado ?? b.auditorAsignado,
       fechaAsignacion: s.fechaAsignacion ?? b.fechaAsignacion,
       fechaAuditoria: s.fechaAuditoria ?? b.fechaAuditoria,
+      numeroAutoApertura: s.numeroAutoApertura ?? b.numeroAutoApertura,
       bloquear: s.bloquear ?? b.bloquear,
       red: s.red ?? b.red,
       asignado: s.asignado ?? b.asignado,
@@ -91,7 +102,8 @@ function mergeWithStorage(base: Caso[], storage: Caso[]): Caso[] {
   });
 }
 
-/* ===================== Funciones auxiliares ===================== */
+/* ===================== Auxiliares ===================== */
+
 const CATS = ["Fiscalización Masiva", "Grandes Contribuyentes", "Auditoría Sectorial"];
 const DEFAULT_AUDITORES = ["Auditor 1", "Auditor 2", "Auditor 3", "Auditor 4"];
 
@@ -135,8 +147,7 @@ function distribuirPorIguales(rows: Caso[], targetAuditores: string[]): Caso[] {
 
   return rows.map((r) => {
     const tieneAuditorValido = targetAuditores.includes(auditorOf(r));
-    const estaAsignado = r.asignado === true;
-    if (tieneAuditorValido && estaAsignado) return r;
+    if (tieneAuditorValido && r.asignado) return r;
 
     const a = pickMin();
     carga.set(a, (carga.get(a) ?? 0) + 1);
@@ -148,11 +159,12 @@ function distribuirPorIguales(rows: Caso[], targetAuditores: string[]): Caso[] {
       asignado: true,
       fechaAsignacion,
       fechaAuditoria: r.fechaAuditoria ?? randomFutureDate(fechaAsignacion),
+      numeroAutoApertura: r.numeroAutoApertura ?? nextNumeroAuto(),
     };
   });
 }
 
-/* Mock de trazas */
+/* Mock trazas */
 const mockTrazas = (ruc: string): TrazaItem[] => [
   {
     id: `${ruc}-1`,
@@ -165,16 +177,16 @@ const mockTrazas = (ruc: string): TrazaItem[] => [
     id: `${ruc}-2`,
     fechaISO: new Date(Date.now() - 86400000).toISOString(),
     actor: "Auditor",
-    accion: "Preparación de auditoría",
+    accion: "Preparación",
     estado: "PENDIENTE",
   },
 ];
 
-/* ===================== Componente ===================== */
+/* ===================== COMPONENTE ===================== */
+
 const Casos: React.FC<Props> = ({
   casos = [],
   auditoresUI = DEFAULT_AUDITORES,
-  onRegresar,
 }) => {
   const [rows, setRows] = React.useState<Caso[]>([]);
   const [detailOpen, setDetailOpen] = React.useState(false);
@@ -203,6 +215,7 @@ const Casos: React.FC<Props> = ({
     (a) => a && a.trim() && a !== "Sin auditor"
   );
 
+  /* =============== BALANCEO AUTOMÁTICO =============== */
   React.useEffect(() => {
     if (balanceDoneRef.current) return;
     if (!rows.length || !targetAuditores.length) return;
@@ -210,41 +223,76 @@ const Casos: React.FC<Props> = ({
     const needsBalance = rows.some(
       (r) => auditorOf(r) === "Sin auditor" || r.asignado !== true
     );
+
     if (!needsBalance) {
       balanceDoneRef.current = true;
       return;
     }
 
     const balanced = distribuirPorIguales(rows, targetAuditores);
-    const changed = balanced.some((b, i) => {
-      const a = rows[i];
-      return (
-        b.auditorAsignado !== a?.auditorAsignado ||
-        b.fechaAsignacion !== a?.fechaAsignacion ||
-        b.fechaAuditoria !== a?.fechaAuditoria ||
-        b.asignado !== a?.asignado
-      );
-    });
-
-    if (changed) {
-      setRows(balanced);
-      saveStorage(balanced);
-    }
+    setRows(balanced);
+    saveStorage(balanced);
 
     balanceDoneRef.current = true;
   }, [rows, targetAuditores]);
+
+  /* ===================== Acciones ===================== */
+
+  const asignarCaso = async (row: Caso) => {
+  const auditorActual = auditorOf(row);
+
+  const { isConfirmed } = await Swal.fire({
+    title: "Confirmar asignación",
+    html: `¿Desea asignar el caso <b>${row.ruc}</b> al auditor <b>${auditorActual}</b>?`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Sí, asignar",
+    cancelButtonText: "Cancelar",
+  });
+
+  if (!isConfirmed) return;
+
+  const updated = rows.map((r) =>
+    r.id === row.id
+      ? {
+          ...r,
+          asignado: true,
+          auditorAsignado: auditorActual,
+          fechaAsignacion: r.fechaAsignacion ?? new Date().toISOString().slice(0, 10),
+          numeroAutoApertura: r.numeroAutoApertura ?? nextNumeroAuto(),
+
+          // ✅ CLAVE PARA QUE APAREZCA EN EL HOME
+          estadoVerif: "Asignado",
+        }
+      : r
+  );
+
+  setRows(updated);
+  saveStorage(updated);
+
+  await Swal.fire({
+    icon: "success",
+    title: "Asignación realizada",
+    text: "El caso ha sido asignado correctamente.",
+    timer: 1500,
+  });
+};
+
 
   const openDetail = (aud: string) => {
     setDetailAuditor(aud);
     setTab(0);
     setDetailOpen(true);
   };
+
   const closeDetail = () => setDetailOpen(false);
 
   const detailRows = React.useMemo(
     () => rows.filter((r) => auditorOf(r) === detailAuditor),
     [rows, detailAuditor]
   );
+
+  /* ===================== RENDER ===================== */
 
   return (
     <Box component={Paper} sx={{ p: 2 }}>
@@ -283,7 +331,8 @@ const Casos: React.FC<Props> = ({
                 <TableHead>
                   <TableRow>
                     <TableCell>RUC</TableCell>
-                    <TableCell>Nombre o Razón Social</TableCell>
+                    <TableCell>Nombre / Razón Social</TableCell>
+                    <TableCell>N° Auto</TableCell>
                     <TableCell>Auditor asignado</TableCell>
                     <TableCell>Fecha asignación</TableCell>
                     <TableCell>Fecha auditoría</TableCell>
@@ -297,27 +346,47 @@ const Casos: React.FC<Props> = ({
                     <TableRow key={String(r.id) + String(r.ruc)}>
                       <TableCell>{r.ruc}</TableCell>
                       <TableCell>{r.nombre}</TableCell>
+
+                      {/* Número de auto */}
+                      <TableCell>{r.numeroAutoApertura ?? "—"}</TableCell>
+
                       <TableCell>{auditorOf(r)}</TableCell>
                       <TableCell>{r.fechaAsignacion ?? "—"}</TableCell>
                       <TableCell>{r.fechaAuditoria ?? "—"}</TableCell>
+                      <TableCell>{r.asignado ? "Asignado" : "Pendiente"}</TableCell>
+
+                      {/* ICONOS */}
                       <TableCell>
-                        {r.asignado ? "Asignado" : "Pendiente"}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={() => openDetail(auditorOf(r))}
-                        >
-                          DETALLE
-                        </Button>
+                        <Stack direction="row" spacing={1}>
+                          {/* Detalle */}
+                          <Tooltip title="Detalle">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => openDetail(auditorOf(r))}
+                            >
+                              <InfoOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+
+                          {/* Asignar */}
+                          <Tooltip title="Asignar">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={() => asignarCaso(r)}
+                            >
+                              <AssignmentIndIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
 
                   {rowsCat.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         Sin casos para esta categoría
                       </TableCell>
                     </TableRow>
@@ -338,12 +407,13 @@ const Casos: React.FC<Props> = ({
             <Tab label="Trazabilidad" />
           </Tabs>
 
+          {/* TAB: Información */}
           {tab === 0 && (
             <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>RUC</TableCell>
-                  <TableCell>Nombre o Razón Social</TableCell>
+                  <TableCell>Nombre</TableCell>
                   <TableCell>Categoría</TableCell>
                   <TableCell>Fecha asignación</TableCell>
                   <TableCell>Fecha auditoría</TableCell>
@@ -359,9 +429,7 @@ const Casos: React.FC<Props> = ({
                     <TableCell>{categoriaOf(r)}</TableCell>
                     <TableCell>{r.fechaAsignacion ?? "—"}</TableCell>
                     <TableCell>{r.fechaAuditoria ?? "—"}</TableCell>
-                    <TableCell>
-                      {r.asignado ? "Asignado" : "Pendiente"}
-                    </TableCell>
+                    <TableCell>{r.asignado ? "Asignado" : "Pendiente"}</TableCell>
                   </TableRow>
                 ))}
 
@@ -376,6 +444,7 @@ const Casos: React.FC<Props> = ({
             </Table>
           )}
 
+          {/* TAB: Trazabilidad */}
           {tab === 1 && (
             <Box sx={{ mt: 1 }}>
               <Trazabilidad rows={detailRows[0]?.trazas ?? []} height={360} />

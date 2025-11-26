@@ -1,31 +1,43 @@
 // ==========================================
-// src/lib/aprobacionesStorage.ts
+// src/lib/aprobacionesStorage.ts (FINAL)
 // ==========================================
 
-// Clave única
+// Clave única para todos los casos del flujo
 export const CASOS_KEY = "casosAprobacion" as const;
 
-// Notificar cambios globales
+// Dispara un evento global para que Home, Verificación, Aprobación y Asignación recarguen datos
 export const notifyAprobaciones = () =>
   window.dispatchEvent(new Event("casosAprobacion:update"));
 
-// Leer storage
+/* ==========================================
+   LEER – SIEMPRE DEVUELVE UN ARREGLO VÁLIDO
+========================================== */
 export const readCasos = <T = any>(): T[] => {
   try {
     const raw = localStorage.getItem(CASOS_KEY);
-    return raw ? (JSON.parse(raw) as T[]) : [];
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? (list as T[]) : [];
   } catch {
     return [];
   }
 };
 
-// Guardar lista completa
+/* ==========================================
+   GUARDAR – reescribe todo y notifica
+========================================== */
 export const writeCasos = (rows: any[]) => {
-  localStorage.setItem(CASOS_KEY, JSON.stringify(rows));
+  try {
+    localStorage.setItem(CASOS_KEY, JSON.stringify(rows));
+  } catch {
+    /* ignoramos para no romper interfaz */
+  }
   notifyAprobaciones();
 };
 
-// Actualizar registros
+/* ==========================================
+   ACTUALIZAR – modifica solo registros tocados
+========================================== */
 export const updateCasos = (fn: (row: any) => any) => {
   const rows = readCasos<any>();
   const updated = rows.map(fn);
@@ -33,16 +45,23 @@ export const updateCasos = (fn: (row: any) => any) => {
   return updated;
 };
 
-// Casos aprobados por estadoVerif
+/* ==========================================
+   LEER SOLO APROBADOS
+========================================== */
 export const readAprobados = <T = any>(): T[] =>
   readCasos<T>().filter(
     (r: any) => (r?.estadoVerif ?? "Pendiente") === "Aprobado"
   );
 
-// Generador incremental de AUTO DE APERTURA
+/* ==========================================
+   GENERADOR DE AUTO DE APERTURA
+   Secuencial, persistente y formateado
+   AA-2025-0001
+========================================== */
 export const nextNumeroAuto = (): string => {
   const key = "AUTO_APERTURA_SEQ";
   const current = Number(localStorage.getItem(key) || "0") + 1;
+
   localStorage.setItem(key, String(current));
 
   const year = new Date().getFullYear();

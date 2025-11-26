@@ -82,7 +82,7 @@ const useMenuData = () => {
         { label: 'DIRECTOR' },
       ],
     },
-    { label: 'REVISIÓN AUDITOR' },
+    { label: 'ACTA DE INICIO' },
     { label: 'NOTIFICACIÓN ACTA DE INICIO' },
     { label: 'VARIACIÓN EN INGRESOS' },
     { label: 'HISTORIAL CUMPLIMIENTO' },

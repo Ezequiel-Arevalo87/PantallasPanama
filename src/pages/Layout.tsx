@@ -29,8 +29,10 @@ import PantallaControNotificacion from '../components/PantallaControNotificacion
 // HOMES
 import Home from './Home';
 
-import { readAprobados } from '../lib/aprobacionesStorage';
+
 import { NuevosCasos } from './NuevosCasos';
+import { readAprobados } from '../lib/workflowStorage';
+import ActaInicio from './ActaInicio';
 
 
 // Rutas base
@@ -82,19 +84,18 @@ export const Layout: React.FC = () => {
 
       case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
         return <Priorizacion />;
+case 'VERIFICACION':
+case 'VERIFICACIÓN':
+  return <VerificacionPage />;
 
-      case 'VERIFICACIÓN':
-        return <VerificacionPage />;
+case 'APROBACION':
+case 'APROBACIÓN':
+  return <Aprobaciones />;
 
-      case 'APROBACIÓN':
-        return <Aprobaciones />;
-
-
-case 'ASIGNACIÓN': {
+case 'ASIGNACION':
+case 'ASIGNACIÓN':
   const aprobados = readAprobados();
   return <NuevosCasos casosAprobados={aprobados} />;
-}
-
 
       case 'CONSULTAS DE ESTADOS':
         return <ConsultasDeEstado />;
@@ -107,8 +108,8 @@ case 'ASIGNACIÓN': {
       case 'DIRECTOR':
         return <ProgramacionAutoAperturaForm readOnly={readOnly} setReadOnly={setReadOnly} />;
 
-      case 'REVISIÓN AUDITOR':
-        return <AsignacionesVarias tipo="REVISIÓN AUDITOR" />;
+      case 'ACTA DE INICIO':
+        return <ActaInicio  />;
 
       case 'NOTIFICACIÓN ACTA DE INICIO':
         return <PantallaControNotificacion tipo="NOTIFICACIÓN ACTA DE INICIO" />;
