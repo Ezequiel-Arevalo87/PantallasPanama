@@ -14,7 +14,7 @@ export const FICHAS: Record<string, FichaContribuyente> = {
     domicilio: 'CALLE 10, PISO 2',
     numAuto: '345',
     fecha: dayjs().format('DD/MM/YY'),
-    hora: '1:00',
+ 
     antecedentes:
       'Se identificaron inconsistencias en declaraciones juradas del contribuyente SEÑOR JUAN PÉREZ GÓMEZ, cédula No. 8-765-432, representante legal de COMERCIALIZADORA PANAMEÑA, S.A., RUC 987654-1-123456, correspondientes a los periodos 2022 y 2023.',
     fundamentos:

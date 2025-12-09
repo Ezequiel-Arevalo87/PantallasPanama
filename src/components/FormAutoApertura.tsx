@@ -12,9 +12,7 @@ export const FormAutoApertura: React.FC<{
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
-        <Typography align="center" color="error" fontWeight={700} mb={2}>
-          AUTO DE APERTURA
-        </Typography>
+     
 
         <Grid container spacing={2} alignItems="center" justifyContent="center">
           <Grid item xs={12} sm={6} md={4}>

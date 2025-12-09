@@ -27,7 +27,7 @@ export const TablaCasosAsignados: React.FC<{
             <TableCell>{c.fecha}</TableCell>
             <TableCell align="center">
               <Button variant="contained" color="success" onClick={() => onAutoApertura(c.ruc)}>
-                Auto de Apertura
+                Generar Informe de Auditoria
               </Button>
             </TableCell>
           </TableRow>

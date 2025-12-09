@@ -53,7 +53,7 @@ export const Layout: React.FC = () => {
   useEffect(() => {
     if (!selectedPath) return;
 
-    if (leaf === 'AUDITOR' && readOnly && selectedPath !== SUP_PATH) {
+    if (leaf === 'PROCESO DE AUDITORIA' && readOnly && selectedPath !== SUP_PATH) {
       setSelectedPath(SUP_PATH);
     } else if (leaf === 'SUPERVISOR' && !readOnly && selectedPath !== AUD_PATH) {
       setSelectedPath(AUD_PATH);
@@ -97,13 +97,13 @@ case 'ASIGNACIÓN':
   const aprobados = readAprobados();
   return <NuevosCasos casosAprobados={aprobados} />;
 
-      case 'CONSULTAS DE ESTADOS':
+      case 'CONTROL Y SEGUIMIENTO':
         return <ConsultasDeEstado />;
 
-      case 'INICIO DE AUDITORIA':
-        return <Apertura />;
+   /*   case 'INICIO DE AUDITORIA':
+        return <Apertura />;*/
 
-      case 'AUDITOR':
+      case 'PROCESO DE AUDITORIA':
       case 'SUPERVISOR':
       case 'DIRECTOR':
         return <ProgramacionAutoAperturaForm readOnly={readOnly} setReadOnly={setReadOnly} />;

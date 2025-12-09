@@ -72,18 +72,20 @@ const useMenuData = () => {
   const asignacion: MenuNode[] = [{ label: 'ASIGNACIÓN' }];
 
   const auditorias: MenuNode[] = [
-    { label: 'CONSULTAS DE ESTADOS' },
-    { label: 'INICIO DE AUDITORIA' },
+    { label: 'CONTROL Y SEGUIMIENTO' },
+  //  { label: 'INICIO DE AUDITORIA' },
     {
       label: 'GESTIÓN DE AUDITORIA',
       children: [
-        { label: 'AUDITOR' },
+        { label: 'ACTA DE INICIO' },
+         { label: 'NOTIFICACIÓN ACTA DE INICIO' },
+        { label: 'PROCESO DE AUDITORIA' },
         { label: 'SUPERVISOR' },
         { label: 'DIRECTOR' },
       ],
     },
-    { label: 'ACTA DE INICIO' },
-    { label: 'NOTIFICACIÓN ACTA DE INICIO' },
+   
+   
     { label: 'VARIACIÓN EN INGRESOS' },
     { label: 'HISTORIAL CUMPLIMIENTO' },
     { label: 'ANALISIS FISCAL' },

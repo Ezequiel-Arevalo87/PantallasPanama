@@ -233,7 +233,7 @@ const PantallaControNotificacion: React.FC<Props> = ({ tipo, fetchContribuyente 
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            {/* <Grid item xs={12} md={4}>
               <TextField
                 label="Fecha límite (+180 días)"
                 value={fechaLimite}
@@ -241,8 +241,8 @@ const PantallaControNotificacion: React.FC<Props> = ({ tipo, fetchContribuyente 
                 InputProps={{ readOnly: true }}
                 placeholder="—"
               />
-            </Grid>
-            <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
+            </Grid> */}
+            <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -255,7 +255,7 @@ const PantallaControNotificacion: React.FC<Props> = ({ tipo, fetchContribuyente 
             </Grid>
 
             {/* Fila 4: Condicional */}
-            {form.esPresencial ? (
+          
               <>
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -274,7 +274,7 @@ const PantallaControNotificacion: React.FC<Props> = ({ tipo, fetchContribuyente 
                   />
                 </Grid>
               </>
-            ) : (
+           
               <>
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -296,7 +296,7 @@ const PantallaControNotificacion: React.FC<Props> = ({ tipo, fetchContribuyente 
                   />
                 </Grid>
               </>
-            )}
+            
 
             {/* Fila 5: Botones */}
             <Grid item xs={12}>

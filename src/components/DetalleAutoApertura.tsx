@@ -81,7 +81,7 @@ const DocumentoAutoApertura = React.forwardRef<HTMLDivElement, {
               <TableBody>
                 <Row label="Número de Auto de Apertura" value={ficha.numAuto} />
                 <Row label="Fecha" value={ficha.fecha} />
-                <Row label="Hora" value={ficha.hora} />
+               
               </TableBody>
             </Table>
           </TableContainer>
@@ -388,7 +388,7 @@ export const DetalleAutoApertura: React.FC<{
               <TableBody>
                 <TableRow><TableCell sx={{ fontWeight: 'bold' }}>Número de Auto de Apertura</TableCell><TableCell>{ficha.numAuto}</TableCell></TableRow>
                 <TableRow><TableCell sx={{ fontWeight: 'bold' }}>Fecha</TableCell><TableCell>{ficha.fecha}</TableCell></TableRow>
-                <TableRow><TableCell sx={{ fontWeight: 'bold' }}>Hora</TableCell><TableCell>{ficha.hora}</TableCell></TableRow>
+                
               </TableBody>
             </Table>
           </TableContainer>
