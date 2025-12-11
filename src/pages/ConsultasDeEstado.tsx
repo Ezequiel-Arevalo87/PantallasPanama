@@ -154,20 +154,6 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Semáforo */}
-        <Grid item xs={12} sm={6} md={2}>
-          <TextField
-            select fullWidth label="Semáforo"
-            value={sem}
-            onChange={(e) => setSem(e.target.value as SemaforoSel)}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
-            <MenuItem value="VERDE">VERDE</MenuItem>
-            <MenuItem value="AMARILLO">AMARILLO</MenuItem>
-            <MenuItem value="ROJO">ROJO</MenuItem>
-          </TextField>
-        </Grid>
 
         {/* Desde */}
         <Grid item xs={12} sm={6} md={2}>
@@ -186,6 +172,20 @@ const ConsultasDeEstado: React.FC = () => {
             onChange={(e) => setHasta(e.target.value)}
           />
         </Grid>
+        {/* Semáforo */}
+        <Grid item xs={12} sm={6} md={2}>
+          <TextField
+            select fullWidth label="Semáforo"
+            value={sem}
+            onChange={(e) => setSem(e.target.value as SemaforoSel)}
+          >
+            <MenuItem value="">— Todos —</MenuItem>
+            <MenuItem value="Todos">Todos</MenuItem>
+            <MenuItem value="VERDE">VERDE</MenuItem>
+            <MenuItem value="AMARILLO">AMARILLO</MenuItem>
+            <MenuItem value="ROJO">ROJO</MenuItem>
+          </TextField>
+        </Grid>
 
 
         {/* Acciones */}
@@ -202,11 +202,11 @@ const ConsultasDeEstado: React.FC = () => {
       </Grid>
 
       {/* Leyenda */}
-      <Stack direction="row" spacing={1} mt={2}>
+      {/* <Stack direction="row" spacing={1} mt={2}>
         <Chip label="Verde: >10 días" color="success" size="small" />
         <Chip label="Amarillo: 3–10 días" color="warning" size="small" />
         <Chip label="Rojo: ≤2 días / vencido" color="error" size="small" />
-      </Stack>
+      </Stack> */}
 
       {mostrarResultados && <TablaResultadosEstado rows={filtrados} />}
 
