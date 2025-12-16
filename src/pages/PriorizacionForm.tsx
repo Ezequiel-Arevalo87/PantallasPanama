@@ -1,6 +1,3 @@
-// ==========================================
-// src/pages/PriorizacionForm.tsx  (CORREGIDO)
-// ==========================================
 import * as React from "react";
 import {
   Box,
@@ -18,7 +15,11 @@ import {
   TableCell,
   TableBody,
   Stack,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import {
   DataGrid,
@@ -37,6 +38,7 @@ import * as XLSX from "xlsx";
 
 import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import type { Actividad } from "../services/actividadesLoader";
 
 /* ====================== TYPES ====================== */
 type Operador = ">=" | "<=" | "==" | "!=";
@@ -45,21 +47,22 @@ type Props = {
   categoria?: string;
   inconsistencia?: string;
   actividadEconomica?: string[];
-  impuesto?: string;
-  zonaEspecial?: string;
   programa?: string | null;
+  zonaEspecial?: string;
   periodoInicial?: string | null;
   periodoFinal?: string | null;
   operador?: Operador;
   valorMin?: string;
   valorMax?: string;
   provincia?: string;
+  actividades?: Actividad[]; // ✅ catálogo
 };
 
 type RawRow = {
   id: number;
   categoria: string;
   ruc: string;
+  dv: number | string | null;
   nombre: string;
   periodos: string;
   valor: number;
@@ -70,6 +73,7 @@ type Row = {
   id: number | string;
   categoria: string;
   ruc: string;
+  dv: string; // 2 dígitos
   nombre: string;
   periodos: string;
   valor: number;
@@ -85,12 +89,11 @@ export type RowAprobacion = Row & {
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
   metaPeriodoFinal?: string | null;
-  metaImpuesto?: string | null;
   metaZonaEspecial?: string | null;
+  metaProvincia?: string | null;
   fechaAsignacionISO?: string;
   detalleVisto?: boolean;
 
-  // 🔹 Añadimos estadoVerif
   estadoVerif: "Pendiente" | "ParaAprobacion" | "Aprobado" | "NoProductivo" | "Devuelto";
 };
 
@@ -102,52 +105,58 @@ const fmtMoney = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const toDV = (dv: any): string => {
+  if (dv === null || dv === undefined) return "—";
+  const n = Number(dv);
+  if (Number.isNaN(n)) return "—";
+  return n.toString().padStart(2, "0");
+};
+
+const buildActividadMap = (actividades?: Actividad[]) => {
+  const m = new Map<string, string>();
+  (actividades ?? []).forEach((a) => m.set(String(a.code), String(a.label)));
+  return m;
+};
+
+// ✅ SOLO PRIMERA ACTIVIDAD (por nombre)
+const firstActividadLabel = (codes: string[] | undefined, map: Map<string, string>) => {
+  if (!codes || codes.length === 0) return "Todas";
+  const first = String(codes[0] ?? "").trim();
+  if (!first) return "Todas";
+  return map.get(first) ?? first; // si no hay label, muestra el código
+};
+
 /* ========================== MOCK DATA =========================== */
 const rawRows: RawRow[] = [
-  { id: 1, categoria: "Fiscalización Masiva", ruc: "8-123-456", nombre: "Individual", periodos: "06/25", valor: 1250000, provincia: "Darién" },
-  { id: 2, categoria: "Fiscalización Masiva", ruc: "8-654-321", nombre: "Individual", periodos: "05/25", valor: 236.23, provincia: "Darién" },
-  { id: 3, categoria: "Fiscalización Masiva", ruc: "100200", nombre: "Panamá Retail S.A.", periodos: "04/25", valor: 2980000, provincia: "Panamá" },
-  { id: 4, categoria: "Fiscalización Masiva", ruc: "100201", nombre: "Construcciones Istmo S.A.", periodos: "03/25", valor: 1745320, provincia: "Panamá Oeste" },
-  { id: 5, categoria: "Fiscalización Masiva", ruc: "100202", nombre: "Servicios Canal S.A.", periodos: "02/25", valor: 695, provincia: "Colón" },
-  { id: 6, categoria: "Fiscalización Masiva", ruc: "100203", nombre: "Agroexport Delta", periodos: "01/25", valor: 1100000, provincia: "Veraguas" },
-  { id: 7, categoria: "Fiscalización Masiva", ruc: "100204", nombre: "Tecno Sur S.A.", periodos: "12/24", valor: 8547, provincia: "Coclé" },
-  { id: 8, categoria: "Fiscalización Masiva", ruc: "100205", nombre: "Transporte Caribe", periodos: "11/24", valor: 2300000, provincia: "Chiriquí" },
-  { id: 9, categoria: "Fiscalización Masiva", ruc: "100206", nombre: "Hoteles del Istmo", periodos: "10/24", valor: 978, provincia: "Bocas del Toro" },
-  { id: 10, categoria: "Fiscalización Masiva", ruc: "100207", nombre: "Textiles del Istmo", periodos: "09/24", valor: 1505000, provincia: "Los Santos" },
-
-  // GC…
-  { id: 11, categoria: "Grandes Contribuyentes", ruc: "200300", nombre: "Comercial ABC S.A.", periodos: "06/25", valor: 654, provincia: "Panamá" },
-  { id: 12, categoria: "Grandes Contribuyentes", ruc: "200301", nombre: "Energía Nacional S.A.", periodos: "05/25", valor: 4123000.21, provincia: "Colón" },
-  { id: 13, categoria: "Grandes Contribuyentes", ruc: "200302", nombre: "Telecom Panavisión", periodos: "04/25", valor: 158, provincia: "Panamá Oeste" },
-  { id: 14, categoria: "Grandes Contribuyentes", ruc: "200303", nombre: "Aviación del Istmo", periodos: "03/25", valor: 2060000.45, provincia: "Chiriquí" },
-  { id: 15, categoria: "Grandes Contribuyentes", ruc: "200304", nombre: "Finanzas Canal Group", periodos: "02/25", valor: 657, provincia: "Herrera" },
-  { id: 16, categoria: "Grandes Contribuyentes", ruc: "200305", nombre: "Minería del Pacífico", periodos: "01/25", valor: 3100450.23, provincia: "Veraguas" },
+  { id: 1, categoria: "Fiscalización Masiva", ruc: "100200", dv: 3, nombre: "Panamá Retail S.A.", periodos: "06/25", valor: 1250000, provincia: "Panamá" },
+  { id: 2, categoria: "Fiscalización Masiva", ruc: "100201", dv: 15, nombre: "Construcciones Istmo S.A.", periodos: "05/25", valor: 236.23, provincia: "Panamá Oeste" },
 ];
 
 const BASE_ROWS: Row[] = rawRows.map((r) => ({
   ...r,
+  dv: toDV(r.dv),
   valorInt: toInt(r.valor),
   trazas: [],
 }));
 
-/* ========================== MAIN COMPONENT =========================== */
 export default function PriorizacionForm({
   categoria,
   inconsistencia,
   actividadEconomica,
-  impuesto,
-  zonaEspecial,
   programa,
+  zonaEspecial,
   periodoInicial,
   periodoFinal,
   operador,
   valorMin,
   valorMax,
   provincia,
+  actividades,
 }: Props) {
   const apiRef = useGridApiRef();
 
-  /* ========== RUCs ya enviados ========== */
+  const actividadesMap = React.useMemo(() => buildActividadMap(actividades), [actividades]);
+
   const [rucsEnVerificacion, setRucsEnVerificacion] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
@@ -155,7 +164,6 @@ export default function PriorizacionForm({
       const raw = localStorage.getItem(CASOS_KEY);
       if (!raw) return;
       const arr = JSON.parse(raw);
-
       const s = new Set<string>();
       arr.forEach((r: any) => {
         if (r?.ruc) s.add(String(r.ruc));
@@ -166,12 +174,10 @@ export default function PriorizacionForm({
     }
   }, []);
 
-  /* ========== FILTRO ========== */
   const rows = React.useMemo<Row[]>(() => {
     let base = BASE_ROWS;
 
-    if (provincia && provincia !== "Todos")
-      base = base.filter((r) => r.provincia === provincia);
+    if (provincia && provincia !== "Todos") base = base.filter((r) => r.provincia === provincia);
 
     const minVal = valorMin ? Number(valorMin) : null;
     const maxVal = valorMax ? Number(valorMax) : null;
@@ -184,7 +190,6 @@ export default function PriorizacionForm({
 
   const [selectedCount, setSelectedCount] = React.useState(0);
 
-  /* ========== DETALLE ========== */
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const [tabSel, setTabSel] = React.useState(0);
@@ -195,14 +200,27 @@ export default function PriorizacionForm({
     setDetailOpen(true);
   };
 
-  /* ========== COLUMNAS ========== */
   const columns: GridColDef[] = [
-    { field: "ruc", headerName: "RUC", flex: 0.8, minWidth: 130 },
-    { field: "nombre", headerName: "Nombre / Razón Social", flex: 1.1, minWidth: 220 },
-    { field: "provincia", headerName: "Provincia", flex: 0.7, minWidth: 110 },
+    { field: "ruc", headerName: "RUC", flex: 0.7, minWidth: 130 },
+    { field: "dv", headerName: "DV", flex: 0.35, minWidth: 80 },
+    { field: "nombre", headerName: "Nombre Contribuyente", flex: 1.2, minWidth: 240 },
+    { field: "provincia", headerName: "Provincia", flex: 0.7, minWidth: 120 },
 
-    { field: "zonaEspecial", headerName: "Zona Especial", minWidth: 150, valueGetter: () => zonaEspecial ?? "—" },
-    { field: "impuesto", headerName: "Impuesto", minWidth: 130, valueGetter: () => impuesto ?? "—" },
+    // ✅ SOLO el primer nombre de actividad
+    {
+      field: "actividadEconomica",
+      headerName: "Actividad Económica",
+      minWidth: 220,
+      flex: 1,
+      valueGetter: () => firstActividadLabel(actividadEconomica, actividadesMap),
+    },
+
+    {
+      field: "zonaEspecial",
+      headerName: "Zonas especiales",
+      minWidth: 160,
+      valueGetter: () => zonaEspecial ?? "—",
+    },
 
     {
       field: "valorInt",
@@ -214,16 +232,19 @@ export default function PriorizacionForm({
     {
       field: "acciones",
       headerName: "Acciones",
-      minWidth: 140,
+      minWidth: 110,
+      sortable: false,
+      filterable: false,
       renderCell: (params) => (
-        <Button size="small" variant="contained" onClick={() => openDetail(params.row as Row)}>
-          DETALLE
-        </Button>
+        <Tooltip title="Ver detalle">
+          <IconButton size="small" onClick={() => openDetail(params.row as Row)}>
+            <VisibilityOutlinedIcon />
+          </IconButton>
+        </Tooltip>
       ),
     },
   ];
 
-  /* ========== PASAR A VERIFICACIÓN ========== */
   const handleAprobar = async () => {
     const api = apiRef.current;
     if (!api) return;
@@ -257,27 +278,19 @@ export default function PriorizacionForm({
       metaActividadEconomica: actividadEconomica ?? [],
       metaPeriodoInicial: periodoInicial,
       metaPeriodoFinal: periodoFinal,
-      metaImpuesto: impuesto,
       metaZonaEspecial: zonaEspecial,
+      metaProvincia: provincia ?? null,
       fechaAsignacionISO: ahoraISO,
       detalleVisto: false,
-
-      // ⭐ Correcto para flujo
       estadoVerif: "Pendiente",
     }));
 
     const existentes = JSON.parse(localStorage.getItem(CASOS_KEY) || "[]");
 
-    // quitar duplicados
-    const sinDuplicados = existentes.filter(
-      (x: any) => !paquete.some((p) => p.ruc === x.ruc)
-    );
-
-    // fusionar
+    const sinDuplicados = existentes.filter((x: any) => !paquete.some((p) => p.ruc === x.ruc));
     const nuevos = [...sinDuplicados, ...paquete];
 
     localStorage.setItem(CASOS_KEY, JSON.stringify(nuevos));
-
     notifyAprobaciones();
 
     await Swal.fire("Éxito", "Casos enviados a Verificación.", "success");
@@ -287,7 +300,6 @@ export default function PriorizacionForm({
     setRucsEnVerificacion(s);
   };
 
-  /* ========== EXPORT ========== */
   const handleExportExcel = () => {
     if (!rows.length) {
       Swal.fire("Sin datos", "No hay datos que exportar.", "info");
@@ -296,12 +308,13 @@ export default function PriorizacionForm({
 
     const data = rows.map((r) => ({
       RUC: r.ruc,
-      Nombre: r.nombre,
+      DV: r.dv,
+      "Nombre Contribuyente": r.nombre,
       Provincia: r.provincia,
-      Categoria: categoria ?? r.categoria,
-      Inconsistencia: inconsistencia ?? "",
-      Impuesto: impuesto ?? "",
-      ZonaEspecial: zonaEspecial ?? "",
+      "Tipo Inconsistencia": inconsistencia ?? "",
+      "Impuesto/Programa": programa ?? "",
+      "Zonas especiales": zonaEspecial ?? "",
+      "Actividad Económica": firstActividadLabel(actividadEconomica, actividadesMap), // ✅ solo primero
       Periodos: r.periodos,
       Valor: r.valorInt,
     }));
@@ -312,7 +325,6 @@ export default function PriorizacionForm({
     XLSX.writeFile(wb, "selector_casos_priorizacion.xlsx");
   };
 
-  /* ========== TOOLBAR ========== */
   const localeText = {
     ...esES.components.MuiDataGrid.defaultProps.localeText,
     toolbarQuickFilterPlaceholder: "Buscar…",
@@ -330,11 +342,20 @@ export default function PriorizacionForm({
     );
   }
 
-  /* ========== RENDER ========== */
   return (
     <Box component={Paper} sx={{ mt: 2, p: 1 }}>
+      {/* <Box sx={{ px: 1, pt: 1, pb: 0.5 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          Resultados de consulta
+        </Typography>
+        <Typography variant="body2">
+          <b>Tipo de Inconsistencia:</b> {inconsistencia ?? "—"} &nbsp;|&nbsp;{" "}
+          <b>Impuesto/Programa:</b> {programa || "—"}
+        </Typography>
+      </Box> */}
+
       <DataGrid
-        sx={{ height: 420 }}
+        sx={{ height: 420, mt: 1 }}
         apiRef={apiRef}
         rows={rows}
         columns={columns}
@@ -353,7 +374,6 @@ export default function PriorizacionForm({
         }}
       />
 
-      {/* DETALLE */}
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Detalle del Caso</DialogTitle>
         <DialogContent dividers>
@@ -372,40 +392,41 @@ export default function PriorizacionForm({
                 <Box sx={{ mt: 2 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
-                      <Typography variant="caption">Categoría</Typography>
-                      <Paper sx={{ p: 1 }}>{categoria}</Paper>
+                      <Typography variant="caption">Tipo de Inconsistencia</Typography>
+                      <Paper sx={{ p: 1 }}>{inconsistencia ?? "—"}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Typography variant="caption">Inconsistencia</Typography>
-                      <Paper sx={{ p: 1 }}>{inconsistencia}</Paper>
+                      <Typography variant="caption">Impuesto/Programa</Typography>
+                      <Paper sx={{ p: 1 }}>{programa ?? "—"}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Typography variant="caption">RUC</Typography>
-                      <Paper sx={{ p: 1 }}>{detailRow.ruc}</Paper>
-                    </Grid>
-
-                    <Grid item xs={12} md={8}>
-                      <Typography variant="caption">Nombre</Typography>
-                      <Paper sx={{ p: 1 }}>{detailRow.nombre}</Paper>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Typography variant="caption">Actividad Económica</Typography>
+                      <Typography variant="caption">RUC / DV</Typography>
                       <Paper sx={{ p: 1 }}>
-                        {actividadEconomica?.length ? actividadEconomica.join(", ") : "—"}
+                        {detailRow.ruc} &nbsp; <b>DV:</b> {detailRow.dv}
                       </Paper>
                     </Grid>
 
-                    <Grid item xs={6}>
-                      <Typography variant="caption">Periodo Inicial</Typography>
-                      <Paper sx={{ p: 1 }}>{periodoInicial}</Paper>
+                    <Grid item xs={12} md={8}>
+                      <Typography variant="caption">Nombre Contribuyente</Typography>
+                      <Paper sx={{ p: 1 }}>{detailRow.nombre}</Paper>
                     </Grid>
 
-                    <Grid item xs={6}>
-                      <Typography variant="caption">Periodo Final</Typography>
-                      <Paper sx={{ p: 1 }}>{periodoFinal}</Paper>
+                    <Grid item xs={12} md={4}>
+                      <Typography variant="caption">Provincia</Typography>
+                      <Paper sx={{ p: 1 }}>{detailRow.provincia}</Paper>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="caption">Zonas especiales</Typography>
+                      <Paper sx={{ p: 1 }}>{zonaEspecial ?? "—"}</Paper>
+                    </Grid>
+
+                    {/* ✅ DETALLE: solo primer nombre de actividad */}
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="caption">Actividad Económica</Typography>
+                      <Paper sx={{ p: 1 }}>{firstActividadLabel(actividadEconomica, actividadesMap)}</Paper>
                     </Grid>
                   </Grid>
 
@@ -451,19 +472,12 @@ export default function PriorizacionForm({
         </DialogActions>
       </Dialog>
 
-      {/* BOTONES FINALES */}
       <Box sx={{ px: 2, py: 1, display: "flex", gap: 1 }}>
         <Button size="small" variant="outlined" onClick={handleExportExcel}>
           Exportar Excel
         </Button>
 
-        <Button
-          size="small"
-          variant="contained"
-          color="success"
-          disabled={selectedCount === 0}
-          onClick={handleAprobar}
-        >
+        <Button size="small" variant="contained" color="success" disabled={selectedCount === 0} onClick={handleAprobar}>
           Pasar a Verificación
         </Button>
       </Box>

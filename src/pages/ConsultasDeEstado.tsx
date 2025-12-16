@@ -44,10 +44,19 @@ const ACTIVIDADES: EstadoActividad[] = [
   "notificación de resolución",
   "cierre y archivo",
 ];
+const TIPOS_INCONSISTENCIA = [
+  "Omiso",
+  "Inexacto",
+  "Extemporáneo",
+  "Todos",
+] as const;
+
+type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number] | "";
+
 
 type CategoriaSel = Categoria | "";                   // ← permite vacío
 type ActividadSel = EstadoActividad | "Todos" | "";   // ← permite vacío
-type SemaforoSel  = Semaforo | "Todos" | "";          // ← permite vacío
+type SemaforoSel = Semaforo | "Todos" | "";          // ← permite vacío
 
 // ⚠️ Ajusta la ruta según dónde tengas el componente
 
@@ -58,10 +67,12 @@ const ConsultasDeEstado: React.FC = () => {
   const [query, setQuery] = useState("");
   const [categoria, setCategoria] = useState<CategoriaSel>("");           // ← vacío
   const [actividad, setActividad] = useState<ActividadSel>("");           // ← vacío
-  const [sem, setSem]             = useState<SemaforoSel>("");            // ← vacío
-  const [desde, setDesde]         = useState("");                         // yyyy-mm-dd
-  const [hasta, setHasta]         = useState("");
+  const [sem, setSem] = useState<SemaforoSel>("");            // ← vacío
+  const [desde, setDesde] = useState("");                         // yyyy-mm-dd
+  const [hasta, setHasta] = useState("");
   const [mostrarResultados, setMostrarResultados] = useState(false);
+  const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
+
 
   // -------- Data (mock) --------
   const [data, setData] = useState<FilaEstado[]>([]);
@@ -122,7 +133,7 @@ const ConsultasDeEstado: React.FC = () => {
     <Box>
       <Grid container spacing={2}>
         {/* Categoría */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <TextField
             select fullWidth label="Categoría"
             value={categoria}
@@ -137,8 +148,27 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
+        {/* Tipo de Inconsistencia */}
+        <Grid item xs={12} sm={6} md={4}>
+          <TextField
+            select
+            fullWidth
+            label="Tipo de Inconsistencia"
+            value={tipoInc}
+            onChange={(e) => setTipoInc(e.target.value as TipoInconsistencia)}
+          >
+            <MenuItem value="">— Todos —</MenuItem>
+            {TIPOS_INCONSISTENCIA.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+
         {/* Estado / Actividad */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <TextField
             select fullWidth label="Estado / Actividad"
             value={actividad}
@@ -156,7 +186,7 @@ const ConsultasDeEstado: React.FC = () => {
 
 
         {/* Desde */}
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={3}>
           <TextField
             fullWidth type="date" label="Desde" InputLabelProps={{ shrink: true }}
             value={desde}
@@ -165,7 +195,7 @@ const ConsultasDeEstado: React.FC = () => {
         </Grid>
 
         {/* Hasta */}
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={3}>
           <TextField
             fullWidth type="date" label="Hasta" InputLabelProps={{ shrink: true }}
             value={hasta}
@@ -173,7 +203,7 @@ const ConsultasDeEstado: React.FC = () => {
           />
         </Grid>
         {/* Semáforo */}
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={3}>
           <TextField
             select fullWidth label="Semáforo"
             value={sem}
