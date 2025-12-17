@@ -17,9 +17,11 @@ import {
   Stack,
   IconButton,
   Tooltip,
+  Divider,
 } from "@mui/material";
 
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 
 import {
   DataGrid,
@@ -55,7 +57,7 @@ type Props = {
   valorMin?: string;
   valorMax?: string;
   provincia?: string;
-  actividades?: Actividad[]; // ✅ catálogo
+  actividades?: Actividad[];
 };
 
 type RawRow = {
@@ -118,13 +120,14 @@ const buildActividadMap = (actividades?: Actividad[]) => {
   return m;
 };
 
-// ✅ SOLO PRIMERA ACTIVIDAD (por nombre)
 const firstActividadLabel = (codes: string[] | undefined, map: Map<string, string>) => {
   if (!codes || codes.length === 0) return "Todas";
   const first = String(codes[0] ?? "").trim();
   if (!first) return "Todas";
-  return map.get(first) ?? first; // si no hay label, muestra el código
+  return map.get(first) ?? first;
 };
+
+const safe = (v: any) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
 
 /* ========================== MOCK DATA =========================== */
 const rawRows: RawRow[] = [
@@ -154,9 +157,9 @@ export default function PriorizacionForm({
   actividades,
 }: Props) {
   const apiRef = useGridApiRef();
-
   const actividadesMap = React.useMemo(() => buildActividadMap(actividades), [actividades]);
 
+  /* ========== RUCs ya enviados ========== */
   const [rucsEnVerificacion, setRucsEnVerificacion] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
@@ -174,6 +177,7 @@ export default function PriorizacionForm({
     }
   }, []);
 
+  /* ========== FILTRO ========== */
   const rows = React.useMemo<Row[]>(() => {
     let base = BASE_ROWS;
 
@@ -190,6 +194,7 @@ export default function PriorizacionForm({
 
   const [selectedCount, setSelectedCount] = React.useState(0);
 
+  /* ========== DETALLE ========== */
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailRow, setDetailRow] = React.useState<Row | null>(null);
   const [tabSel, setTabSel] = React.useState(0);
@@ -200,51 +205,45 @@ export default function PriorizacionForm({
     setDetailOpen(true);
   };
 
-  const columns: GridColDef[] = [
-    { field: "ruc", headerName: "RUC", flex: 0.7, minWidth: 130 },
-    { field: "dv", headerName: "DV", flex: 0.35, minWidth: 80 },
-    { field: "nombre", headerName: "Nombre Contribuyente", flex: 1.2, minWidth: 240 },
-    { field: "provincia", headerName: "Provincia", flex: 0.7, minWidth: 120 },
+  /* ===================== EXPORTS ===================== */
+  const exportRowsExcel = (exportRows: Row[], fileName: string) => {
+    if (!exportRows.length) {
+      Swal.fire("Sin datos", "No hay datos que exportar.", "info");
+      return;
+    }
 
-    // ✅ SOLO el primer nombre de actividad
-    {
-      field: "actividadEconomica",
-      headerName: "Actividad Económica",
-      minWidth: 220,
-      flex: 1,
-      valueGetter: () => firstActividadLabel(actividadEconomica, actividadesMap),
-    },
+    const actLabel = firstActividadLabel(actividadEconomica, actividadesMap);
 
-    {
-      field: "zonaEspecial",
-      headerName: "Zonas especiales",
-      minWidth: 160,
-      valueGetter: () => zonaEspecial ?? "—",
-    },
+    const data = exportRows.map((r) => ({
+      RUC: r.ruc,
+      DV: r.dv,
+      "Nombre Contribuyente": r.nombre,
+      Provincia: r.provincia,
+      "Actividad Económica": actLabel,
+      "Zonas especiales": safe(zonaEspecial),
+      "Tipo Inconsistencia": safe(inconsistencia),
+      "Impuesto/Programa": safe(programa),
+      "Periodo Inicial": safe(periodoInicial),
+      "Periodo Final": safe(periodoFinal),
+      Operador: safe(operador),
+      "Valor (B/.)": r.valorInt,
+      Periodos: r.periodos,
+    }));
 
-    {
-      field: "valorInt",
-      headerName: "Valor (B/.)",
-      minWidth: 140,
-      renderCell: (params) => fmtMoney.format(params.row.valorInt),
-    },
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Priorización");
+    XLSX.writeFile(wb, fileName);
+  };
 
-    {
-      field: "acciones",
-      headerName: "Acciones",
-      minWidth: 110,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <Tooltip title="Ver detalle">
-          <IconButton size="small" onClick={() => openDetail(params.row as Row)}>
-            <VisibilityOutlinedIcon />
-          </IconButton>
-        </Tooltip>
-      ),
-    },
-  ];
+  const handleExportExcel = () => exportRowsExcel(rows, "selector_casos_priorizacion.xlsx");
 
+  const handleExportDetalle = () => {
+    if (!detailRow) return;
+    exportRowsExcel([detailRow], `detalle_caso_${detailRow.ruc}.xlsx`);
+  };
+
+  /* ========== PASAR A VERIFICACIÓN ========== */
   const handleAprobar = async () => {
     const api = apiRef.current;
     if (!api) return;
@@ -300,31 +299,48 @@ export default function PriorizacionForm({
     setRucsEnVerificacion(s);
   };
 
-  const handleExportExcel = () => {
-    if (!rows.length) {
-      Swal.fire("Sin datos", "No hay datos que exportar.", "info");
-      return;
-    }
+  /* ========== COLUMNAS ========== */
+  const columns: GridColDef[] = [
+    { field: "ruc", headerName: "RUC", flex: 0.7, minWidth: 130 },
+    { field: "dv", headerName: "DV", flex: 0.35, minWidth: 80 },
+    { field: "nombre", headerName: "Nombre Contribuyente", flex: 1.2, minWidth: 240 },
+    { field: "provincia", headerName: "Provincia", flex: 0.7, minWidth: 120 },
+    {
+      field: "actividadEconomica",
+      headerName: "Actividad Económica",
+      minWidth: 240,
+      flex: 1,
+      valueGetter: () => firstActividadLabel(actividadEconomica, actividadesMap),
+    },
+    {
+      field: "zonaEspecial",
+      headerName: "Zonas especiales",
+      minWidth: 160,
+      valueGetter: () => zonaEspecial ?? "—",
+    },
+    {
+      field: "valorInt",
+      headerName: "Valor (B/.)",
+      minWidth: 140,
+      renderCell: (params) => fmtMoney.format(params.row.valorInt),
+    },
+    {
+      field: "acciones",
+      headerName: "Acciones",
+      minWidth: 110,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <Tooltip title="Ver detalle">
+          <IconButton size="small" onClick={() => openDetail(params.row as Row)}>
+            <VisibilityOutlinedIcon />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+  ];
 
-    const data = rows.map((r) => ({
-      RUC: r.ruc,
-      DV: r.dv,
-      "Nombre Contribuyente": r.nombre,
-      Provincia: r.provincia,
-      "Tipo Inconsistencia": inconsistencia ?? "",
-      "Impuesto/Programa": programa ?? "",
-      "Zonas especiales": zonaEspecial ?? "",
-      "Actividad Económica": firstActividadLabel(actividadEconomica, actividadesMap), // ✅ solo primero
-      Periodos: r.periodos,
-      Valor: r.valorInt,
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Priorización");
-    XLSX.writeFile(wb, "selector_casos_priorizacion.xlsx");
-  };
-
+  /* ========== TOOLBAR ========== */
   const localeText = {
     ...esES.components.MuiDataGrid.defaultProps.localeText,
     toolbarQuickFilterPlaceholder: "Buscar…",
@@ -344,15 +360,18 @@ export default function PriorizacionForm({
 
   return (
     <Box component={Paper} sx={{ mt: 2, p: 1 }}>
-      {/* <Box sx={{ px: 1, pt: 1, pb: 0.5 }}>
+      {/* solo info arriba */}
+      <Box sx={{ px: 1, pt: 1, pb: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
           Resultados de consulta
         </Typography>
         <Typography variant="body2">
-          <b>Tipo de Inconsistencia:</b> {inconsistencia ?? "—"} &nbsp;|&nbsp;{" "}
-          <b>Impuesto/Programa:</b> {programa || "—"}
+          <b>Tipo de Inconsistencia:</b> {safe(inconsistencia)} &nbsp;|&nbsp;{" "}
+          <b>Impuesto/Programa:</b> {safe(programa)}
         </Typography>
-      </Box> */}
+      </Box>
+
+      <Divider />
 
       <DataGrid
         sx={{ height: 420, mt: 1 }}
@@ -374,17 +393,42 @@ export default function PriorizacionForm({
         }}
       />
 
+      {/* ✅ BOTONES ABAJO (priorización) */}
+      <Box sx={{ px: 2, py: 1, display: "flex", gap: 1, justifyContent: "flex-start" }}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<DownloadOutlinedIcon />}
+          onClick={handleExportExcel}
+          disabled={!rows.length}
+        >
+          Descargar Excel
+        </Button>
+
+        <Button
+          size="small"
+          variant="contained"
+          color="success"
+          disabled={selectedCount === 0}
+          onClick={handleAprobar}
+        >
+          Pasar a Verificación
+        </Button>
+      </Box>
+
+      {/* DETALLE */}
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Detalle del Caso</DialogTitle>
+
         <DialogContent dividers>
           {detailRow && (
             <>
-              <Stack direction="row" spacing={2}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                 <Button variant={tabSel === 0 ? "contained" : "text"} onClick={() => setTabSel(0)}>
-                  Información
+                  INFORMACIÓN
                 </Button>
                 <Button variant={tabSel === 1 ? "contained" : "text"} onClick={() => setTabSel(1)}>
-                  Trazabilidad
+                  TRAZABILIDAD
                 </Button>
               </Stack>
 
@@ -393,12 +437,12 @@ export default function PriorizacionForm({
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Tipo de Inconsistencia</Typography>
-                      <Paper sx={{ p: 1 }}>{inconsistencia ?? "—"}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(inconsistencia)}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Impuesto/Programa</Typography>
-                      <Paper sx={{ p: 1 }}>{programa ?? "—"}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(programa)}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
@@ -410,23 +454,24 @@ export default function PriorizacionForm({
 
                     <Grid item xs={12} md={8}>
                       <Typography variant="caption">Nombre Contribuyente</Typography>
-                      <Paper sx={{ p: 1 }}>{detailRow.nombre}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(detailRow.nombre)}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Provincia</Typography>
-                      <Paper sx={{ p: 1 }}>{detailRow.provincia}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(detailRow.provincia)}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={6}>
                       <Typography variant="caption">Zonas especiales</Typography>
-                      <Paper sx={{ p: 1 }}>{zonaEspecial ?? "—"}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(zonaEspecial)}</Paper>
                     </Grid>
 
-                    {/* ✅ DETALLE: solo primer nombre de actividad */}
                     <Grid item xs={12} md={6}>
                       <Typography variant="caption">Actividad Económica</Typography>
-                      <Paper sx={{ p: 1 }}>{firstActividadLabel(actividadEconomica, actividadesMap)}</Paper>
+                      <Paper sx={{ p: 1 }}>
+                        {firstActividadLabel(actividadEconomica, actividadesMap)}
+                      </Paper>
                     </Grid>
                   </Grid>
 
@@ -465,22 +510,19 @@ export default function PriorizacionForm({
           )}
         </DialogContent>
 
+        {/* ✅ BOTONES ABAJO (detalle) */}
         <DialogActions>
+          {tabSel === 0 && (
+            <Button variant="outlined" startIcon={<DownloadOutlinedIcon />} onClick={handleExportDetalle}>
+              Descargar Excel
+            </Button>
+          )}
+
           <Button variant="contained" onClick={() => setDetailOpen(false)}>
             CERRAR
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Box sx={{ px: 2, py: 1, display: "flex", gap: 1 }}>
-        <Button size="small" variant="outlined" onClick={handleExportExcel}>
-          Exportar Excel
-        </Button>
-
-        <Button size="small" variant="contained" color="success" disabled={selectedCount === 0} onClick={handleAprobar}>
-          Pasar a Verificación
-        </Button>
-      </Box>
     </Box>
   );
 }
