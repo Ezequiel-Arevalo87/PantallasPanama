@@ -49,9 +49,10 @@ type Props = {
   categoria?: string;
   inconsistencia?: string;
   actividadEconomica?: string[];
-  programa?: string | null;
+  impuesto?: string;
   zonaEspecial?: string;
-  periodoInicial?: string | null;
+  programa?: string | null; // aquí viene "Omisos vs Retenciones ITBMS", etc.
+  periodoInicial?: string | null; // puede venir YYYY-MM o YYYY-MM-DD
   periodoFinal?: string | null;
   operador?: Operador;
   valorMin?: string;
@@ -91,6 +92,7 @@ export type RowAprobacion = Row & {
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
   metaPeriodoFinal?: string | null;
+  metaImpuesto?: string | null;
   metaZonaEspecial?: string | null;
   metaProvincia?: string | null;
   fechaAsignacionISO?: string;
@@ -114,6 +116,9 @@ const toDV = (dv: any): string => {
   return n.toString().padStart(2, "0");
 };
 
+const safe = (v: any) =>
+  v === null || v === undefined || String(v).trim() === "" ? "—" : String(v);
+
 const buildActividadMap = (actividades?: Actividad[]) => {
   const m = new Map<string, string>();
   (actividades ?? []).forEach((a) => m.set(String(a.code), String(a.label)));
@@ -127,7 +132,46 @@ const firstActividadLabel = (codes: string[] | undefined, map: Map<string, strin
   return map.get(first) ?? first;
 };
 
-const safe = (v: any) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
+// ======= PERIODO MENSUAL SOLO PARA ITBMS / RETENCIONES ITBMS =======
+const normalize = (s?: string | null) => (s ?? "").toLowerCase();
+
+const isProgramaMensual = (programa?: string | null) => {
+  const p = normalize(programa);
+  // mensual para: Omisos/Inexactos vs Retenciones ITBMS o vs ITBMS
+  return p.includes("itbms") || p.includes("retenciones itbms");
+};
+
+// "YYYY-MM" o "YYYY-MM-DD" -> Date primer día del mes
+const parseMonthLoose = (s?: string | null) => {
+  if (!s) return null;
+  const raw = String(s).trim();
+  if (!raw) return null;
+  const ym = raw.length >= 7 ? raw.slice(0, 7) : raw;
+  if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+  return new Date(`${ym}-01T00:00:00`);
+};
+
+const buildMonths = (ini?: string | null, fin?: string | null) => {
+  const dIni = parseMonthLoose(ini);
+  const dFin = parseMonthLoose(fin);
+  if (!dIni || !dFin || dIni > dFin) return [];
+
+  const months: string[] = [];
+  const d = new Date(dIni.getFullYear(), dIni.getMonth(), 1);
+
+  while (d <= dFin) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    months.push(`${yyyy}-${mm}`);
+    d.setMonth(d.getMonth() + 1);
+  }
+  return months;
+};
+
+const fmtMonth = (ym: string) => {
+  const [y, m] = ym.split("-");
+  return `${m}/${y}`; // MM/YYYY
+};
 
 /* ========================== MOCK DATA =========================== */
 const rawRows: RawRow[] = [
@@ -146,8 +190,9 @@ export default function PriorizacionForm({
   categoria,
   inconsistencia,
   actividadEconomica,
-  programa,
+  impuesto,
   zonaEspecial,
+  programa,
   periodoInicial,
   periodoFinal,
   operador,
@@ -222,7 +267,7 @@ export default function PriorizacionForm({
       "Actividad Económica": actLabel,
       "Zonas especiales": safe(zonaEspecial),
       "Tipo Inconsistencia": safe(inconsistencia),
-      "Impuesto/Programa": safe(programa),
+      "Impuesto/Programa": safe(impuesto ?? programa),
       "Periodo Inicial": safe(periodoInicial),
       "Periodo Final": safe(periodoFinal),
       Operador: safe(operador),
@@ -240,7 +285,8 @@ export default function PriorizacionForm({
 
   const handleExportDetalle = () => {
     if (!detailRow) return;
-    exportRowsExcel([detailRow], `detalle_caso_${detailRow.ruc}.xlsx`);
+    const dv = detailRow.dv === "—" ? "00" : detailRow.dv;
+    exportRowsExcel([detailRow], `detalle_RUC_${detailRow.ruc}_DV_${dv}.xlsx`);
   };
 
   /* ========== PASAR A VERIFICACIÓN ========== */
@@ -277,7 +323,8 @@ export default function PriorizacionForm({
       metaActividadEconomica: actividadEconomica ?? [],
       metaPeriodoInicial: periodoInicial,
       metaPeriodoFinal: periodoFinal,
-      metaZonaEspecial: zonaEspecial,
+      metaImpuesto: impuesto ?? programa ?? null,
+      metaZonaEspecial: zonaEspecial ?? null,
       metaProvincia: provincia ?? null,
       fechaAsignacionISO: ahoraISO,
       detalleVisto: false,
@@ -358,16 +405,22 @@ export default function PriorizacionForm({
     );
   }
 
+  // ✅ mensual SOLO para ITBMS / Retenciones ITBMS
+  const mensual = isProgramaMensual(impuesto ?? programa);
+  const months = React.useMemo(
+    () => (mensual ? buildMonths(periodoInicial, periodoFinal) : []),
+    [mensual, periodoInicial, periodoFinal]
+  );
+
   return (
     <Box component={Paper} sx={{ mt: 2, p: 1 }}>
-      {/* solo info arriba */}
       <Box sx={{ px: 1, pt: 1, pb: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
           Resultados de consulta
         </Typography>
         <Typography variant="body2">
           <b>Tipo de Inconsistencia:</b> {safe(inconsistencia)} &nbsp;|&nbsp;{" "}
-          <b>Impuesto/Programa:</b> {safe(programa)}
+          <b>Impuesto/Programa:</b> {safe(impuesto ?? programa)}
         </Typography>
       </Box>
 
@@ -393,8 +446,7 @@ export default function PriorizacionForm({
         }}
       />
 
-      {/* ✅ BOTONES ABAJO (priorización) */}
-      <Box sx={{ px: 2, py: 1, display: "flex", gap: 1, justifyContent: "flex-start" }}>
+      <Box sx={{ px: 2, py: 1, display: "flex", gap: 1 }}>
         <Button
           size="small"
           variant="outlined"
@@ -442,7 +494,7 @@ export default function PriorizacionForm({
 
                     <Grid item xs={12} md={4}>
                       <Typography variant="caption">Impuesto/Programa</Typography>
-                      <Paper sx={{ p: 1 }}>{safe(programa)}</Paper>
+                      <Paper sx={{ p: 1 }}>{safe(impuesto ?? programa)}</Paper>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
@@ -475,28 +527,81 @@ export default function PriorizacionForm({
                     </Grid>
                   </Grid>
 
+                  {/* ✅ CAMBIO DE TEXTO SIEMPRE */}
                   <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2">Períodos por monto</Typography>
+                    <Typography variant="subtitle2">Monto por período</Typography>
 
-                    <Table size="small" sx={{ mt: 1 }}>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell align="right">2025</TableCell>
-                          <TableCell align="right">2024</TableCell>
-                          <TableCell align="right">2023</TableCell>
-                          <TableCell align="right">Total</TableCell>
-                        </TableRow>
-                      </TableHead>
+                    {/* ✅ MENSUAL SOLO PARA ITBMS / RETENCIONES ITBMS */}
+                    {mensual ? (
+                      <Table size="small" sx={{ mt: 1 }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Período</TableCell>
+                            <TableCell align="right">Monto (B/.)</TableCell>
+                          </TableRow>
+                        </TableHead>
 
-                      <TableBody>
-                        <TableRow>
-                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.4)}</TableCell>
-                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.35)}</TableCell>
-                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt * 0.25)}</TableCell>
-                          <TableCell align="right">{fmtMoney.format(detailRow.valorInt)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                        <TableBody>
+                          {months.length ? (
+                            (() => {
+                              const n = Math.max(1, months.length);
+                              const perMonth = (detailRow?.valorInt ?? 0) / n;
+
+                              return (
+                                <>
+                                  {months.map((m) => (
+                                    <TableRow key={m}>
+                                      <TableCell>{fmtMonth(m)}</TableCell>
+                                      <TableCell align="right">{fmtMoney.format(perMonth)}</TableCell>
+                                    </TableRow>
+                                  ))}
+
+                                  <TableRow>
+                                    <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                                      {fmtMoney.format(detailRow?.valorInt ?? 0)}
+                                    </TableCell>
+                                  </TableRow>
+                                </>
+                              );
+                            })()
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={2}>—</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      /* ✅ ANUAL (Renta/Informes y el resto) */
+                      <Table size="small" sx={{ mt: 1 }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell align="right">2025</TableCell>
+                            <TableCell align="right">2024</TableCell>
+                            <TableCell align="right">2023</TableCell>
+                            <TableCell align="right">Total</TableCell>
+                          </TableRow>
+                        </TableHead>
+
+                        <TableBody>
+                          <TableRow>
+                            <TableCell align="right">
+                              {fmtMoney.format((detailRow?.valorInt ?? 0) * 0.4)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {fmtMoney.format((detailRow?.valorInt ?? 0) * 0.35)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {fmtMoney.format((detailRow?.valorInt ?? 0) * 0.25)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {fmtMoney.format(detailRow?.valorInt ?? 0)}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    )}
                   </Box>
                 </Box>
               )}
@@ -510,10 +615,13 @@ export default function PriorizacionForm({
           )}
         </DialogContent>
 
-        {/* ✅ BOTONES ABAJO (detalle) */}
         <DialogActions>
           {tabSel === 0 && (
-            <Button variant="outlined" startIcon={<DownloadOutlinedIcon />} onClick={handleExportDetalle}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadOutlinedIcon />}
+              onClick={handleExportDetalle}
+            >
               Descargar Excel
             </Button>
           )}
