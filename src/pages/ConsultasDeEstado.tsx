@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Box, Grid, TextField, MenuItem, Button, Stack, Chip, InputAdornment,
-} from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
+import { Box, Grid, TextField, MenuItem, Button, Stack } from "@mui/material";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 
@@ -11,24 +9,15 @@ import {
   buildMockEstados,
   calcularSemaforo,
   toDDMMYYYY,
-  type Categoria,
   type EstadoActividad,
   type FilaEstado,
   type Semaforo,
 } from "../services/mockEstados";
 import TablaResultadosEstado from "./TablaResultadosEstado";
 
-// 👇 habilita plugins de comparación
+dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
-
-// --------- Catálogos ---------
-const CATEGORIAS: Categoria[] = [
-  "Fiscalización Masiva",
-  "Auditoría Sectorial",
-  "Grandes Contribuyentes",
-  "Todos",
-];
 
 const ACTIVIDADES: EstadoActividad[] = [
   "asignacion",
@@ -44,85 +33,116 @@ const ACTIVIDADES: EstadoActividad[] = [
   "notificación de resolución",
   "cierre y archivo",
 ];
-const TIPOS_INCONSISTENCIA = [
-  "Omiso",
-  "Inexacto",
-  "Extemporáneo",
-  "Todos",
-] as const;
 
+const TIPOS_INCONSISTENCIA = ["Omiso", "Inexacto", "Extemporáneo", "Todos"] as const;
 type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number] | "";
 
+const IMPUESTO_PROGRAMA_OPCIONES = [
+  "Costos y gastos vs Anexos",
+  "Ventas e ingresos vs Anexos",
+  "Inexactos vs retenciones 4331 ITBMS",
+  "Inexactos vs ITBMS",
+] as const;
 
-type CategoriaSel = Categoria | "";                   // ← permite vacío
-type ActividadSel = EstadoActividad | "Todos" | "";   // ← permite vacío
-type SemaforoSel = Semaforo | "Todos" | "";          // ← permite vacío
+type ImpuestoProgramaSel = (typeof IMPUESTO_PROGRAMA_OPCIONES)[number] | "";
+type ActividadSel = EstadoActividad | "Todos" | "";
+type SemaforoSel = Semaforo | "Todos" | "";
 
-// ⚠️ Ajusta la ruta según dónde tengas el componente
-
-// Si lo tienes en la misma carpeta, usa: "./TablaResultadosEstado"
+// ✅ Parse robusto: ISO / YYYY-MM-DD / DD/MM/YYYY
+const parseFecha = (f: any) => {
+  const s = (f ?? "").toString().trim();
+  if (!s) return null;
+  const d = dayjs(s, ["YYYY-MM-DD", "YYYY-MM-DDTHH:mm:ss.SSSZ", "DD/MM/YYYY"], true);
+  return d.isValid() ? d : null;
+};
 
 const ConsultasDeEstado: React.FC = () => {
-  // -------- Estado UI seguro (vacíos por defecto) --------
-  const [query, setQuery] = useState("");
-  const [categoria, setCategoria] = useState<CategoriaSel>("");           // ← vacío
-  const [actividad, setActividad] = useState<ActividadSel>("");           // ← vacío
-  const [sem, setSem] = useState<SemaforoSel>("");            // ← vacío
-  const [desde, setDesde] = useState("");                         // yyyy-mm-dd
-  const [hasta, setHasta] = useState("");
-  const [mostrarResultados, setMostrarResultados] = useState(false);
+  // orden: 1) tipoInc 2) actividad 3) impuestoPrograma
   const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
+  const [actividad, setActividad] = useState<ActividadSel>("");
+  const [impuestoPrograma, setImpuestoPrograma] = useState<ImpuestoProgramaSel>("");
 
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [sem, setSem] = useState<SemaforoSel>("");
+  const [mostrarResultados, setMostrarResultados] = useState(false);
 
-  // -------- Data (mock) --------
   const [data, setData] = useState<FilaEstado[]>([]);
   useEffect(() => {
     setData(buildMockEstados());
 
-    // Rango por defecto para no dejar la tabla vacía al abrir:
-    const dftDesde = dayjs().add(-5, "day").format("YYYY-MM-DD");
-    const dftHasta = dayjs().add(30, "day").format("YYYY-MM-DD");
-    setDesde(dftDesde);
-    setHasta(dftHasta);
+    setDesde(dayjs().add(-5, "day").format("YYYY-MM-DD"));
+    setHasta(dayjs().add(30, "day").format("YYYY-MM-DD"));
   }, []);
 
-  // -------- Filtro robusto --------
   const filtrados = useMemo(() => {
-    let rows = data;
+    let rows = data as any[];
 
-    if (categoria && categoria !== "Todos") {
-      rows = rows.filter((r) => r.categoria === categoria);
+    // 1) Tipo inconsistencia (no mates filas si el mock no trae el campo)
+    if (tipoInc && tipoInc !== "Todos") {
+      rows = rows.filter((r) => {
+        const t = (r.tipoInconsistencia ?? tipoInc).toString(); // fallback
+        return t.toLowerCase() === tipoInc.toLowerCase();
+      });
     }
+
+    // 2) Estado / Actividad
     if (actividad && actividad !== "Todos") {
-      rows = rows.filter((r) => r.estado === actividad);
+      rows = rows.filter(
+        (r) => String(r.estado).toLowerCase() === String(actividad).toLowerCase()
+      );
     }
+
+    // 3) Impuesto / Programa (no mates filas si el mock no trae el campo)
+    if (impuestoPrograma) {
+      rows = rows.filter((r) => {
+        const imp = (
+          r.impuestoPrograma ??
+          r.impuesto_programa ??
+          impuestoPrograma
+        ).toString();
+        return imp.toLowerCase() === impuestoPrograma.toLowerCase();
+      });
+    }
+
+    // Semáforo (select)
     if (sem && sem !== "Todos") {
       rows = rows.filter((r) => calcularSemaforo(r.fecha) === sem);
     }
-    if (desde) {
-      const d = dayjs(desde);
-      if (d.isValid()) rows = rows.filter((r) => dayjs(r.fecha).isSameOrAfter(d, "day"));
+
+    // Fechas robustas
+    const d = desde ? dayjs(desde, "YYYY-MM-DD", true) : null;
+    const h = hasta ? dayjs(hasta, "YYYY-MM-DD", true) : null;
+
+    if (d?.isValid()) {
+      rows = rows.filter((r) => {
+        const fr = parseFecha(r.fecha);
+        return fr ? fr.isSameOrAfter(d, "day") : true;
+      });
     }
-    if (hasta) {
-      const h = dayjs(hasta);
-      if (h.isValid()) rows = rows.filter((r) => dayjs(r.fecha).isSameOrBefore(h, "day"));
+    if (h?.isValid()) {
+      rows = rows.filter((r) => {
+        const fr = parseFecha(r.fecha);
+        return fr ? fr.isSameOrBefore(h, "day") : true;
+      });
     }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      rows = rows.filter(
-        (r) =>
-          r.ruc.toLowerCase().includes(q) ||
-          r.contribuyente.toLowerCase().includes(q) ||
-          r.numeroTramite.toLowerCase().includes(q)
-      );
-    }
-    return rows;
-  }, [data, categoria, actividad, sem, desde, hasta, query]);
+
+    return rows as FilaEstado[];
+  }, [data, tipoInc, actividad, impuestoPrograma, sem, desde, hasta]);
+
+  // ✅ Inyectamos impuesto/tipo para que la tabla siempre muestre
+  const filasParaTabla = useMemo(() => {
+    return filtrados.map((r: any) => ({
+      ...r,
+      tipoInconsistencia: r.tipoInconsistencia ?? tipoInc,
+      impuestoPrograma: r.impuestoPrograma ?? r.impuesto_programa ?? impuestoPrograma,
+    })) as FilaEstado[];
+  }, [filtrados, tipoInc, impuestoPrograma]);
 
   const limpiar = () => {
-    setQuery("");
-    setCategoria("");
+    setTipoInc("");
     setActividad("");
+    setImpuestoPrograma("");
     setSem("");
     setDesde(dayjs().add(-5, "day").format("YYYY-MM-DD"));
     setHasta(dayjs().add(30, "day").format("YYYY-MM-DD"));
@@ -132,23 +152,7 @@ const ConsultasDeEstado: React.FC = () => {
   return (
     <Box>
       <Grid container spacing={2}>
-        {/* Categoría */}
-        <Grid item xs={12} sm={6} md={4}>
-          <TextField
-            select fullWidth label="Categoría"
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value as CategoriaSel)}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            {CATEGORIAS.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Tipo de Inconsistencia */}
+        {/* 1) Tipo inconsistencia */}
         <Grid item xs={12} sm={6} md={4}>
           <TextField
             select
@@ -166,11 +170,12 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-
-        {/* Estado / Actividad */}
+        {/* 2) Estado / Actividad */}
         <Grid item xs={12} sm={6} md={4}>
           <TextField
-            select fullWidth label="Estado / Actividad"
+            select
+            fullWidth
+            label="Estado / Actividad"
             value={actividad}
             onChange={(e) => setActividad(e.target.value as ActividadSel)}
           >
@@ -184,11 +189,31 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
+        {/* 3) Impuesto / Programa */}
+        <Grid item xs={12} sm={6} md={4}>
+          <TextField
+            select
+            fullWidth
+            label="Impuesto / Programa"
+            value={impuestoPrograma}
+            onChange={(e) => setImpuestoPrograma(e.target.value as ImpuestoProgramaSel)}
+          >
+            <MenuItem value="">— Todos —</MenuItem>
+            {IMPUESTO_PROGRAMA_OPCIONES.map((op) => (
+              <MenuItem key={op} value={op}>
+                {op}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
 
         {/* Desde */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
-            fullWidth type="date" label="Desde" InputLabelProps={{ shrink: true }}
+            fullWidth
+            type="date"
+            label="Desde"
+            InputLabelProps={{ shrink: true }}
             value={desde}
             onChange={(e) => setDesde(e.target.value)}
           />
@@ -197,15 +222,21 @@ const ConsultasDeEstado: React.FC = () => {
         {/* Hasta */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
-            fullWidth type="date" label="Hasta" InputLabelProps={{ shrink: true }}
+            fullWidth
+            type="date"
+            label="Hasta"
+            InputLabelProps={{ shrink: true }}
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
           />
         </Grid>
+
         {/* Semáforo */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
-            select fullWidth label="Semáforo"
+            select
+            fullWidth
+            label="Semáforo"
             value={sem}
             onChange={(e) => setSem(e.target.value as SemaforoSel)}
           >
@@ -216,7 +247,6 @@ const ConsultasDeEstado: React.FC = () => {
             <MenuItem value="ROJO">ROJO</MenuItem>
           </TextField>
         </Grid>
-
 
         {/* Acciones */}
         <Grid item xs={12} md="auto">
@@ -231,18 +261,11 @@ const ConsultasDeEstado: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Leyenda */}
-      {/* <Stack direction="row" spacing={1} mt={2}>
-        <Chip label="Verde: >10 días" color="success" size="small" />
-        <Chip label="Amarillo: 3–10 días" color="warning" size="small" />
-        <Chip label="Rojo: ≤2 días / vencido" color="error" size="small" />
-      </Stack> */}
+      {mostrarResultados && <TablaResultadosEstado rows={filasParaTabla} />}
 
-      {mostrarResultados && <TablaResultadosEstado rows={filtrados} />}
-
-      {mostrarResultados && filtrados[0] && (
+      {mostrarResultados && filasParaTabla[0] && (
         <Box mt={1} fontSize={12} color="text.secondary">
-          Ejemplo formato fecha: {toDDMMYYYY(filtrados[0].fecha)}
+          Ejemplo formato fecha: {toDDMMYYYY(filasParaTabla[0].fecha)}
         </Box>
       )}
     </Box>

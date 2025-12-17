@@ -1,4 +1,3 @@
-// src/components/TablaResultadosEstado.tsx
 import React, { useMemo, useState, useCallback } from "react";
 import {
   Box,
@@ -9,6 +8,8 @@ import {
   IconButton,
   Typography,
   Tooltip,
+  Stack,
+  Button,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
@@ -26,8 +27,9 @@ import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
 
 type Props = { rows: FilaEstado[] };
+type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 
-const colorDeSemaforo = (s: "VERDE" | "AMARILLO" | "ROJO") =>
+const colorDeSemaforo = (s: Semaforo) =>
   s === "VERDE" ? "success" : s === "AMARILLO" ? "warning" : "error";
 
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
@@ -35,9 +37,16 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<TrazaItem[]>([]);
   const [tramiteActual, setTramiteActual] = useState<string | number | null>(null);
 
+  // ✅ Filtro por chips (nuestro, NO del DataGrid)
+  const [semaforoSeleccionado, setSemaforoSeleccionado] = useState<Semaforo | "">("");
+
+  const handleToggleFiltroSemaforo = useCallback((s: Semaforo) => {
+    setSemaforoSeleccionado((prev) => (prev === s ? "" : s));
+  }, []);
+
   const handleVerTrazas = useCallback((fila: FilaEstado) => {
     const ruc = (fila as any).ruc ?? "";
-    const tramite = fila.numeroTramite ?? "";
+    const tramite = (fila as any).numeroTramite ?? "";
     const key = `${ruc}|${tramite}`;
 
     setTramiteActual(tramite || "");
@@ -51,35 +60,84 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     setTrazasSeleccionadas([]);
   }, []);
 
+  // ✅ Base rows con impuesto normalizado
+  const gridRowsBase = useMemo(() => {
+    return rows.map((r, i) => {
+      const impuestoPrograma =
+        (r as any).impuestoPrograma ??
+        (r as any).impuesto_programa ??
+        (r as any).impuesto ??
+        "";
+
+      return {
+        id: i,
+        ...r,
+        impuestoPrograma,
+      };
+    });
+  }, [rows]);
+
+  // ✅ Filtrado REAL (a prueba de fallos)
+  const gridRows = useMemo(() => {
+    if (!semaforoSeleccionado) return gridRowsBase;
+
+    return gridRowsBase.filter((r: any) => {
+      const f = r?.fecha;
+      if (!f) return false;
+      return (calcularSemaforo(f) as Semaforo) === semaforoSeleccionado;
+    });
+  }, [gridRowsBase, semaforoSeleccionado]);
+
+  // ✅ Resumen calculado sobre lo que se ve (gridRows ya filtrado)
+  const resumenSemaforos = useMemo(() => {
+    let rojo = 0;
+    let amarillo = 0;
+    let verde = 0;
+
+    // Para el resumen, cuando hay filtro, mostramos el total filtrado (y sus colores serán solo ese)
+    // Cuando NO hay filtro, mostramos el conteo real por color
+    const base = semaforoSeleccionado ? gridRows : gridRowsBase;
+
+    for (const r of base as any[]) {
+      const f = r?.fecha as string | undefined;
+      if (!f) continue;
+      const s = calcularSemaforo(f) as Semaforo;
+      if (s === "ROJO") rojo++;
+      else if (s === "AMARILLO") amarillo++;
+      else if (s === "VERDE") verde++;
+    }
+
+    return { rojo, amarillo, verde, total: base.length };
+  }, [gridRows, gridRowsBase, semaforoSeleccionado]);
+
   const columns = useMemo<GridColDef[]>(
     () => [
-      { field: "numeroTramite", headerName: "numero tramite", width: 130 },
-      { field: "ruc", headerName: "ruc", width: 140 },
+      { field: "numeroTramite", headerName: "Número trámite", width: 140 },
+      { field: "ruc", headerName: "RUC", width: 140 },
       {
         field: "contribuyente",
-        headerName: "nombre contribuyente",
+        headerName: "Nombre / Razón Social",
         flex: 1,
-        minWidth: 240,
+        minWidth: 260,
       },
-      { field: "estado", headerName: "estado", width: 230 },
+      { field: "estado", headerName: "Estado", width: 220 },
 
-      // FECHA
+      // ✅ Impuesto
+      { field: "impuestoPrograma", headerName: "Impuesto", width: 280 },
+
+      // Fecha
       {
         field: "fecha",
-        headerName: "fecha",
+        headerName: "Fecha",
         width: 140,
         renderCell: (p: any) => {
           const f = p?.row?.fecha;
           if (!f) return "";
           try {
             const d = new Date(f);
-            const formatted = `${d
-              .getDate()
-              .toString()
-              .padStart(2, "0")}/${(d.getMonth() + 1)
+            return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
               .toString()
               .padStart(2, "0")}/${d.getFullYear()}`;
-            return formatted;
           } catch {
             return f;
           }
@@ -94,42 +152,41 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         },
       },
 
-      // SEMÁFORO
+      // ✅ Semáforo (único)
       {
         field: "semaforo",
-        headerName: "semaforo",
-        width: 150,
-        valueGetter: (p) => {
-          const f = (p as any)?.row?.fecha as string | undefined;
-          return f ? calcularSemaforo(f) : "";
-        },
+        headerName: "Semáforo",
+        width: 170,
+        sortable: false,
+        filterable: false, // no usamos filtro interno
         renderCell: (p) => {
           const f = (p as any)?.row?.fecha as string | undefined;
           if (!f) return null;
-          const s = calcularSemaforo(f);
+          const s = calcularSemaforo(f) as Semaforo;
           const d = diasRestantes(f);
+
           return (
             <Chip
               label={`${d} días`}
               color={colorDeSemaforo(s)}
               size="small"
+              variant="filled"
             />
           );
         },
       },
 
-      // ACCIÓN: TRAZABILIDAD (ICONO OJITO + TOOLTIP)
+      // Acción
       {
         field: "accion",
         headerName: "Acción",
-        width: 120,
+        width: 110,
         sortable: false,
         filterable: false,
         align: "center",
         headerAlign: "center",
         renderCell: (params) => {
           const fila = params.row as FilaEstado;
-
           return (
             <Tooltip title="Trazabilidad">
               <IconButton
@@ -149,14 +206,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   );
 
   const exportar = () => {
-    const data = rows.map((r) => ({
-      "numero tramite": r.numeroTramite ?? "",
-      ruc: r.ruc ?? "",
-      "nombre contribuyente": r.contribuyente ?? "",
-      estado: r.estado ?? "",
-      fecha: toDDMMYYYY(r.fecha ?? ""),
-      semaforo: r.fecha ? calcularSemaforo(r.fecha) : "",
+    // ✅ exporta lo que está visible (filtrado o no)
+    const data = (gridRows as any[]).map((r) => ({
+      "Número trámite": r.numeroTramite ?? "",
+      RUC: r.ruc ?? "",
+      "Nombre / Razón Social": r.contribuyente ?? "",
+      Estado: r.estado ?? "",
+      Impuesto: r.impuestoPrograma ?? "",
+      Fecha: toDDMMYYYY(r.fecha ?? ""),
+      Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
+      "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
     }));
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Resultados");
@@ -165,15 +226,64 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="flex-end" mb={1}>
-        <button onClick={exportar} className="btn-export">
+      <br />
+      <br />
+
+      {/* Resumen + filtro chips */}
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        mb={1}
+        flexWrap="wrap"
+      >
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ mr: 1 }}>
+            Total: <b>{resumenSemaforos.total}</b>
+          </Typography>
+
+          <Chip
+            clickable
+            label={`ROJO: ${resumenSemaforos.rojo}`}
+            color="error"
+            variant={semaforoSeleccionado === "ROJO" ? "filled" : "outlined"}
+            onClick={() => handleToggleFiltroSemaforo("ROJO")}
+          />
+          <Chip
+            clickable
+            label={`AMARILLO: ${resumenSemaforos.amarillo}`}
+            color="warning"
+            variant={semaforoSeleccionado === "AMARILLO" ? "filled" : "outlined"}
+            onClick={() => handleToggleFiltroSemaforo("AMARILLO")}
+          />
+          <Chip
+            clickable
+            label={`VERDE: ${resumenSemaforos.verde}`}
+            color="success"
+            variant={semaforoSeleccionado === "VERDE" ? "filled" : "outlined"}
+            onClick={() => handleToggleFiltroSemaforo("VERDE")}
+          />
+
+          {semaforoSeleccionado && (
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setSemaforoSeleccionado("")}
+            >
+              Quitar filtro
+            </Button>
+          )}
+        </Stack>
+
+        <Button variant="outlined" onClick={exportar}>
           Descargar Excel
-        </button>
+        </Button>
       </Box>
 
       <div style={{ height: 520, width: "100%" }}>
         <DataGrid
-          rows={rows.map((r, i) => ({ id: i, ...r }))}
+          rows={gridRows} // ✅ ya viene filtrado si aplica
           columns={columns}
           density="compact"
           disableRowSelectionOnClick
@@ -182,23 +292,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         />
       </div>
 
-      {/* Dialog de Trazabilidad */}
-      <Dialog
-        open={openTraza}
-        onClose={handleCerrarTrazas}
-        maxWidth="md"
-        fullWidth
-      >
+      {/* Dialog trazabilidad */}
+      <Dialog open={openTraza} onClose={handleCerrarTrazas} maxWidth="md" fullWidth>
         <DialogTitle sx={{ m: 0, p: 2 }}>
           Trazabilidad {tramiteActual ? `- Trámite ${tramiteActual}` : ""}
           <IconButton
             aria-label="close"
             onClick={handleCerrarTrazas}
-            sx={{
-              position: "absolute",
-              right: 8,
-              top: 8,
-            }}
+            sx={{ position: "absolute", right: 8, top: 8 }}
           >
             <CloseIcon />
           </IconButton>
@@ -213,19 +314,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
           )}
         </DialogContent>
       </Dialog>
-
-      <style>{`
-        .btn-export{
-          padding:8px 12px;
-          border-radius:8px;
-          border:1px solid #ccc;
-          background:#fff;
-          cursor:pointer;
-        }
-        .btn-export:hover{
-          background:#f5f5f5;
-        }
-      `}</style>
     </Box>
   );
 };
