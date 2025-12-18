@@ -97,7 +97,7 @@ export function buildMockEstados(cantidad = 20): FilaEstado[] {
       numeroTramite: `${categoria.startsWith("Grandes") ? "GC" : "FS"}-${(i + 1)
         .toString()
         .padStart(4, "0")}`,
-      ruc: `RUC-${100200 + i}`,
+      ruc: `${100200 + i}`,
       contribuyente,
       categoria,
       estado,
