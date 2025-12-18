@@ -291,7 +291,7 @@ export const Priorizacion: React.FC = () => {
           />
         </Grid>
 
-        <Grid item xs={6} md={3}>
+        <Grid item xs={6} md={1}>
           <TextField select fullWidth label="Operador" name="operador" value={form.operador} onChange={handleChange}>
             {OPERADORES.map((op) => (
               <MenuItem key={op} value={op}>
@@ -301,7 +301,7 @@ export const Priorizacion: React.FC = () => {
           </TextField>
         </Grid>
 
-        <Grid item xs={6} md={3}>
+        <Grid item xs={6} md={5}>
           <TextField
             fullWidth
             label="Valor total (B/.)"
