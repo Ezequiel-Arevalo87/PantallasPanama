@@ -1,3 +1,4 @@
+// src/pages/TablaResultadosEstado.tsx
 import React, { useMemo, useState, useCallback } from "react";
 import {
   Box,
@@ -10,6 +11,7 @@ import {
   Tooltip,
   Stack,
   Button,
+  Grid,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
@@ -32,12 +34,43 @@ type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 const colorDeSemaforo = (s: Semaforo) =>
   s === "VERDE" ? "success" : s === "AMARILLO" ? "warning" : "error";
 
+const normalizarImpuestos = (fila: any): string[] => {
+  const raw =
+    fila?.impuestos ??
+    fila?.impuestoS ??
+    fila?.impuesto_list ??
+    fila?.codigoImpuesto ??
+    fila?.codigo_impuesto ??
+    fila?.impuestoCodigo ??
+    fila?.impuestoPrograma ??
+    fila?.impuesto_programa ??
+    "";
+
+  if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
+
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  return s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+};
+
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [openTraza, setOpenTraza] = useState(false);
   const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<TrazaItem[]>([]);
   const [tramiteActual, setTramiteActual] = useState<string | number | null>(null);
 
-  // ✅ Filtro por chips (nuestro, NO del DataGrid)
+  // Encabezado ventana "Ver"
+  const [detalleHeader, setDetalleHeader] = useState<{
+    numeroTramite?: string | number;
+    ruc?: string;
+    contribuyente?: string;
+    impuestos?: string[];
+    actividadActual?: string;
+  } | null>(null);
+
+  // Filtro por chips
   const [semaforoSeleccionado, setSemaforoSeleccionado] = useState<Semaforo | "">("");
 
   const handleToggleFiltroSemaforo = useCallback((s: Semaforo) => {
@@ -45,9 +78,21 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   }, []);
 
   const handleVerTrazas = useCallback((fila: FilaEstado) => {
-    const ruc = (fila as any).ruc ?? "";
-    const tramite = (fila as any).numeroTramite ?? "";
+    const anyFila = fila as any;
+    const ruc = anyFila?.ruc ?? "";
+    const tramite = anyFila?.numeroTramite ?? "";
     const key = `${ruc}|${tramite}`;
+
+    const impuestos = normalizarImpuestos(anyFila);
+    const actividadActual = anyFila?.estado ?? anyFila?.actividadActual ?? "";
+
+    setDetalleHeader({
+      numeroTramite: tramite ?? "",
+      ruc: ruc ?? "",
+      contribuyente: anyFila?.contribuyente ?? "",
+      impuestos,
+      actividadActual,
+    });
 
     setTramiteActual(tramite || "");
     setTrazasSeleccionadas(buildMockTrazas(key));
@@ -58,26 +103,33 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     setOpenTraza(false);
     setTramiteActual(null);
     setTrazasSeleccionadas([]);
+    setDetalleHeader(null);
   }, []);
 
-  // ✅ Base rows con impuesto normalizado
+  // Base rows normalizados
   const gridRowsBase = useMemo(() => {
     return rows.map((r, i) => {
-      const impuestoPrograma =
-        (r as any).impuestoPrograma ??
-        (r as any).impuesto_programa ??
-        (r as any).impuesto ??
+      const anyR = r as any;
+
+      const codigoImpuesto =
+        anyR.codigoImpuesto ??
+        anyR.codigo_impuesto ??
+        anyR.impuestoCodigo ??
+        anyR.codigo_impuesto_programa ??
         "";
+
+      const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
 
       return {
         id: i,
         ...r,
-        impuestoPrograma,
+        codigoImpuesto,
+        tipoPersona,
       };
     });
   }, [rows]);
 
-  // ✅ Filtrado REAL (a prueba de fallos)
+  // Filtrado por chips
   const gridRows = useMemo(() => {
     if (!semaforoSeleccionado) return gridRowsBase;
 
@@ -88,14 +140,12 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     });
   }, [gridRowsBase, semaforoSeleccionado]);
 
-  // ✅ Resumen calculado sobre lo que se ve (gridRows ya filtrado)
+  // Resumen
   const resumenSemaforos = useMemo(() => {
     let rojo = 0;
     let amarillo = 0;
     let verde = 0;
 
-    // Para el resumen, cuando hay filtro, mostramos el total filtrado (y sus colores serán solo ese)
-    // Cuando NO hay filtro, mostramos el conteo real por color
     const base = semaforoSeleccionado ? gridRows : gridRowsBase;
 
     for (const r of base as any[]) {
@@ -112,7 +162,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
 
   const columns = useMemo<GridColDef[]>(
     () => [
-      { field: "numeroTramite", headerName: "Número trámite", width: 140 },
+      { field: "numeroTramite", headerName: "No Trámite", width: 140 },
       { field: "ruc", headerName: "RUC", width: 140 },
       {
         field: "contribuyente",
@@ -120,10 +170,9 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         flex: 1,
         minWidth: 260,
       },
+      { field: "tipoPersona", headerName: "Tipo de Persona", width: 160 },
       { field: "estado", headerName: "Estado", width: 220 },
-
-      // ✅ Impuesto
-      { field: "impuestoPrograma", headerName: "Impuesto", width: 280 },
+      { field: "codigoImpuesto", headerName: "Código-Impuesto", width: 160 },
 
       // Fecha
       {
@@ -152,13 +201,13 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         },
       },
 
-      // ✅ Semáforo (único)
+      // Semáforo
       {
         field: "semaforo",
         headerName: "Semáforo",
         width: 170,
         sortable: false,
-        filterable: false, // no usamos filtro interno
+        filterable: false,
         renderCell: (p) => {
           const f = (p as any)?.row?.fecha as string | undefined;
           if (!f) return null;
@@ -176,11 +225,11 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         },
       },
 
-      // Acción
+      // Ver
       {
         field: "accion",
-        headerName: "Acción",
-        width: 110,
+        headerName: "Ver",
+        width: 90,
         sortable: false,
         filterable: false,
         align: "center",
@@ -188,12 +237,12 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         renderCell: (params) => {
           const fila = params.row as FilaEstado;
           return (
-            <Tooltip title="Trazabilidad">
+            <Tooltip title="Ver detalle">
               <IconButton
                 size="small"
                 color="primary"
                 onClick={() => handleVerTrazas(fila)}
-                aria-label="Ver trazabilidad"
+                aria-label="Ver detalle"
               >
                 <VisibilityIcon fontSize="small" />
               </IconButton>
@@ -206,13 +255,13 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   );
 
   const exportar = () => {
-    // ✅ exporta lo que está visible (filtrado o no)
     const data = (gridRows as any[]).map((r) => ({
-      "Número trámite": r.numeroTramite ?? "",
+      "No Trámite": r.numeroTramite ?? "",
       RUC: r.ruc ?? "",
       "Nombre / Razón Social": r.contribuyente ?? "",
+      "Tipo de Persona": r.tipoPersona ?? "",
       Estado: r.estado ?? "",
-      Impuesto: r.impuestoPrograma ?? "",
+      "Código-Impuesto": r.codigoImpuesto ?? "",
       Fecha: toDDMMYYYY(r.fecha ?? ""),
       Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
       "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
@@ -229,7 +278,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       <br />
       <br />
 
-      {/* Resumen + filtro chips */}
+      {/* Resumen + chips */}
       <Box
         display="flex"
         alignItems="center"
@@ -266,11 +315,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
           />
 
           {semaforoSeleccionado && (
-            <Button
-              size="small"
-              variant="text"
-              onClick={() => setSemaforoSeleccionado("")}
-            >
+            <Button size="small" variant="text" onClick={() => setSemaforoSeleccionado("")}>
               Quitar filtro
             </Button>
           )}
@@ -283,7 +328,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
 
       <div style={{ height: 520, width: "100%" }}>
         <DataGrid
-          rows={gridRows} // ✅ ya viene filtrado si aplica
+          rows={gridRows}
           columns={columns}
           density="compact"
           disableRowSelectionOnClick
@@ -292,10 +337,10 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         />
       </div>
 
-      {/* Dialog trazabilidad */}
+      {/* Dialog Ver */}
       <Dialog open={openTraza} onClose={handleCerrarTrazas} maxWidth="md" fullWidth>
         <DialogTitle sx={{ m: 0, p: 2 }}>
-          Trazabilidad {tramiteActual ? `- Trámite ${tramiteActual}` : ""}
+          Detalle {tramiteActual ? `- Trámite ${tramiteActual}` : ""}
           <IconButton
             aria-label="close"
             onClick={handleCerrarTrazas}
@@ -304,7 +349,47 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
+
         <DialogContent dividers>
+          {/* Encabezado */}
+          {detalleHeader && (
+            <Box mb={2}>
+              <Grid container spacing={1}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>No Trámite:</b> {detalleHeader.numeroTramite ?? ""}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>RUC:</b> {detalleHeader.ruc ?? ""}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <b>Nombre / Razón Social:</b> {detalleHeader.contribuyente ?? ""}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2" sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <b>Impuestos:</b>
+                    {(detalleHeader.impuestos ?? []).length ? (
+                      (detalleHeader.impuestos ?? []).map((x) => (
+                        <Chip key={x} size="small" label={x} variant="outlined" />
+                      ))
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <b>Actividad Actual:</b> {detalleHeader.actividadActual ?? ""}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
           {trazasSeleccionadas && trazasSeleccionadas.length > 0 ? (
             <Trazabilidad rows={trazasSeleccionadas} height={420} />
           ) : (

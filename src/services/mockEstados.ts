@@ -1,20 +1,29 @@
+// src/services/mockEstados.ts
 import dayjs from "dayjs";
 
 // ===== Tipos =====
-export type Categoria = "Fiscalización Masiva" | "Auditoría Sectorial" | "Grandes Contribuyentes" | "Todos";
+export type Categoria =
+  | "Fiscalización Masiva"
+  | "Auditoría Sectorial"
+  | "Grandes Contribuyentes"
+  | "Todos";
+
 export type EstadoActividad =
   | "asignacion"
-  |"acta de inicio"
-  |"notificacion acta de inicio"
-  |"informe auditoria"
-  |"propuesta de regularizacion"
-  |"notificación propuesta de regularizacion"
-  |"aceptacion total"
-  |"aceptacion parcial"
-  |"rechazo"
-  |"resolucion en firme"
-  |"notificación de resolución"
-  |"cierre y archivo"
+  | "acta de inicio"
+  | "notificacion acta de inicio"
+  | "informe auditoria"
+  | "propuesta de regularizacion"
+  | "Revisión Análisis Normativo 1"
+  | "Revisión Análisis Normativo 2"
+  | "notificación propuesta de regularizacion"
+  | "aceptacion total"
+  | "aceptacion parcial"
+  | "rechazo"
+  | "resolucion en firme"
+  | "notificación de resolución"
+  | "cierre y archivo";
+
 export type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 
 export type FilaEstado = {
@@ -23,7 +32,16 @@ export type FilaEstado = {
   contribuyente: string;
   categoria: Categoria;
   estado: EstadoActividad;
-  fecha: string; // formato ISO
+  fecha: string; // formato ISO YYYY-MM-DD
+
+  // ✅ opcionales (para columnas extra / filtros nuevos)
+  tipoPersona?: string;
+  codigoImpuesto?: string;
+  actividadEconomica?: string;
+  red?: string;
+  categoriaContribuyente?: string;
+  impuestoPrograma?: string;
+  tipoInconsistencia?: string;
 };
 
 // ===== Utilidades =====
@@ -64,6 +82,8 @@ const ESTADOS: EstadoActividad[] = [
   "notificacion acta de inicio",
   "informe auditoria",
   "propuesta de regularizacion",
+  "Revisión Análisis Normativo 1",
+  "Revisión Análisis Normativo 2",
   "notificación propuesta de regularizacion",
   "aceptacion total",
   "aceptacion parcial",
@@ -79,6 +99,11 @@ const CATEGORIAS: Categoria[] = [
   "Grandes Contribuyentes",
 ];
 
+const ACTIV_ECON = ["Comercio", "Servicios", "Construcción", "Transporte"];
+const REDS = ["675", "659"];
+const CAT_CONTRIB = ["Grande", "Medio", "Pequeño"];
+const COD_IMP = ["4331", "ITBMS", "ISR", "INFORMES"];
+
 // ===== Generar fechas random =====
 function randomFecha(): string {
   const randomDias = Math.floor(Math.random() * 60) - 30; // entre -30 y +30 días
@@ -86,7 +111,7 @@ function randomFecha(): string {
 }
 
 // ===== Construir mock =====
-export function buildMockEstados(cantidad = 20): FilaEstado[] {
+export function buildMockEstados(cantidad = 200): FilaEstado[] {
   const arr: FilaEstado[] = [];
   for (let i = 0; i < cantidad; i++) {
     const categoria = CATEGORIAS[Math.floor(Math.random() * CATEGORIAS.length)];
@@ -102,6 +127,15 @@ export function buildMockEstados(cantidad = 20): FilaEstado[] {
       categoria,
       estado,
       fecha: randomFecha(),
+
+      // extras para que SI haya matches con filtros
+      tipoPersona: Math.random() > 0.5 ? "Natural" : "Jurídica",
+      codigoImpuesto: COD_IMP[Math.floor(Math.random() * COD_IMP.length)],
+      actividadEconomica: ACTIV_ECON[Math.floor(Math.random() * ACTIV_ECON.length)],
+      red: REDS[Math.floor(Math.random() * REDS.length)],
+      categoriaContribuyente: CAT_CONTRIB[Math.floor(Math.random() * CAT_CONTRIB.length)],
+      impuestoPrograma: Math.random() > 0.5 ? "Omisos vs ITBMS" : "Omisos vs retenciones 4331 ITBMS",
+      tipoInconsistencia: Math.random() > 0.5 ? "Omiso" : "Inexacto",
     });
   }
   return arr;
