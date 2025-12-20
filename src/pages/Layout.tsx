@@ -1,63 +1,73 @@
 // ===============================================
 // src/layout/Layout.tsx  (VERSIÓN COMPLETA)
 // ===============================================
-import React, { useEffect, useMemo, useState } from 'react';
-import { Sidebar } from '../components/Sidebar';
-import { Box, Typography } from '@mui/material';
+import React, { useEffect, useMemo, useState } from "react";
+import { Sidebar } from "../components/Sidebar";
+import { Box, Typography } from "@mui/material";
 
-import logoDos from '../assets/logos/logoDos.png';
+import logoDos from "../assets/logos/logoDos.png";
 
 // Páginas del sistema
-import { ProgramacionAutoAperturaForm } from './ProgramacionAutoAperturaForm';
-import { PresentacionVoluntaria } from './PresentacionVoluntaria';
-import { Eliminaciones } from './Eliminaciones';
-import { Rectificativa } from './Rectificativa';
-import { Cierre } from './Cierre';
-import { LiquidacionesAdicionales } from './LiquidacionesAdicionales';
-import { Apertura } from './Apertura';
-import { Priorizacion } from './Priorizacion';
-import { AsignacionesVarias } from './AsignacionesVarias';
-import VariacionesIngreso from './VariacionesIngreso';
-import HistorialCumplimiento from './HistorialCumplimiento';
-import AnalisisFiscal from './AnalisisFiscal';
-import Aprobaciones from './Aprobaciones';
-import VerificacionPage from './VerificacionPage';
-import TrazabilidadBusqueda from './TrazabilidadBusqueda';
-import ConsultasDeEstado from './ConsultasDeEstado';
-import PantallaControNotificacion from '../components/PantallaControNotificacion';
+import { ProgramacionAutoAperturaForm } from "./ProgramacionAutoAperturaForm";
+import { PresentacionVoluntaria } from "./PresentacionVoluntaria";
+import { Eliminaciones } from "./Eliminaciones";
+import { Rectificativa } from "./Rectificativa";
+import { Cierre } from "./Cierre";
+import { LiquidacionesAdicionales } from "./LiquidacionesAdicionales";
+import { Apertura } from "./Apertura";
+import { Priorizacion } from "./Priorizacion";
+import { AsignacionesVarias } from "./AsignacionesVarias";
+import VariacionesIngreso from "./VariacionesIngreso";
+import HistorialCumplimiento from "./HistorialCumplimiento";
+import AnalisisFiscal from "./AnalisisFiscal";
+import Aprobaciones from "./Aprobaciones";
+import VerificacionPage from "./VerificacionPage";
+import TrazabilidadBusqueda from "./TrazabilidadBusqueda";
+import ConsultasDeEstado from "./ConsultasDeEstado";
+import PantallaControNotificacion from "../components/PantallaControNotificacion";
+
+// ✅ NUEVO: Comunicaciones
+
 
 // HOMES
-import Home from './Home';
+import Home from "./Home";
 
-
-import { NuevosCasos } from './NuevosCasos';
-import { readAprobados } from '../lib/workflowStorage';
-import ActaInicio from './ActaInicio';
-
+import { NuevosCasos } from "./NuevosCasos";
+import { readAprobados } from "../lib/workflowStorage";
+import ActaInicio from "./ActaInicio";
+import ComunicacionesForm from "./comunicacionesForm";
 
 // Rutas base
-const AUD_PATH = 'PROCESOS DE AUDITORIAS/AUDITOR';
-const SUP_PATH = 'PROCESOS DE AUDITORIAS/SUPERVISOR';
-const DIR_PATH = 'PROCESOS DE AUDITORIAS/DIRECTOR';
+const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
+const SUP_PATH = "PROCESOS DE AUDITORIAS/SUPERVISOR";
+const DIR_PATH = "PROCESOS DE AUDITORIAS/DIRECTOR";
 
 export const Layout: React.FC = () => {
-  const [selectedPath, setSelectedPath] = useState<string>('HOME');
+  const [selectedPath, setSelectedPath] = useState<string>("HOME");
   const [readOnly, setReadOnly] = useState<boolean>(false);
 
   const leaf = useMemo(() => {
-    if (!selectedPath) return '';
-    const parts = selectedPath.split('/');
-    return parts[parts.length - 1] ?? '';
+    if (!selectedPath) return "";
+    const parts = selectedPath.split("/");
+    return parts[parts.length - 1] ?? "";
   }, [selectedPath]);
 
   useEffect(() => {
     if (!selectedPath) return;
 
-    if (leaf === 'PROCESO DE AUDITORIA' && readOnly && selectedPath !== SUP_PATH) {
+    if (
+      leaf === "PROCESO DE AUDITORIA" &&
+      readOnly &&
+      selectedPath !== SUP_PATH
+    ) {
       setSelectedPath(SUP_PATH);
-    } else if (leaf === 'SUPERVISOR' && !readOnly && selectedPath !== AUD_PATH) {
+    } else if (
+      leaf === "SUPERVISOR" &&
+      !readOnly &&
+      selectedPath !== AUD_PATH
+    ) {
       setSelectedPath(AUD_PATH);
-    } else if (leaf === 'DIRECTOR' && !readOnly && selectedPath !== DIR_PATH) {
+    } else if (leaf === "DIRECTOR" && !readOnly && selectedPath !== DIR_PATH) {
       setSelectedPath(DIR_PATH);
     }
   }, [readOnly, leaf, selectedPath]);
@@ -65,83 +75,96 @@ export const Layout: React.FC = () => {
   const handleSelect = (ruta: string) => {
     setSelectedPath(ruta);
     setReadOnly(
-      ruta === SUP_PATH || ruta.endsWith('/SUPERVISOR') ||
-      ruta === DIR_PATH || ruta.endsWith('/DIRECTOR')
+      ruta === SUP_PATH ||
+        ruta.endsWith("/SUPERVISOR") ||
+        ruta === DIR_PATH ||
+        ruta.endsWith("/DIRECTOR")
     );
   };
 
   const renderContent = () => {
     switch (leaf) {
-
       // HOMES
       case "HOME":
         return <Home onGo={handleSelect} contexto={selectedPath} />;
 
-    
+      // ✅ NUEVO: COMUNICACIONES
+      case "COMUNICACIONES":
+        return <ComunicacionesForm />;
+
       // RESTO DE PANTALLAS
-      case 'TRAZABILIDAD':
+      case "TRAZABILIDAD":
         return <TrazabilidadBusqueda />;
 
-      case 'SELECTOR DE CASOS Y PRIORIZACIÓN':
+      case "SELECTOR DE CASOS Y PRIORIZACIÓN":
         return <Priorizacion />;
-case 'VERIFICACION':
-case 'VERIFICACIÓN':
-  return <VerificacionPage />;
 
-case 'APROBACION':
-case 'APROBACIÓN':
-  return <Aprobaciones />;
+      case "VERIFICACION":
+      case "VERIFICACIÓN":
+        return <VerificacionPage />;
 
-case 'ASIGNACION':
-case 'ASIGNACIÓN':
-  const aprobados = readAprobados();
-  return <NuevosCasos casosAprobados={aprobados} />;
+      case "APROBACION":
+      case "APROBACIÓN":
+        return <Aprobaciones />;
 
-      case 'CONTROL Y SEGUIMIENTO':
+      case "ASIGNACION":
+      case "ASIGNACIÓN": {
+        const aprobados = readAprobados();
+        return <NuevosCasos casosAprobados={aprobados} />;
+      }
+
+      case "CONTROL Y SEGUIMIENTO":
         return <ConsultasDeEstado />;
 
-   /*   case 'INICIO DE AUDITORIA':
+      /*   case 'INICIO DE AUDITORIA':
         return <Apertura />;*/
 
-      case 'PROCESO DE AUDITORIA':
-      case 'SUPERVISOR':
-      case 'DIRECTOR':
-        return <ProgramacionAutoAperturaForm readOnly={readOnly} setReadOnly={setReadOnly} />;
+      case "PROCESO DE AUDITORIA":
+      case "SUPERVISOR":
+      case "DIRECTOR":
+        return (
+          <ProgramacionAutoAperturaForm
+            readOnly={readOnly}
+            setReadOnly={setReadOnly}
+          />
+        );
 
-      case 'ACTA DE INICIO':
-        return <ActaInicio  />;
+      case "ACTA DE INICIO":
+        return <ActaInicio />;
 
-      case 'NOTIFICACIÓN ACTA DE INICIO':
-        return <PantallaControNotificacion tipo="NOTIFICACIÓN ACTA DE INICIO" />;
+      case "NOTIFICACIÓN ACTA DE INICIO":
+        return (
+          <PantallaControNotificacion tipo="NOTIFICACIÓN ACTA DE INICIO" />
+        );
 
-      case 'REVISIÓN SUPERVISOR':
+      case "REVISIÓN SUPERVISOR":
         return <AsignacionesVarias tipo="REVISIÓN SUPERVISOR" />;
 
-      case 'REVISIÓN JEFE DE SECCIÓN':
+      case "REVISIÓN JEFE DE SECCIÓN":
         return <AsignacionesVarias tipo="REVISIÓN JEFE DE SECCIÓN" />;
 
-      case 'VARIACIÓN EN INGRESOS':
+      case "VARIACIÓN EN INGRESOS":
         return <VariacionesIngreso />;
 
-      case 'HISTORIAL CUMPLIMIENTO':
+      case "HISTORIAL CUMPLIMIENTO":
         return <HistorialCumplimiento />;
 
-      case 'ANALISIS FISCAL':
+      case "ANALISIS FISCAL":
         return <AnalisisFiscal />;
 
-      case 'PRESENTACIÓN VOLUNTARIA':
+      case "PRESENTACIÓN VOLUNTARIA":
         return <PresentacionVoluntaria />;
 
-      case 'LIQUIDACIONES ADICIONALES':
+      case "LIQUIDACIONES ADICIONALES":
         return <LiquidacionesAdicionales />;
 
-      case 'ELIMINACIONES':
+      case "ELIMINACIONES":
         return <Eliminaciones />;
 
-      case 'RECTIFICATIVA':
+      case "RECTIFICATIVA":
         return <Rectificativa />;
 
-      case 'CIERRE':
+      case "CIERRE":
         return <Cierre />;
 
       default:
@@ -150,32 +173,35 @@ case 'ASIGNACIÓN':
   };
 
   return (
-    <Box display="flex" flexDirection="column" height="100vh" sx={{ overflow: 'hidden' }}>
-
+    <Box
+      display="flex"
+      flexDirection="column"
+      height="100vh"
+      sx={{ overflow: "hidden" }}
+    >
       {/* ENCABEZADO */}
-      <Box sx={{ width: '100%' }}>
+      <Box sx={{ width: "100%" }}>
         <img
           src={logoDos}
           alt="Encabezado DGI"
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+          style={{ width: "100%", height: "auto", display: "block" }}
         />
       </Box>
 
       {/* CONTENIDO */}
       <Box display="flex" flexGrow={1} sx={{ minHeight: 0 }}>
-
         {/* SIDEBAR */}
         <Box
           sx={{
             width: 300,
-            backgroundColor: '#fdfdf5',
-            borderRight: '2px solid #b5b5b5',  // ⭐ línea clara y visible
+            backgroundColor: "#fdfdf5",
+            borderRight: "2px solid #b5b5b5", // ⭐ línea clara y visible
             p: 2,
-            height: '100%',
-            overflowY: 'auto',
+            height: "100%",
+            overflowY: "auto",
             minHeight: 0,
             flexShrink: 0,
-            position: 'relative',
+            position: "relative",
             zIndex: 2,
           }}
         >
@@ -188,17 +214,17 @@ case 'ASIGNACIÓN':
           sx={{
             flexGrow: 1,
             p: 4,
-            pl: 5,  // ⭐ separación estética
-            backgroundColor: '#fff',
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            pl: 5, // ⭐ separación estética
+            backgroundColor: "#fff",
+            overflowY: "auto",
+            overflowX: "hidden",
             minWidth: 0,
-            position: 'relative',
+            position: "relative",
             zIndex: 1,
           }}
         >
           <Typography variant="h5" gutterBottom>
-            {selectedPath || 'Selecciona una opción del menú'}
+            {selectedPath || "Selecciona una opción del menú"}
           </Typography>
 
           {renderContent()}

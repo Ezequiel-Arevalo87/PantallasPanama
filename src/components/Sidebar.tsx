@@ -99,10 +99,15 @@ const useMenuData = () => {
   ];
 
   const modulos: MenuNode[] = [
-    { label: 'MÓDULO COMUNICACIÓN' },
-    { label: 'MÓDULO CONSULTAS' },
-    { label: 'MÓDULO ALERTAS' },
-  ];
+  {
+    label: "MÓDULO COMUNICACIÓN",
+    children: [
+      { label: "COMUNICACIONES" }, // 👈 aquí entra tu pantalla
+    ],
+  },
+  { label: "MÓDULO CONSULTAS" },
+  { label: "MÓDULO ALERTAS" },
+];
 
   return { home, trazabilidad, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
 };
@@ -315,16 +320,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
         <Divider sx={{ my: 1.5 }} />
 
         {/* MÓDULOS */}
-        {modulos.map(m => (
-          <ListItemButton
-            key={m.label}
-            sx={{ ...SECTION_STYLE, py: 1 }}
-            onClick={() => onSelect(m.label)}
-            selected={selected === m.label}
-          >
-            <Typography variant="subtitle2">{m.label}</Typography>
-          </ListItemButton>
-        ))}
+       {/* MÓDULOS */}
+{modulos.map(m => {
+  const hasChildren = !!m.children?.length;
+  const rootKey = m.label;
+  const isOpen = !!openMap[rootKey];
+
+  if (hasChildren) {
+    return (
+      <React.Fragment key={rootKey}>
+        <ListItemButton
+          onClick={() => togglePath(rootKey)}
+          sx={SECTION_STYLE}
+          selected={isOpen}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            {m.label}
+          </Typography>
+          {isOpen ? <ExpandLess /> : <ExpandMore />}
+        </ListItemButton>
+
+        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+          {renderNodes(m.children!, rootKey)}
+        </Collapse>
+      </React.Fragment>
+    );
+  }
+
+  return (
+    <ListItemButton
+      key={rootKey}
+      sx={{ ...SECTION_STYLE, py: 1 }}
+      onClick={() => onSelect(rootKey)}
+      selected={selected === rootKey}
+    >
+      <Typography variant="subtitle2">{m.label}</Typography>
+    </ListItemButton>
+  );
+})}
+
       </List>
     </Box>
   );

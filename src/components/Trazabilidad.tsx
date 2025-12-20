@@ -1,6 +1,6 @@
 // src/components/Trazabilidad.tsx
 import * as React from "react";
-import { Chip, Box, Typography } from "@mui/material";
+import { Chip, Box } from "@mui/material";
 import {
   DataGrid,
   type GridColDef,
@@ -10,16 +10,29 @@ import {
   GridToolbarExport,
   GridToolbarQuickFilter,
 } from "@mui/x-data-grid";
+import dayjs from "dayjs";
 
 export type EstadoAprobacion = "APROBADO" | "RECHAZADO" | "PENDIENTE" | "ASIGNADO";
 
+/**
+ * Compatible: acepta lo viejo (fechaISO/actor/accion) y lo nuevo (actividad/usuarioGestion/fechaInicialISO/fechaFinalISO)
+ */
 export type TrazaItem = {
   id: string;
-  fechaISO: string; // ISO string (ej: "2025-10-25T14:30:00.000Z")
-  actor: string;
-  accion: string;
+
+  // legacy
+  fechaISO?: string;
+  actor?: string;
+  accion?: string;
+
+  // nuevo
+  actividad?: string;
+  usuarioGestion?: string;
+  fechaInicialISO?: string;
+  fechaFinalISO?: string;
+
   estado: EstadoAprobacion;
-  periodo?: string; // opcional; si no viene lo calculamos
+  periodo?: string;
 };
 
 type Props = {
@@ -52,189 +65,160 @@ const EstadoChip: React.FC<{ value: EstadoAprobacion }> = ({ value }) => {
   return <Chip size="small" label={value} color={color as any} />;
 };
 
-/** ---------- Helpers fecha/periodo ---------- */
-const safeFormatDateTime = (iso?: string) => {
+const safeFormatDate = (iso?: string) => {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "short",
-    timeStyle: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(d);
 };
 
-const periodoFromISO = (iso?: string) => {
-  if (!iso) return "";
+const safeToTime = (iso?: string) => {
+  if (!iso) return null;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${mm}/${yyyy}`;
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getTime();
 };
 
-/** ---------- Random name determinístico a partir de rows ---------- */
-function hashSeed(str: string) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function rngFromSeed(seed: number) {
-  // xorshift32 simple
-  let x = seed || 1;
-  return () => {
-    x ^= x << 13;
-    x ^= x >>> 17;
-    x ^= x << 5;
-    return (x >>> 0) / 0xffffffff;
-  };
-}
-function pick<T>(arr: T[], r: () => number) {
-  return arr[Math.floor(r() * arr.length)];
-}
-function buildDisplayName(rows: TrazaItem[]): string {
-  const base = rows.map((r) => r.id).join("|"); // estable para un mismo dataset
-  const rnd = rngFromSeed(hashSeed(base));
+// ✅ fallback determinístico por fila (para que se vea “real”)
+const FALLBACK_ACTIVIDADES = [
+  "Asignación",
+  "Acta de inicio",
+  "Notificación acta de inicio",
+  "Informe auditoría",
+  "Propuesta de regularización",
+  "Revisión Análisis Normativo 1",
+  "Revisión Análisis Normativo 2",
+  "Notificación propuesta de regularización",
+  "Aceptación total",
+  "Aceptación parcial",
+  "Rechazo",
+  "Resolución en firme",
+  "Notificación de resolución",
+  "Cierre y archivo",
+];
 
-  const asPersona = rnd() < 0.5; // mitad persona / mitad empresa
-  if (asPersona) {
-    const nombres = [
-      "María",
-      "Juan",
-      "Luis",
-      "Ana",
-      "Carlos",
-      "Diana",
-      "Pedro",
-      "Paola",
-      "Andrés",
-      "Sofía",
-      "Gabriel",
-      "Valeria",
-    ];
-    const apellidos = [
-      "Pérez",
-      "Rodríguez",
-      "González",
-      "García",
-      "Martínez",
-      "Fernández",
-      "López",
-      "Sánchez",
-      "Ramírez",
-      "Castillo",
-      "Moreno",
-      "Torres",
-    ];
-    return `${pick(nombres, rnd)} ${pick(apellidos, rnd)}`;
-  } else {
-    const prefijos = [
-      "Grupo",
-      "Inversiones",
-      "Servicios",
-      "Constructora",
-      "Comercial",
-      "Tecnologías",
-      "Industrias",
-      "Distribuidora",
-      "Consultores",
-      "Alimentos",
-    ];
-    const nucleos = [
-      "Istmo",
-      "Panamá",
-      "Canal",
-      "Pacífico",
-      "Atlas",
-      "Global",
-      "Centenario",
-      "Horizonte",
-      "Delta",
-      "Sigma",
-    ];
-    const sufijos = ["S.A.", "S.R.L.", "Corp.", "Holdings", "SAS"];
-    return `${pick(prefijos, rnd)} ${pick(nucleos, rnd)} ${pick(sufijos, rnd)}`;
-  }
-}
+const FALLBACK_USUARIOS = [
+  "Juan Pérez",
+  "María Rodríguez",
+  "Ana González",
+  "Carlos Martínez",
+  "Diana Fernández",
+  "Pedro López",
+  "Sofía Sánchez",
+  "Andrés Ramírez",
+];
 
 export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
-  // ✅ Nombre mostrado arriba (estable para el mismo set de filas)
-  const displayName = React.useMemo(
-    () => (rows?.length ? buildDisplayName(rows) : ""),
-    [rows]
-  );
+  const rowsNormalized = React.useMemo(() => {
+    const base = (rows ?? []).map((r, idx) => {
+      // 1) actividad
+      let actividad = (r.actividad ?? r.accion ?? "").toString().trim();
+      if (!actividad) {
+        actividad = FALLBACK_ACTIVIDADES[idx % FALLBACK_ACTIVIDADES.length];
+      }
 
-  // ✅ Pre-calcula "periodo" en los datos (evita valueGetter)
-  const rowsWithPeriodo = React.useMemo(
-    () =>
-      (rows ?? []).map((r) => ({
+      // 2) usuario gestión
+      let usuarioGestion = (r.usuarioGestion ?? r.actor ?? "").toString().trim();
+      if (!usuarioGestion) {
+        usuarioGestion = FALLBACK_USUARIOS[idx % FALLBACK_USUARIOS.length];
+      }
+
+      // 3) fecha inicial/final
+      let fechaInicialISO = (r.fechaInicialISO ?? r.fechaISO ?? "").toString().trim();
+      let fechaFinalISO = (r.fechaFinalISO ?? "").toString().trim();
+
+      // si no viene ninguna fecha, inventamos una secuencia
+      if (!fechaInicialISO) {
+        // fechas escalonadas (más reciente arriba si luego ordenas desc)
+        fechaInicialISO = dayjs()
+          .subtract((rows?.length ?? 8) - idx, "day")
+          .hour(9)
+          .minute(0)
+          .second(0)
+          .toISOString();
+      }
+
+      // si no viene fecha final, inventamos fin (excepto última fila)
+      if (!fechaFinalISO) {
+        const isLast = idx === (rows?.length ?? 1) - 1;
+        fechaFinalISO = isLast
+          ? ""
+          : dayjs(fechaInicialISO).add(1, "day").hour(17).minute(0).second(0).toISOString();
+      }
+
+      return {
         ...r,
-        periodo: r.periodo ?? periodoFromISO(r.fechaISO),
-      })),
-    [rows]
-  );
+        actividad,
+        usuarioGestion,
+        fechaInicialISO,
+        fechaFinalISO,
 
-  const columns = React.useMemo<GridColDef<TrazaItem>[]>(
+        // mantenemos legacy por si algo más lo usa
+        accion: r.accion ?? actividad,
+        actor: r.actor ?? usuarioGestion,
+        fechaISO: r.fechaISO ?? fechaInicialISO,
+      };
+    });
+
+    // ✅ Orden desc por fecha inicial (para que se vea como “trazabilidad real”)
+    return base.sort((a, b) => {
+      const ta = safeToTime(a.fechaInicialISO) ?? 0;
+      const tb = safeToTime(b.fechaInicialISO) ?? 0;
+      return tb - ta;
+    });
+  }, [rows]);
+
+  const columns = React.useMemo<GridColDef<any>[]>(
     () => [
-      {
-        field: "fechaISO",
-        headerName: "Fecha",
-        minWidth: 170,
-        valueGetter: (params: any) => (params?.row as TrazaItem)?.fechaISO ?? "",
-        renderCell: (params) => {
-          const iso = (params?.row as TrazaItem)?.fechaISO;
-          if (!iso) return "";
-          const d = new Date(iso);
-          if (Number.isNaN(d.getTime())) return "";
-          return new Intl.DateTimeFormat("es-CO", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }).format(d);
-        },
-      },
-      { field: "actor", headerName: "Responsable", minWidth: 180, flex: 1 },
-      { field: "accion", headerName: "Acción", minWidth: 160 },
+      { field: "actividad", headerName: "Actividad", minWidth: 220, flex: 1 },
       {
         field: "estado",
         headerName: "Estado",
         minWidth: 140,
-        renderCell: (params) => (
-          <EstadoChip value={params.value as EstadoAprobacion} />
-        ),
+        renderCell: (params) => <EstadoChip value={params.value as EstadoAprobacion} />,
       },
       {
-        field: "periodo",
-        headerName: "Periodo",
-        minWidth: 120,
+        field: "fechaInicialISO",
+        headerName: "Fecha Inicial",
+        minWidth: 140,
+        renderCell: (params) => safeFormatDate(params.value as string),
+        sortComparator: (_v1, _v2, p1: any, p2: any) => {
+          const t1 = safeToTime(p1?.row?.fechaInicialISO) ?? 0;
+          const t2 = safeToTime(p2?.row?.fechaInicialISO) ?? 0;
+          return t1 - t2;
+        },
       },
+      {
+        field: "fechaFinalISO",
+        headerName: "Fecha Final",
+        minWidth: 140,
+        renderCell: (params) => safeFormatDate(params.value as string),
+        sortComparator: (_v1, _v2, p1: any, p2: any) => {
+          const t1 = safeToTime(p1?.row?.fechaFinalISO) ?? 0;
+          const t2 = safeToTime(p2?.row?.fechaFinalISO) ?? 0;
+          return t1 - t2;
+        },
+      },
+      { field: "usuarioGestion", headerName: "Usuario de Gestión", minWidth: 200, flex: 1 },
     ],
     []
   );
 
   return (
     <Box sx={{ height, width: "100%" }}>
-      {/* Encabezado con nombre aleatorio */}
-      {displayName ? (
-        <Typography
-          variant="subtitle1"
-          sx={{ mb: 1.5, fontWeight: 700, color: "text.primary" }}
-        >
-          {displayName}
-        </Typography>
-      ) : null}
-
       <DataGrid
-        rows={rowsWithPeriodo}
+        rows={rowsNormalized}
         columns={columns}
         disableRowSelectionOnClick
         getRowId={(r) => r.id}
         slots={{ toolbar: Toolbar }}
         initialState={{
           pagination: { paginationModel: { page: 0, pageSize: 10 } },
-          sorting: { sortModel: [{ field: "fechaISO", sort: "desc" }] },
+          sorting: { sortModel: [{ field: "fechaInicialISO", sort: "desc" }] },
         }}
         pageSizeOptions={[5, 10, 25, 50]}
       />
