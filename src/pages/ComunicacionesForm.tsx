@@ -1,7 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, Grid, TextField, Typography, Stack } from "@mui/material";
-import TablaResultadoComunicaciones, { ComunicacionRow, Decision } from "./TablaResultadoComunicaciones";
-
+import {
+  Box,
+  Button,
+  Grid,
+  TextField,
+  Typography,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
+import TablaResultadoComunicaciones, {
+  ComunicacionRow,
+  Decision,
+} from "./TablaResultadoComunicaciones";
 
 type FormuState = {
   ruc: string;
@@ -50,6 +63,8 @@ const ComunicacionesForm: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [rucError, setRucError] = useState<string>("");
   const [rows, setRows] = useState<ComunicacionRow[]>([]);
+  const [openConfirm, setOpenConfirm] = useState(false); // ✅ NUEVO
+
   const numeroPropuesta = useMemo(() => "7010000008756", []);
 
   const handleChange =
@@ -63,8 +78,6 @@ const ComunicacionesForm: React.FC = () => {
     const ruc = formulario.ruc.trim();
     if (!ruc) return "El RUC es obligatorio.";
     if (ruc.length < 6) return "RUC inválido (muy corto).";
-    // si quieres solo números:
-    // if (!/^\d+$/.test(ruc)) return "El RUC debe ser numérico.";
     return "";
   };
 
@@ -79,7 +92,6 @@ const ComunicacionesForm: React.FC = () => {
       return;
     }
 
-    // ✅ aquí simulas la consulta
     setRows(buildMockRows());
     setSubmitted(true);
   };
@@ -93,6 +105,25 @@ const ComunicacionesForm: React.FC = () => {
 
   const onDecisionChange = (id: string, decision: Decision) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, decision } : r)));
+  };
+
+  // ✅ ABRIR CONFIRMACIÓN
+  const handleEnviar = () => {
+    setOpenConfirm(true);
+  };
+
+  // ✅ CONFIRMAR ENVÍO
+  const confirmarEnvio = () => {
+    setOpenConfirm(false);
+
+    // 👉 Aquí luego conectas tu API
+    console.log("ENVIADO:", {
+      formulario,
+      numeroPropuesta,
+      decisiones: rows,
+    });
+
+    alert("Propuesta enviada correctamente ✅");
   };
 
   return (
@@ -148,7 +179,6 @@ const ComunicacionesForm: React.FC = () => {
         </Grid>
       </Box>
 
-      {/* Encabezado tipo "pantalla" (solo si ya consultó) */}
       {submitted && (
         <Box sx={{ mt: 3, mb: 1 }}>
           <Typography sx={{ fontWeight: 700 }}>
@@ -162,11 +192,42 @@ const ComunicacionesForm: React.FC = () => {
         </Box>
       )}
 
-      {/* Tabla: solo aparece cuando hay data */}
       <TablaResultadoComunicaciones
         rows={rows}
         onDecisionChange={onDecisionChange}
       />
+
+      {/* ✅ BOTÓN ENVIAR */}
+      {rows.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Button variant="contained" color="success" onClick={handleEnviar}>
+            Enviar
+          </Button>
+        </Box>
+      )}
+
+      {/* ✅ DIÁLOGO CONFIRMACIÓN */}
+      <Dialog open={openConfirm} onClose={() => setOpenConfirm(false)}>
+        <DialogTitle>Confirmar envío</DialogTitle>
+        <DialogContent>
+          <Typography>
+            ¿Está seguro que desea <b>enviar</b> la respuesta de la propuesta de
+            regularización?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenConfirm(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={confirmarEnvio}
+          >
+            Aceptar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
