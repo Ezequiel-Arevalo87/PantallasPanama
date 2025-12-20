@@ -35,7 +35,7 @@ import Home from "./Home";
 import { NuevosCasos } from "./NuevosCasos";
 import { readAprobados } from "../lib/workflowStorage";
 import ActaInicio from "./ActaInicio";
-import ComunicacionesForm from "./comunicacionesForm";
+import ComunicacionesForm from "./ComunicacionesForm";
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
