@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Box, Button, Grid, TextField, Typography, Stack } from "@mui/material";
-import TablaResultadoComunicaciones, { ComunicacionRow, Decision } from "./tablaResultadoComunicaciones";
+import TablaResultadoComunicaciones, { ComunicacionRow, Decision } from "./TablaResultadoComunicaciones";
 
 
 type FormuState = {
