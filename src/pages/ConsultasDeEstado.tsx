@@ -79,9 +79,6 @@ const PROGRAMAS_EXTEMPORANEO = [
 const REDS = ["Todos", "675", "659"] as const;
 type RedSel = (typeof REDS)[number] | "";
 
-const CATEG_CONTRIB = ["Todos", "Grande", "Medio", "Pequeño"] as const;
-type CategoriaContribSel = (typeof CATEG_CONTRIB)[number] | "";
-
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values()).filter(Boolean);
 
@@ -92,7 +89,6 @@ type CodigoImpuestoSel = string | "";
 
 // ✅ Multi-select actividad económica (igual que Priorización)
 const ALL_VALUE = "__ALL__";
-
 type ActividadEconSel = string[]; // ahora es array
 
 /** Parse robusto: ISO / YYYY-MM-DD / DD/MM/YYYY */
@@ -107,13 +103,14 @@ const ConsultasDeEstado: React.FC = () => {
   // orden: 1) tipoInc 2) actividad 3) impuestoPrograma
   const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
   const [actividad, setActividad] = useState<ActividadSel>("");
+
+  // ✅ campos seguidos en línea 1: Código Impuesto + Impuesto/Programa
+  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>("");
   const [impuestoPrograma, setImpuestoPrograma] = useState<ImpuestoProgramaSel>("");
 
   // ✅ filtros
   const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]); // ✅ multi
   const [red, setRed] = useState<RedSel>("");
-  const [categoriaContrib, setCategoriaContrib] = useState<CategoriaContribSel>("");
-  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>("");
 
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -252,7 +249,30 @@ const ConsultasDeEstado: React.FC = () => {
       );
     }
 
-    // 3) Impuesto / Programa
+    // 3) Código Impuesto
+    if (codigoImpuesto && codigoImpuesto !== "Todos") {
+      rows = rows.filter((r) => {
+        const v =
+          r.codigoImpuesto ??
+          r.codigo_impuesto ??
+          r.impuestoCodigo ??
+          r.codigo_impuesto_programa ??
+          "";
+        const s = String(v).trim();
+        if (!s) return true;
+
+        const parts = s
+          .split(",")
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean);
+
+        return parts.length
+          ? parts.includes(String(codigoImpuesto).toLowerCase())
+          : s.toLowerCase() === String(codigoImpuesto).toLowerCase();
+      });
+    }
+
+    // 4) Impuesto / Programa
     if (impuestoPrograma) {
       rows = rows.filter((r) => {
         const imp = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim();
@@ -280,38 +300,6 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // Categoría contribuyente
-    if (categoriaContrib && categoriaContrib !== "Todos") {
-      rows = rows.filter((r) => {
-        const c = (r.categoriaContribuyente ?? r.categoria_contribuyente ?? "").toString().trim();
-        if (!c) return true;
-        return c.toLowerCase() === String(categoriaContrib).toLowerCase();
-      });
-    }
-
-    // Código Impuesto
-    if (codigoImpuesto && codigoImpuesto !== "Todos") {
-      rows = rows.filter((r) => {
-        const v =
-          r.codigoImpuesto ??
-          r.codigo_impuesto ??
-          r.impuestoCodigo ??
-          r.codigo_impuesto_programa ??
-          "";
-        const s = String(v).trim();
-        if (!s) return true;
-
-        const parts = s
-          .split(",")
-          .map((x) => x.trim().toLowerCase())
-          .filter(Boolean);
-
-        return parts.length
-          ? parts.includes(String(codigoImpuesto).toLowerCase())
-          : s.toLowerCase() === String(codigoImpuesto).toLowerCase();
-      });
-    }
-
     // Semáforo (select)
     if (sem && sem !== "Todos") {
       rows = rows.filter((r) => calcularSemaforo(r.fecha) === sem);
@@ -335,19 +323,7 @@ const ConsultasDeEstado: React.FC = () => {
     }
 
     return rows as FilaEstado[];
-  }, [
-    data,
-    tipoInc,
-    actividad,
-    impuestoPrograma,
-    actividadEcon,
-    red,
-    categoriaContrib,
-    codigoImpuesto,
-    sem,
-    desde,
-    hasta,
-  ]);
+  }, [data, tipoInc, actividad, codigoImpuesto, impuestoPrograma, actividadEcon, red, sem, desde, hasta]);
 
   /** ✅ Inyectamos campos para la tabla */
   const filasParaTabla = useMemo(() => {
@@ -360,14 +336,12 @@ const ConsultasDeEstado: React.FC = () => {
       actividadEconomica:
         r.actividadEconomica ?? r.actividad_economica ?? (actividadEcon[0] ?? ""),
       red: r.red ?? r.redDgi ?? red,
-      categoriaContribuyente:
-        r.categoriaContribuyente ?? r.categoria_contribuyente ?? categoriaContrib,
       codigoImpuesto:
         r.codigoImpuesto ?? r.codigo_impuesto ?? r.impuestoCodigo ?? codigoImpuesto,
 
       tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
     })) as any as FilaEstado[];
-  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, categoriaContrib, codigoImpuesto]);
+  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto]);
 
   // =========================
   // ✅ GARANTIZAR RESULTADOS
@@ -420,8 +394,6 @@ const ConsultasDeEstado: React.FC = () => {
       actividadEconomica: actividadEcon[0] || (actividades[0]?.code ?? "Servicios"),
 
       red: (red && red !== "Todos" ? red : "675") || "675",
-      categoriaContribuyente:
-        (categoriaContrib && categoriaContrib !== "Todos" ? categoriaContrib : "Grande") || "Grande",
       tipoPersona: "Jurídica",
     };
   };
@@ -436,12 +408,12 @@ const ConsultasDeEstado: React.FC = () => {
   const limpiar = () => {
     setTipoInc("");
     setActividad("");
+
+    setCodigoImpuesto("");
     setImpuestoPrograma("");
 
     setActividadEcon([]); // ✅ multi reset
     setRed("");
-    setCategoriaContrib("");
-    setCodigoImpuesto("");
 
     setSem("");
     setDesde(dayjs().add(-5, "day").format("YYYY-MM-DD"));
@@ -473,29 +445,8 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Estado / Actividad */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            select
-            fullWidth
-            label="Estado / Actividad"
-            value={actividad}
-            onChange={(e) => {
-              setActividad(e.target.value as ActividadSel);
-              setMostrarResultados(false);
-            }}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
-            {ACTIVIDADES.map((a) => (
-              <MenuItem key={a} value={a}>
-                {a}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Impuesto / Programa */}
+    
+  {/* ✅ Impuesto / Programa (línea 1, al lado de Código) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
@@ -517,7 +468,52 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Actividad Económica (MULTI igual Priorización) */}
+        {/* ✅ Código de Impuesto (línea 1, seguido de Impuesto/Programa) */}
+        <Grid item xs={12} sm={6} md={3}>
+          <TextField
+            select
+            fullWidth
+            label="Código de Impuesto"
+            value={codigoImpuesto}
+            onChange={(e) => {
+              setCodigoImpuesto(e.target.value as CodigoImpuestoSel);
+              setMostrarResultados(false);
+            }}
+          >
+            <MenuItem value="">— Todos —</MenuItem>
+            <MenuItem value="Todos">Todos</MenuItem>
+            {codigosImpuestoDisponibles.map((op) => (
+              <MenuItem key={op} value={op}>
+                {op}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+      
+            {/* Estado / Actividad */}
+        <Grid item xs={12} sm={6} md={3}>
+          <TextField
+            select
+            fullWidth
+            label="Estado / Actividad"
+            value={actividad}
+            onChange={(e) => {
+              setActividad(e.target.value as ActividadSel);
+              setMostrarResultados(false);
+            }}
+          >
+            <MenuItem value="">— Todos —</MenuItem>
+            <MenuItem value="Todos">Todos</MenuItem>
+            {ACTIVIDADES.map((a) => (
+              <MenuItem key={a} value={a}>
+                {a}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        {/* ✅ Actividad Económica (MULTI) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
@@ -558,49 +554,6 @@ const ConsultasDeEstado: React.FC = () => {
             {REDS.map((r) => (
               <MenuItem key={r} value={r}>
                 {r}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Categoría Contribuyente */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            select
-            fullWidth
-            label="Categoría Contribuyente"
-            value={categoriaContrib}
-            onChange={(e) => {
-              setCategoriaContrib(e.target.value as CategoriaContribSel);
-              setMostrarResultados(false);
-            }}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            {CATEG_CONTRIB.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Código de Impuesto */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            select
-            fullWidth
-            label="Código de Impuesto"
-            value={codigoImpuesto}
-            onChange={(e) => {
-              setCodigoImpuesto(e.target.value as CodigoImpuestoSel);
-              setMostrarResultados(false);
-            }}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
-            {codigosImpuestoDisponibles.map((op) => (
-              <MenuItem key={op} value={op}>
-                {op}
               </MenuItem>
             ))}
           </TextField>

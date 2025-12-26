@@ -215,12 +215,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
           const d = diasRestantes(f);
 
           return (
-            <Chip
-              label={`${d} días`}
-              color={colorDeSemaforo(s)}
-              size="small"
-              variant="filled"
-            />
+            <Chip label={`${d} días`} color={colorDeSemaforo(s)} size="small" variant="filled" />
           );
         },
       },
@@ -390,12 +385,11 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
               </Grid>
             </Box>
           )}
+
           {trazasSeleccionadas && trazasSeleccionadas.length > 0 ? (
             <Trazabilidad rows={trazasSeleccionadas} height={420} />
           ) : (
-            <Typography variant="body2">
-              No hay trazabilidad registrada para este trámite.
-            </Typography>
+            <Typography variant="body2">No hay trazabilidad registrada para este trámite.</Typography>
           )}
         </DialogContent>
       </Dialog>
