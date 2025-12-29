@@ -91,7 +91,6 @@ type CodigoImpuestoSel = string | "";
 const ALL_VALUE = "__ALL__";
 type ActividadEconSel = string[];
 
-/** Parse robusto: ISO / YYYY-MM-DD / DD/MM/YYYY */
 const parseFecha = (f: any) => {
   const s = (f ?? "").toString().trim();
   if (!s) return null;
@@ -100,17 +99,15 @@ const parseFecha = (f: any) => {
 };
 
 // ============================
-// ✅ Helpers
+// ✅ Helpers para código automático (3 dígitos)
 // ============================
 const toCodigo3 = (input: any): string => {
   const s = String(input ?? "").trim();
   if (!s) return "";
 
-  // primer bloque numérico (3+), tomamos 3
-  const m = s.match(/\d{3,}/);
+  const m = s.match(/\d{3,}/); // toma el primer bloque numérico 3+ (ej 4331)
   if (m?.[0]) return m[0].slice(0, 3);
 
-  // fallback
   const digits = s.replace(/\D/g, "");
   if (digits.length >= 3) return digits.slice(0, 3);
 
@@ -121,6 +118,7 @@ const inferCodigoDesdePrograma = (programa: string): string => {
   const c = toCodigo3(programa);
   if (c) return c;
 
+  // fallback por palabra clave
   const p = (programa ?? "").toLowerCase();
   if (p.includes("itbms")) return "433";
   if (p.includes("isr") || p.includes("renta")) return "101";
@@ -128,22 +126,15 @@ const inferCodigoDesdePrograma = (programa: string): string => {
   return "";
 };
 
-// ✅ Nombre completo SIN números (NO repite 4331, 6599, etc.)
-const limpiarNombreImpuestoPrograma = (programa: string): string => {
-  return String(programa ?? "")
-    .replace(/\b\d+\b/g, "") // quita números completos como "4331"
-    .replace(/\s+/g, " ")
-    .replace(/\s+-\s+/g, " - ")
-    .trim();
-};
-
 const ConsultasDeEstado: React.FC = () => {
+  // orden: 1) tipoInc 2) actividad 3) impuestoPrograma (y codigo auto)
   const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
   const [actividad, setActividad] = useState<ActividadSel>("");
 
   const [impuestoPrograma, setImpuestoPrograma] = useState<ImpuestoProgramaSel>("");
-  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>(""); // AUTO (3 dígitos)
+  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>(""); // AUTO
 
+  // ✅ filtros
   const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]);
   const [red, setRed] = useState<RedSel>("");
 
@@ -154,6 +145,7 @@ const ConsultasDeEstado: React.FC = () => {
 
   const [data, setData] = useState<FilaEstado[]>([]);
 
+  // ✅ catálogo actividades económicas
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingAct, setLoadingAct] = useState(true);
 
@@ -174,7 +166,7 @@ const ConsultasDeEstado: React.FC = () => {
     return m;
   }, [actividades]);
 
-  /** ✅ Programas dependen del tipo de inconsistencia */
+  /** ✅ Programas dependen del tipo de inconsistencia (RESTABLECIDO) */
   const programasDisponibles = useMemo(() => {
     switch (tipoInc) {
       case "Omiso":
@@ -198,14 +190,16 @@ const ConsultasDeEstado: React.FC = () => {
     }
   }, [tipoInc]);
 
+  // Si cambia tipoInc y el programa ya no existe -> limpiar
   useEffect(() => {
     if (impuestoPrograma && !programasDisponibles.includes(impuestoPrograma)) {
       setImpuestoPrograma("");
+      setCodigoImpuesto("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programasDisponibles]);
 
-  // ✅ AUTO: escoger Impuesto/Programa => setea el código (3 dígitos)
+  // ✅ AUTO: escoger Impuesto/Programa => setea el código (3 dígitos) y el código queda deshabilitado
   useEffect(() => {
     if (!impuestoPrograma) {
       setCodigoImpuesto("");
@@ -220,11 +214,13 @@ const ConsultasDeEstado: React.FC = () => {
   // ============================
   const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
     const raw = e.target.value as unknown as string[];
+
     if (raw.includes(ALL_VALUE)) {
       setActividadEcon([]);
       setMostrarResultados(false);
       return;
     }
+
     const next = uniqCaseInsensitive(raw.filter((v) => v !== ALL_VALUE));
     setActividadEcon(next);
     setMostrarResultados(false);
@@ -233,8 +229,10 @@ const ConsultasDeEstado: React.FC = () => {
   const renderActividadChips = (selected: any) => {
     const arr: string[] = selected as string[];
     if (!arr?.length) return "Todas";
+
     const first = arr[0];
     const label = actividadesMap.get(first) ?? first;
+
     return (
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
         <Chip key={first} size="small" label={label} />
@@ -265,7 +263,7 @@ const ConsultasDeEstado: React.FC = () => {
       );
     }
 
-    // 3) Código (si ya hay uno auto)
+    // 3) Código Impuesto (auto) - se filtra por “3 dígitos”
     if (codigoImpuesto) {
       rows = rows.filter((r) => {
         const v =
@@ -276,8 +274,10 @@ const ConsultasDeEstado: React.FC = () => {
           "";
         const s = String(v).trim();
         if (!s) return true;
+
         const cod3 = toCodigo3(s);
         if (!cod3) return true;
+
         return cod3 === codigoImpuesto;
       });
     }
@@ -334,8 +334,11 @@ const ConsultasDeEstado: React.FC = () => {
     return rows as FilaEstado[];
   }, [data, tipoInc, actividad, codigoImpuesto, impuestoPrograma, actividadEcon, red, sem, desde, hasta]);
 
-  /** ✅ Inyectamos campos para la tabla */
+  /** ✅ Inyectamos campos para la tabla (SIN romper lo que ya funciona) */
   const filasParaTabla = useMemo(() => {
+    const periodoInicial = desde || "";
+    const periodoFinal = hasta || "";
+
     return filtrados.map((r: any) => {
       const impProg = r.impuestoPrograma ?? r.impuesto_programa ?? impuestoPrograma;
       const codRaw =
@@ -345,32 +348,50 @@ const ConsultasDeEstado: React.FC = () => {
         r.codigo_impuesto_programa ??
         "";
 
-      const cod3 =
-        toCodigo3(codRaw) || (impProg ? inferCodigoDesdePrograma(String(impProg)) : "") || codigoImpuesto;
+      const cod3 = toCodigo3(codRaw) || (impProg ? inferCodigoDesdePrograma(String(impProg)) : "") || codigoImpuesto;
 
-      // ✅ nombre COMPLETO pero sin números
-      const impuestoNombre =
-        r.impuestoNombre ??
-        r.impuesto_nombre ??
-        limpiarNombreImpuestoPrograma(String(impProg ?? ""));
+      // nombre completo SIN números (para que no se repita 4331)
+      const impuestoNombre = String(impProg ?? "")
+        .replace(/\b\d+\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // ✅ detalle: relación impuestos (bonito en dialog, sin tabla extra arriba)
+      const montoLiquidado =
+        Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) ||
+        Math.round((500 + Math.random() * 9500) * 100) / 100;
+
+      const relacionImpuestos = Array.isArray(r.relacionImpuestos)
+        ? r.relacionImpuestos
+        : [
+            {
+              codigoImpuesto: cod3,
+              nombreImpuesto: impuestoNombre,
+              montoLiquidado,
+            },
+          ];
 
       return {
         ...r,
         tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? tipoInc,
         impuestoPrograma: impProg,
 
-        // ✅ esto es lo que mostrará la tabla (sin códigos repetidos)
-        impuestoNombre,
+        // display/compat tabla
+        codigoImpuesto: cod3,
+        impuestoNombre, // <- lo usa la tabla para mostrar nombre completo
+
+        // detalle
+        periodoInicial,
+        periodoFinal,
+        relacionImpuestos,
 
         actividadEconomica:
           r.actividadEconomica ?? r.actividad_economica ?? (actividadEcon[0] ?? ""),
         red: r.red ?? r.redDgi ?? red,
-
-        codigoImpuesto: cod3,
         tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
       };
     }) as any as FilaEstado[];
-  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto, codigoImpuesto]);
+  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto, desde, hasta]);
 
   // =========================
   // ✅ GARANTIZAR RESULTADOS
@@ -393,10 +414,8 @@ const ConsultasDeEstado: React.FC = () => {
 
     if (d?.isValid() && out.isBefore(d, "day")) out = d.add(1, "day");
     if (h?.isValid() && out.isAfter(h, "day")) out = h.subtract(1, "day");
+    if (d?.isValid() && h?.isValid() && d.isAfter(h, "day")) out = d.add(1, "day");
 
-    if (d?.isValid() && h?.isValid() && d.isAfter(h, "day")) {
-      out = d.add(1, "day");
-    }
     return out.format("YYYY-MM-DD");
   };
 
@@ -407,8 +426,9 @@ const ConsultasDeEstado: React.FC = () => {
     const f1 = fechaParaSemaforo(sem);
     const fecha = fechaDentroDeRango(f1);
 
-    const impProg = impuestoPrograma || "Omisos vs retenciones 4331 ITBMS";
+    const impProg = impuestoPrograma || "Omisos vs ITBMS";
     const cod3 = inferCodigoDesdePrograma(impProg) || "433";
+    const impuestoNombre = String(impProg).replace(/\b\d+\b/g, "").replace(/\s+/g, " ").trim();
 
     return {
       numeroTramite: num,
@@ -420,9 +440,18 @@ const ConsultasDeEstado: React.FC = () => {
 
       tipoInconsistencia: tipoInc || "Omiso",
       impuestoPrograma: impProg,
-      impuestoNombre: limpiarNombreImpuestoPrograma(impProg),
-
+      impuestoNombre,
       codigoImpuesto: cod3,
+
+      periodoInicial: desde || "",
+      periodoFinal: hasta || "",
+      relacionImpuestos: [
+        {
+          codigoImpuesto: cod3,
+          nombreImpuesto: impuestoNombre,
+          montoLiquidado: Math.round((500 + Math.random() * 9500) * 100) / 100,
+        },
+      ],
 
       actividadEconomica: actividadEcon[0] || (actividades[0]?.code ?? "Servicios"),
       red: (red && red !== "Todos" ? red : "675") || "675",
@@ -477,7 +506,7 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Impuesto / Programa */}
+        {/* Impuesto / Programa (depende del tipoInc) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
@@ -499,11 +528,11 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Código (AUTO) - DESHABILITADO */}
+        {/* Código de Impuesto (AUTO + DESHABILITADO) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             fullWidth
-            label="Código de Impuesto (3 dígitos)"
+            label="Código de Impuesto"
             value={codigoImpuesto}
             disabled
             helperText="Se asigna automáticamente al seleccionar Impuesto / Programa"

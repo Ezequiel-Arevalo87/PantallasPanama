@@ -12,6 +12,12 @@ import {
   Stack,
   Button,
   Grid,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import CloseIcon from "@mui/icons-material/Close";
@@ -56,6 +62,12 @@ const normalizarImpuestos = (fila: any): string[] => {
     .filter(Boolean);
 };
 
+const money = (n: any) =>
+  Number(n ?? 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [openTraza, setOpenTraza] = useState(false);
   const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<TrazaItem[]>([]);
@@ -67,6 +79,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     contribuyente?: string;
     impuestos?: string[];
     actividadActual?: string;
+
+    periodoInicial?: string;
+    periodoFinal?: string;
+    relacionImpuestos?: Array<{
+      codigoImpuesto: string;
+      nombreImpuesto: string;
+      montoLiquidado: number;
+    }>;
   } | null>(null);
 
   const [semaforoSeleccionado, setSemaforoSeleccionado] = useState<Semaforo | "">("");
@@ -84,12 +104,21 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     const impuestos = normalizarImpuestos(anyFila);
     const actividadActual = anyFila?.estado ?? anyFila?.actividadActual ?? "";
 
+    const periodoInicial = anyFila?.periodoInicial ?? "";
+    const periodoFinal = anyFila?.periodoFinal ?? "";
+    const relacionImpuestos = Array.isArray(anyFila?.relacionImpuestos)
+      ? anyFila.relacionImpuestos
+      : [];
+
     setDetalleHeader({
       numeroTramite: tramite ?? "",
       ruc: ruc ?? "",
       contribuyente: anyFila?.contribuyente ?? "",
       impuestos,
       actividadActual,
+      periodoInicial,
+      periodoFinal,
+      relacionImpuestos,
     });
 
     setTramiteActual(tramite || "");
@@ -117,19 +146,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         "";
 
       const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
-
-      // ✅ nombre completo sin números (inyectado en ConsultasDeEstado)
-      const impuestoNombre =
-        anyR.impuestoNombre ??
-        anyR.impuesto_nombre ??
-        (anyR.impuestoPrograma ?? anyR.impuesto_programa ?? "");
+      const impuestoNombre = anyR.impuestoNombre ?? anyR.impuesto_nombre ?? "";
 
       return {
         id: i,
         ...r,
         codigoImpuesto,
-        tipoPersona,
         impuestoNombre,
+        tipoPersona,
       };
     });
   }, [rows]);
@@ -165,6 +189,65 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return { rojo, amarillo, verde, total: base.length };
   }, [gridRows, gridRowsBase, semaforoSeleccionado]);
 
+  // ✅ Excel general
+  const exportar = () => {
+    const data = (gridRows as any[]).map((r) => ({
+      "No Trámite": r.numeroTramite ?? "",
+      RUC: r.ruc ?? "",
+      "Nombre / Razón Social": r.contribuyente ?? "",
+      "Tipo de Persona": r.tipoPersona ?? "",
+      Estado: r.estado ?? "",
+      "Código Impuesto": r.codigoImpuesto ?? "",
+      "Nombre Impuesto": r.impuestoNombre ?? "",
+      "Periodo Inicial": r.periodoInicial ?? "",
+      "Periodo Final": r.periodoFinal ?? "",
+      Fecha: toDDMMYYYY(r.fecha ?? ""),
+      Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
+      "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+    XLSX.writeFile(wb, "consulta_estado.xlsx");
+  };
+
+  // ✅ Excel del DETALLE (del trámite abierto)
+  const exportarDetalle = () => {
+    if (!detalleHeader) return;
+
+    const encabezado = [
+      {
+        "No Trámite": detalleHeader.numeroTramite ?? "",
+        RUC: detalleHeader.ruc ?? "",
+        Contribuyente: detalleHeader.contribuyente ?? "",
+        "Actividad Actual": detalleHeader.actividadActual ?? "",
+        "Periodo Inicial": detalleHeader.periodoInicial ?? "",
+        "Periodo Final": detalleHeader.periodoFinal ?? "",
+      },
+    ];
+
+    const relacion = (detalleHeader.relacionImpuestos ?? []).map((x) => ({
+      "Código Impuesto": x.codigoImpuesto ?? "",
+      "Nombre Impuesto": x.nombreImpuesto ?? "",
+      "Monto liquidado": Number(x.montoLiquidado ?? 0),
+    }));
+
+    const ws1 = XLSX.utils.json_to_sheet(encabezado);
+    const ws2 = XLSX.utils.json_to_sheet(
+      relacion.length
+        ? relacion
+        : [{ "Código Impuesto": "", "Nombre Impuesto": "", "Monto liquidado": "" }]
+    );
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Encabezado");
+    XLSX.utils.book_append_sheet(wb, ws2, "RelacionImpuestos");
+
+    const num = String(detalleHeader.numeroTramite ?? "sin_numero").replace(/[^\w-]/g, "_");
+    XLSX.writeFile(wb, `detalle_tramite_${num}.xlsx`);
+  };
+
   const columns = useMemo<GridColDef[]>(
     () => [
       { field: "numeroTramite", headerName: "No Trámite", width: 140 },
@@ -178,17 +261,16 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       { field: "tipoPersona", headerName: "Tipo de Persona", width: 160 },
       { field: "estado", headerName: "Estado", width: 220 },
 
-      // ✅ COD3 - NOMBRE COMPLETO (sin repetir números)
       {
         field: "codigoImpuesto",
-        headerName: "Código-Impuesto",
-        width: 360,
+        headerName: "Código - Impuesto",
+        width: 420,
         renderCell: (p: any) => {
           const cod = String(p?.row?.codigoImpuesto ?? "").trim();
-          const nombre = String(p?.row?.impuestoNombre ?? "").trim();
-          if (!cod && !nombre) return "—";
-          if (!nombre) return cod || "—";
-          return `${cod} - ${nombre}`;
+          const nom = String(p?.row?.impuestoNombre ?? "").trim();
+          if (!cod && !nom) return "—";
+          if (!nom) return cod || "—";
+          return `${cod} - ${nom}`;
         },
       },
 
@@ -267,25 +349,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     [handleVerTrazas]
   );
 
-  const exportar = () => {
-    const data = (gridRows as any[]).map((r) => ({
-      "No Trámite": r.numeroTramite ?? "",
-      RUC: r.ruc ?? "",
-      "Nombre / Razón Social": r.contribuyente ?? "",
-      "Tipo de Persona": r.tipoPersona ?? "",
-      Estado: r.estado ?? "",
-      "Código-Impuesto": `${r.codigoImpuesto ?? ""}${r.impuestoNombre ? ` - ${r.impuestoNombre}` : ""}`,
-      Fecha: toDDMMYYYY(r.fecha ?? ""),
-      Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
-      "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Resultados");
-    XLSX.writeFile(wb, "consulta_estado.xlsx");
-  };
-
   return (
     <Box>
       <br />
@@ -354,6 +417,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       <Dialog open={openTraza} onClose={handleCerrarTrazas} maxWidth="md" fullWidth>
         <DialogTitle sx={{ m: 0, p: 2 }}>
           Detalle {tramiteActual ? `- Trámite ${tramiteActual}` : ""}
+
+          {/* ✅ Botón Excel Detalle */}
+          <Stack direction="row" spacing={1} sx={{ position: "absolute", right: 52, top: 10 }}>
+            <Button size="small" variant="outlined" onClick={exportarDetalle}>
+              Descargar Excel (Detalle)
+            </Button>
+          </Stack>
+
           <IconButton
             aria-label="close"
             onClick={handleCerrarTrazas}
@@ -364,7 +435,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         </DialogTitle>
 
         <DialogContent dividers>
-          {/* Encabezado */}
           {detalleHeader && (
             <Box mb={2}>
               <Grid container spacing={1}>
@@ -383,22 +453,68 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                     <b>Nombre / Razón Social:</b> {detalleHeader.contribuyente ?? ""}
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body2" sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    <b>Impuestos:</b>
-                    {(detalleHeader.impuestos ?? []).length ? (
-                      (detalleHeader.impuestos ?? []).map((x) => (
-                        <Chip key={x} size="small" label={x} variant="outlined" />
-                      ))
-                    ) : (
-                      <span>—</span>
-                    )}
+
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>Periodo Inicial:</b> {detalleHeader.periodoInicial || "—"}
                   </Typography>
                 </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>Periodo Final:</b> {detalleHeader.periodoFinal || "—"}
+                  </Typography>
+                </Grid>
+
                 <Grid item xs={12}>
                   <Typography variant="body2">
                     <b>Actividad Actual:</b> {detalleHeader.actividadActual ?? ""}
                   </Typography>
+                </Grid>
+
+                {/* ✅ Relación de impuestos bonita */}
+                <Grid item xs={12}>
+                  <Paper variant="outlined" sx={{ mt: 1, p: 1.5, borderRadius: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Relación de impuestos
+                    </Typography>
+
+                    <Table size="small" sx={{ "& td, & th": { py: 0.75 } }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>
+                            <b>Código</b>
+                          </TableCell>
+                          <TableCell>
+                            <b>Impuesto</b>
+                          </TableCell>
+                          <TableCell align="right">
+                            <b>Monto liquidado</b>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(detalleHeader.relacionImpuestos ?? []).length ? (
+                          (detalleHeader.relacionImpuestos ?? []).map((x, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                {x.codigoImpuesto ?? "—"}
+                              </TableCell>
+                              <TableCell sx={{ maxWidth: 420 }}>
+                                {x.nombreImpuesto ?? "—"}
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                {money(x.montoLiquidado)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={3}>—</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Paper>
                 </Grid>
               </Grid>
             </Box>
