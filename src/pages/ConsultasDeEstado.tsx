@@ -89,7 +89,7 @@ type CodigoImpuestoSel = string | "";
 
 // ✅ Multi-select actividad económica (igual que Priorización)
 const ALL_VALUE = "__ALL__";
-type ActividadEconSel = string[]; // ahora es array
+type ActividadEconSel = string[];
 
 /** Parse robusto: ISO / YYYY-MM-DD / DD/MM/YYYY */
 const parseFecha = (f: any) => {
@@ -99,17 +99,52 @@ const parseFecha = (f: any) => {
   return d.isValid() ? d : null;
 };
 
+// ============================
+// ✅ Helpers
+// ============================
+const toCodigo3 = (input: any): string => {
+  const s = String(input ?? "").trim();
+  if (!s) return "";
+
+  // primer bloque numérico (3+), tomamos 3
+  const m = s.match(/\d{3,}/);
+  if (m?.[0]) return m[0].slice(0, 3);
+
+  // fallback
+  const digits = s.replace(/\D/g, "");
+  if (digits.length >= 3) return digits.slice(0, 3);
+
+  return "";
+};
+
+const inferCodigoDesdePrograma = (programa: string): string => {
+  const c = toCodigo3(programa);
+  if (c) return c;
+
+  const p = (programa ?? "").toLowerCase();
+  if (p.includes("itbms")) return "433";
+  if (p.includes("isr") || p.includes("renta")) return "101";
+  if (p.includes("informes")) return "102";
+  return "";
+};
+
+// ✅ Nombre completo SIN números (NO repite 4331, 6599, etc.)
+const limpiarNombreImpuestoPrograma = (programa: string): string => {
+  return String(programa ?? "")
+    .replace(/\b\d+\b/g, "") // quita números completos como "4331"
+    .replace(/\s+/g, " ")
+    .replace(/\s+-\s+/g, " - ")
+    .trim();
+};
+
 const ConsultasDeEstado: React.FC = () => {
-  // orden: 1) tipoInc 2) actividad 3) impuestoPrograma
   const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
   const [actividad, setActividad] = useState<ActividadSel>("");
 
-  // ✅ campos seguidos en línea 1: Código Impuesto + Impuesto/Programa
-  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>("");
   const [impuestoPrograma, setImpuestoPrograma] = useState<ImpuestoProgramaSel>("");
+  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>(""); // AUTO (3 dígitos)
 
-  // ✅ filtros
-  const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]); // ✅ multi
+  const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]);
   const [red, setRed] = useState<RedSel>("");
 
   const [desde, setDesde] = useState("");
@@ -119,17 +154,14 @@ const ConsultasDeEstado: React.FC = () => {
 
   const [data, setData] = useState<FilaEstado[]>([]);
 
-  // ✅ catálogo actividades económicas desde loader (igual Priorización)
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingAct, setLoadingAct] = useState(true);
 
   useEffect(() => {
-    // ✅ data
     setData(buildMockEstados(250));
     setDesde(dayjs().add(-5, "day").format("YYYY-MM-DD"));
     setHasta(dayjs().add(30, "day").format("YYYY-MM-DD"));
 
-    // ✅ actividades económicas
     loadActividades().then((arr) => {
       setActividades(arr ?? []);
       setLoadingAct(false);
@@ -173,39 +205,26 @@ const ConsultasDeEstado: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programasDisponibles]);
 
-  // ✅ códigos de impuesto para el select
-  const codigosImpuestoDisponibles = useMemo(() => {
-    const fromData = uniqCaseInsensitive(
-      (data as any[]).flatMap((r) => {
-        const v =
-          (r as any).codigoImpuesto ??
-          (r as any).codigo_impuesto ??
-          (r as any).impuestoCodigo ??
-          (r as any).codigo_impuesto_programa ??
-          "";
-        return String(v)
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean);
-      })
-    );
-    const fallback = ["4331", "ITBMS", "ISR", "INFORMES"];
-    return uniqCaseInsensitive([...fromData, ...fallback]);
-  }, [data]);
+  // ✅ AUTO: escoger Impuesto/Programa => setea el código (3 dígitos)
+  useEffect(() => {
+    if (!impuestoPrograma) {
+      setCodigoImpuesto("");
+      return;
+    }
+    setCodigoImpuesto(inferCodigoDesdePrograma(impuestoPrograma));
+    setMostrarResultados(false);
+  }, [impuestoPrograma]);
 
   // ============================
   // ✅ actividad económica multi
   // ============================
   const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
     const raw = e.target.value as unknown as string[];
-
-    // "Todas"
     if (raw.includes(ALL_VALUE)) {
       setActividadEcon([]);
       setMostrarResultados(false);
       return;
     }
-
     const next = uniqCaseInsensitive(raw.filter((v) => v !== ALL_VALUE));
     setActividadEcon(next);
     setMostrarResultados(false);
@@ -214,11 +233,8 @@ const ConsultasDeEstado: React.FC = () => {
   const renderActividadChips = (selected: any) => {
     const arr: string[] = selected as string[];
     if (!arr?.length) return "Todas";
-
-    // solo mostramos el primero como chip (igual Priorización)
     const first = arr[0];
     const label = actividadesMap.get(first) ?? first;
-
     return (
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
         <Chip key={first} size="small" label={label} />
@@ -249,8 +265,8 @@ const ConsultasDeEstado: React.FC = () => {
       );
     }
 
-    // 3) Código Impuesto
-    if (codigoImpuesto && codigoImpuesto !== "Todos") {
+    // 3) Código (si ya hay uno auto)
+    if (codigoImpuesto) {
       rows = rows.filter((r) => {
         const v =
           r.codigoImpuesto ??
@@ -260,15 +276,9 @@ const ConsultasDeEstado: React.FC = () => {
           "";
         const s = String(v).trim();
         if (!s) return true;
-
-        const parts = s
-          .split(",")
-          .map((x) => x.trim().toLowerCase())
-          .filter(Boolean);
-
-        return parts.length
-          ? parts.includes(String(codigoImpuesto).toLowerCase())
-          : s.toLowerCase() === String(codigoImpuesto).toLowerCase();
+        const cod3 = toCodigo3(s);
+        if (!cod3) return true;
+        return cod3 === codigoImpuesto;
       });
     }
 
@@ -281,8 +291,7 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // ✅ Actividad Económica (multi)
-    // Si el mock no trae actividadEconomica, no matamos filas.
+    // Actividad Económica (multi)
     if (actividadEcon.length > 0) {
       rows = rows.filter((r) => {
         const ae = (r.actividadEconomica ?? r.actividad_economica ?? "").toString().trim();
@@ -300,7 +309,7 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // Semáforo (select)
+    // Semáforo
     if (sem && sem !== "Todos") {
       rows = rows.filter((r) => calcularSemaforo(r.fecha) === sem);
     }
@@ -327,21 +336,41 @@ const ConsultasDeEstado: React.FC = () => {
 
   /** ✅ Inyectamos campos para la tabla */
   const filasParaTabla = useMemo(() => {
-    return filtrados.map((r: any) => ({
-      ...r,
-      tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? tipoInc,
-      impuestoPrograma: r.impuestoPrograma ?? r.impuesto_programa ?? impuestoPrograma,
+    return filtrados.map((r: any) => {
+      const impProg = r.impuestoPrograma ?? r.impuesto_programa ?? impuestoPrograma;
+      const codRaw =
+        r.codigoImpuesto ??
+        r.codigo_impuesto ??
+        r.impuestoCodigo ??
+        r.codigo_impuesto_programa ??
+        "";
 
-      // para display/compat
-      actividadEconomica:
-        r.actividadEconomica ?? r.actividad_economica ?? (actividadEcon[0] ?? ""),
-      red: r.red ?? r.redDgi ?? red,
-      codigoImpuesto:
-        r.codigoImpuesto ?? r.codigo_impuesto ?? r.impuestoCodigo ?? codigoImpuesto,
+      const cod3 =
+        toCodigo3(codRaw) || (impProg ? inferCodigoDesdePrograma(String(impProg)) : "") || codigoImpuesto;
 
-      tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
-    })) as any as FilaEstado[];
-  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto]);
+      // ✅ nombre COMPLETO pero sin números
+      const impuestoNombre =
+        r.impuestoNombre ??
+        r.impuesto_nombre ??
+        limpiarNombreImpuestoPrograma(String(impProg ?? ""));
+
+      return {
+        ...r,
+        tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? tipoInc,
+        impuestoPrograma: impProg,
+
+        // ✅ esto es lo que mostrará la tabla (sin códigos repetidos)
+        impuestoNombre,
+
+        actividadEconomica:
+          r.actividadEconomica ?? r.actividad_economica ?? (actividadEcon[0] ?? ""),
+        red: r.red ?? r.redDgi ?? red,
+
+        codigoImpuesto: cod3,
+        tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
+      };
+    }) as any as FilaEstado[];
+  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto, codigoImpuesto]);
 
   // =========================
   // ✅ GARANTIZAR RESULTADOS
@@ -378,6 +407,9 @@ const ConsultasDeEstado: React.FC = () => {
     const f1 = fechaParaSemaforo(sem);
     const fecha = fechaDentroDeRango(f1);
 
+    const impProg = impuestoPrograma || "Omisos vs retenciones 4331 ITBMS";
+    const cod3 = inferCodigoDesdePrograma(impProg) || "433";
+
     return {
       numeroTramite: num,
       ruc: "100200999",
@@ -387,12 +419,12 @@ const ConsultasDeEstado: React.FC = () => {
       fecha,
 
       tipoInconsistencia: tipoInc || "Omiso",
-      impuestoPrograma: impuestoPrograma || "Omisos vs ITBMS",
-      codigoImpuesto: codigoImpuesto || "ITBMS",
+      impuestoPrograma: impProg,
+      impuestoNombre: limpiarNombreImpuestoPrograma(impProg),
 
-      // ✅ aquí usamos la primera seleccionada si hay
+      codigoImpuesto: cod3,
+
       actividadEconomica: actividadEcon[0] || (actividades[0]?.code ?? "Servicios"),
-
       red: (red && red !== "Todos" ? red : "675") || "675",
       tipoPersona: "Jurídica",
     };
@@ -409,10 +441,10 @@ const ConsultasDeEstado: React.FC = () => {
     setTipoInc("");
     setActividad("");
 
-    setCodigoImpuesto("");
     setImpuestoPrograma("");
+    setCodigoImpuesto("");
 
-    setActividadEcon([]); // ✅ multi reset
+    setActividadEcon([]);
     setRed("");
 
     setSem("");
@@ -445,8 +477,7 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-    
-  {/* ✅ Impuesto / Programa (línea 1, al lado de Código) */}
+        {/* Impuesto / Programa */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
@@ -468,30 +499,18 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Código de Impuesto (línea 1, seguido de Impuesto/Programa) */}
+        {/* Código (AUTO) - DESHABILITADO */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
-            select
             fullWidth
-            label="Código de Impuesto"
+            label="Código de Impuesto (3 dígitos)"
             value={codigoImpuesto}
-            onChange={(e) => {
-              setCodigoImpuesto(e.target.value as CodigoImpuestoSel);
-              setMostrarResultados(false);
-            }}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
-            {codigosImpuestoDisponibles.map((op) => (
-              <MenuItem key={op} value={op}>
-                {op}
-              </MenuItem>
-            ))}
-          </TextField>
+            disabled
+            helperText="Se asigna automáticamente al seleccionar Impuesto / Programa"
+          />
         </Grid>
 
-      
-            {/* Estado / Actividad */}
+        {/* Estado / Actividad */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
@@ -513,7 +532,7 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Actividad Económica (MULTI) */}
+        {/* Actividad Económica (MULTI) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select

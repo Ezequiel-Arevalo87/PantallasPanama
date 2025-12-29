@@ -61,7 +61,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<TrazaItem[]>([]);
   const [tramiteActual, setTramiteActual] = useState<string | number | null>(null);
 
-  // Encabezado ventana "Ver"
   const [detalleHeader, setDetalleHeader] = useState<{
     numeroTramite?: string | number;
     ruc?: string;
@@ -70,7 +69,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     actividadActual?: string;
   } | null>(null);
 
-  // Filtro por chips
   const [semaforoSeleccionado, setSemaforoSeleccionado] = useState<Semaforo | "">("");
 
   const handleToggleFiltroSemaforo = useCallback((s: Semaforo) => {
@@ -120,11 +118,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
 
       const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
 
+      // ✅ nombre completo sin números (inyectado en ConsultasDeEstado)
+      const impuestoNombre =
+        anyR.impuestoNombre ??
+        anyR.impuesto_nombre ??
+        (anyR.impuestoPrograma ?? anyR.impuesto_programa ?? "");
+
       return {
         id: i,
         ...r,
         codigoImpuesto,
         tipoPersona,
+        impuestoNombre,
       };
     });
   }, [rows]);
@@ -172,7 +177,20 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       },
       { field: "tipoPersona", headerName: "Tipo de Persona", width: 160 },
       { field: "estado", headerName: "Estado", width: 220 },
-      { field: "codigoImpuesto", headerName: "Código-Impuesto", width: 160 },
+
+      // ✅ COD3 - NOMBRE COMPLETO (sin repetir números)
+      {
+        field: "codigoImpuesto",
+        headerName: "Código-Impuesto",
+        width: 360,
+        renderCell: (p: any) => {
+          const cod = String(p?.row?.codigoImpuesto ?? "").trim();
+          const nombre = String(p?.row?.impuestoNombre ?? "").trim();
+          if (!cod && !nombre) return "—";
+          if (!nombre) return cod || "—";
+          return `${cod} - ${nombre}`;
+        },
+      },
 
       // Fecha
       {
@@ -256,7 +274,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       "Nombre / Razón Social": r.contribuyente ?? "",
       "Tipo de Persona": r.tipoPersona ?? "",
       Estado: r.estado ?? "",
-      "Código-Impuesto": r.codigoImpuesto ?? "",
+      "Código-Impuesto": `${r.codigoImpuesto ?? ""}${r.impuestoNombre ? ` - ${r.impuestoNombre}` : ""}`,
       Fecha: toDDMMYYYY(r.fecha ?? ""),
       Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
       "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
