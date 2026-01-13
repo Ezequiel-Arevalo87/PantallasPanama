@@ -80,6 +80,10 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     impuestos?: string[];
     actividadActual?: string;
 
+    // ✅ NUEVO (mínimo) para mostrar en detalle
+    programaCodigo?: string;
+    impuestoProgramaLabel?: string;
+
     periodoInicial?: string;
     periodoFinal?: string;
     relacionImpuestos?: Array<{
@@ -110,12 +114,20 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       ? anyFila.relacionImpuestos
       : [];
 
+    // ✅ NUEVO: traer código + label (inyectados desde ConsultasDeEstado)
+    const programaCodigo = String(anyFila?.programaCodigo ?? "").trim();
+    const impuestoProgramaLabel = String(
+      anyFila?.impuestoProgramaLabel ?? anyFila?.impuestoPrograma ?? ""
+    ).trim();
+
     setDetalleHeader({
       numeroTramite: tramite ?? "",
       ruc: ruc ?? "",
       contribuyente: anyFila?.contribuyente ?? "",
       impuestos,
       actividadActual,
+      programaCodigo,
+      impuestoProgramaLabel,
       periodoInicial,
       periodoFinal,
       relacionImpuestos,
@@ -138,21 +150,17 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return rows.map((r, i) => {
       const anyR = r as any;
 
-      const codigoImpuesto =
-        anyR.codigoImpuesto ??
-        anyR.codigo_impuesto ??
-        anyR.impuestoCodigo ??
-        anyR.codigo_impuesto_programa ??
-        "";
+      // ✅ YA NO ES CODIGO IMPUESTO. AHORA ES CODIGO PROGRAMA (inyectado)
+      const programaCodigo = anyR.programaCodigo ?? "";
 
       const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
-      const impuestoNombre = anyR.impuestoNombre ?? anyR.impuesto_nombre ?? "";
+      const impuestoProgramaLabel = anyR.impuestoProgramaLabel ?? anyR.impuestoPrograma ?? "";
 
       return {
         id: i,
         ...r,
-        codigoImpuesto,
-        impuestoNombre,
+        programaCodigo,
+        impuestoProgramaLabel,
         tipoPersona,
       };
     });
@@ -189,7 +197,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return { rojo, amarillo, verde, total: base.length };
   }, [gridRows, gridRowsBase, semaforoSeleccionado]);
 
-  // ✅ Excel general
+  // ✅ Excel general (misma estructura, solo cambia código)
   const exportar = () => {
     const data = (gridRows as any[]).map((r) => ({
       "No Trámite": r.numeroTramite ?? "",
@@ -197,8 +205,8 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       "Nombre / Razón Social": r.contribuyente ?? "",
       "Tipo de Persona": r.tipoPersona ?? "",
       Estado: r.estado ?? "",
-      "Código Impuesto": r.codigoImpuesto ?? "",
-      "Nombre Impuesto": r.impuestoNombre ?? "",
+      "Código Programa": r.programaCodigo ?? "",
+      Programa: r.impuestoProgramaLabel ?? "",
       "Periodo Inicial": r.periodoInicial ?? "",
       "Periodo Final": r.periodoFinal ?? "",
       Fecha: toDDMMYYYY(r.fecha ?? ""),
@@ -212,7 +220,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     XLSX.writeFile(wb, "consulta_estado.xlsx");
   };
 
-  // ✅ Excel del DETALLE (del trámite abierto)
+  // ✅ Excel del DETALLE (NO lo tocamos, queda igual)
   const exportarDetalle = () => {
     if (!detalleHeader) return;
 
@@ -222,6 +230,8 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         RUC: detalleHeader.ruc ?? "",
         Contribuyente: detalleHeader.contribuyente ?? "",
         "Actividad Actual": detalleHeader.actividadActual ?? "",
+        "Código Programa": detalleHeader.programaCodigo ?? "",
+        Programa: detalleHeader.impuestoProgramaLabel ?? "",
         "Periodo Inicial": detalleHeader.periodoInicial ?? "",
         "Periodo Final": detalleHeader.periodoFinal ?? "",
       },
@@ -262,19 +272,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       { field: "estado", headerName: "Estado", width: 220 },
 
       {
-        field: "codigoImpuesto",
-        headerName: "Código - Impuesto",
+        field: "programaCodigo",
+        headerName: "Código - Programa",
         width: 420,
         renderCell: (p: any) => {
-          const cod = String(p?.row?.codigoImpuesto ?? "").trim();
-          const nom = String(p?.row?.impuestoNombre ?? "").trim();
+          const cod = String(p?.row?.programaCodigo ?? "").trim();
+          const nom = String(p?.row?.impuestoProgramaLabel ?? "").trim();
           if (!cod && !nom) return "—";
           if (!nom) return cod || "—";
-          return `${cod} - ${nom}`;
+          return `${cod} - ${nom.replace(/^\d+\s*-\s*/g, "")}`;
         },
       },
 
-      // Fecha
       {
         field: "fecha",
         headerName: "Fecha",
@@ -301,7 +310,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         },
       },
 
-      // Semáforo
       {
         field: "semaforo",
         headerName: "Semáforo",
@@ -320,7 +328,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         },
       },
 
-      // Ver
       {
         field: "accion",
         headerName: "Ver",
@@ -416,7 +423,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       {/* Dialog Ver */}
       <Dialog open={openTraza} onClose={handleCerrarTrazas} maxWidth="md" fullWidth>
         <DialogTitle sx={{ m: 0, p: 2 }}>
-          Detalle {tramiteActual ? `- Trámite ${tramiteActual}` : ""}
+          Detalle
 
           {/* ✅ Botón Excel Detalle */}
           <Stack direction="row" spacing={1} sx={{ position: "absolute", right: 52, top: 10 }}>
@@ -454,6 +461,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
+                {/* ✅ NUEVO: mostrar código + programa */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>Código Programa:</b> {detalleHeader.programaCodigo || "—"}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>Programa:</b> {detalleHeader.impuestoProgramaLabel || "—"}
+                  </Typography>
+                </Grid>
+
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
                     <b>Periodo Inicial:</b> {detalleHeader.periodoInicial || "—"}
@@ -471,7 +490,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
-                {/* ✅ Relación de impuestos bonita */}
+                {/* ✅ CAMBIO PEDIDO: 1 sola columna Código/Impuesto */}
                 <Grid item xs={12}>
                   <Paper variant="outlined" sx={{ mt: 1, p: 1.5, borderRadius: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -482,10 +501,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                       <TableHead>
                         <TableRow>
                           <TableCell>
-                            <b>Código</b>
-                          </TableCell>
-                          <TableCell>
-                            <b>Impuesto</b>
+                            <b>Código/Impuesto</b>
                           </TableCell>
                           <TableCell align="right">
                             <b>Monto liquidado</b>
@@ -494,22 +510,26 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                       </TableHead>
                       <TableBody>
                         {(detalleHeader.relacionImpuestos ?? []).length ? (
-                          (detalleHeader.relacionImpuestos ?? []).map((x, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                                {x.codigoImpuesto ?? "—"}
-                              </TableCell>
-                              <TableCell sx={{ maxWidth: 420 }}>
-                                {x.nombreImpuesto ?? "—"}
-                              </TableCell>
-                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                                {money(x.montoLiquidado)}
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          (detalleHeader.relacionImpuestos ?? []).map((x, idx) => {
+                            const cod = String(x.codigoImpuesto ?? "").trim();
+                            const nom = String(x.nombreImpuesto ?? "").trim();
+                            const codNom =
+                              cod && nom ? `${cod} - ${nom}` : nom || cod || "—";
+
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell sx={{ maxWidth: 420 }}>
+                                  {codNom}
+                                </TableCell>
+                                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                  {money(x.montoLiquidado)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={3}>—</TableCell>
+                            <TableCell colSpan={2}>—</TableCell>
                           </TableRow>
                         )}
                       </TableBody>

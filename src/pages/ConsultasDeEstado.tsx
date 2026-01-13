@@ -1,4 +1,3 @@
-// src/pages/ConsultasDeEstado.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -10,6 +9,7 @@ import {
   Checkbox,
   ListItemText,
   Chip,
+  Autocomplete,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import dayjs from "dayjs";
@@ -56,6 +56,7 @@ const ACTIVIDADES: EstadoActividad[] = [
 const TIPOS_INCONSISTENCIA = ["Omiso", "Inexacto", "Extemporáneo", "Todos"] as const;
 type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number] | "";
 
+// (los mismos textos que ya tenías)
 const PROGRAMAS_OMISO = [
   "Omisos vs retenciones 4331 ITBMS",
   "Omisos vs informes",
@@ -82,10 +83,8 @@ type RedSel = (typeof REDS)[number] | "";
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values()).filter(Boolean);
 
-type ImpuestoProgramaSel = string | "";
 type ActividadSel = EstadoActividad | "Todos" | "";
 type SemaforoSel = Semaforo | "Todos" | "";
-type CodigoImpuestoSel = string | "";
 
 // ✅ Multi-select actividad económica (igual que Priorización)
 const ALL_VALUE = "__ALL__";
@@ -99,40 +98,46 @@ const parseFecha = (f: any) => {
 };
 
 // ============================
-// ✅ Helpers para código automático (3 dígitos)
+// ✅ Programa con CÓDIGO ÚNICO (para Autocomplete + tabla)
 // ============================
-const toCodigo3 = (input: any): string => {
-  const s = String(input ?? "").trim();
-  if (!s) return "";
-
-  const m = s.match(/\d{3,}/); // toma el primer bloque numérico 3+ (ej 4331)
-  if (m?.[0]) return m[0].slice(0, 3);
-
-  const digits = s.replace(/\D/g, "");
-  if (digits.length >= 3) return digits.slice(0, 3);
-
-  return "";
+type ProgramaOpt = {
+  codigo: string; // único
+  nombre: string; // (texto original)
+  label: string; // `${codigo} - ${nombre}`
 };
 
-const inferCodigoDesdePrograma = (programa: string): string => {
-  const c = toCodigo3(programa);
-  if (c) return c;
+/**
+ * ⚠️ Ajusta si cambian los códigos.
+ * Clave: EL CÓDIGO NO SE REPITE.
+ * (Basado en tu screenshot)
+ */
+const PROGRAMA_CODIGO: Record<string, string> = {
+  "Omisos vs retenciones 4331 ITBMS": "115",
+  "Omisos vs informes": "116",
+  "Omisos vs ISR Renta": "113",
+  "Omisos vs ITBMS": "114",
 
-  // fallback por palabra clave
-  const p = (programa ?? "").toLowerCase();
-  if (p.includes("itbms")) return "433";
-  if (p.includes("isr") || p.includes("renta")) return "101";
-  if (p.includes("informes")) return "102";
-  return "";
+  "Costos y gastos vs Anexos": "210",
+  "Ventas e ingresos vs Anexos": "211",
+  "Inexactos vs retenciones 4331 ITBMS": "212",
+  "Inexactos vs ITBMS": "213",
+
+  "Base contribuyentes VS Calendario ISR": "310",
+  "Base contribuyentes VS Calendario ITBMS": "311",
+  "Base contribuyentes VS Calendario retenciones ITBMS": "312",
+};
+
+const toProgramaOpt = (nombre: string): ProgramaOpt => {
+  const codigo = PROGRAMA_CODIGO[nombre] ?? ""; // si faltara, no rompe
+  return { codigo, nombre, label: codigo ? `${codigo} - ${nombre}` : nombre };
 };
 
 const ConsultasDeEstado: React.FC = () => {
-  // orden: 1) tipoInc 2) actividad 3) impuestoPrograma (y codigo auto)
   const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
   const [actividad, setActividad] = useState<ActividadSel>("");
 
-  const [impuestoPrograma, setImpuestoPrograma] = useState<ImpuestoProgramaSel>("");
-  const [codigoImpuesto, setCodigoImpuesto] = useState<CodigoImpuestoSel>(""); // AUTO
+  // ✅ Autocomplete: guardamos el objeto seleccionado
+  const [programaSel, setProgramaSel] = useState<ProgramaOpt | null>(null);
 
   // ✅ filtros
   const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]);
@@ -166,48 +171,39 @@ const ConsultasDeEstado: React.FC = () => {
     return m;
   }, [actividades]);
 
-  /** ✅ Programas dependen del tipo de inconsistencia (RESTABLECIDO) */
+  /** ✅ Programas dependen del tipo de inconsistencia (MISMA LÓGICA) */
   const programasDisponibles = useMemo(() => {
+    let base: string[] = [];
     switch (tipoInc) {
       case "Omiso":
-        return [...PROGRAMAS_OMISO];
+        base = [...PROGRAMAS_OMISO];
+        break;
       case "Inexacto":
-        return [...PROGRAMAS_INEXACTO];
+        base = [...PROGRAMAS_INEXACTO];
+        break;
       case "Extemporáneo":
-        return [...PROGRAMAS_EXTEMPORANEO];
+        base = [...PROGRAMAS_EXTEMPORANEO];
+        break;
       case "Todos":
-        return uniqCaseInsensitive([
-          ...PROGRAMAS_OMISO,
-          ...PROGRAMAS_INEXACTO,
-          ...PROGRAMAS_EXTEMPORANEO,
-        ]);
       default:
-        return uniqCaseInsensitive([
+        base = uniqCaseInsensitive([
           ...PROGRAMAS_OMISO,
           ...PROGRAMAS_INEXACTO,
           ...PROGRAMAS_EXTEMPORANEO,
         ]);
+        break;
     }
+    return base.map(toProgramaOpt);
   }, [tipoInc]);
 
-  // Si cambia tipoInc y el programa ya no existe -> limpiar
+  // Si cambia tipoInc y el programa ya no existe -> limpiar (MISMO COMPORTAMIENTO)
   useEffect(() => {
-    if (impuestoPrograma && !programasDisponibles.includes(impuestoPrograma)) {
-      setImpuestoPrograma("");
-      setCodigoImpuesto("");
+    if (programaSel) {
+      const exists = programasDisponibles.some((p) => p.nombre === programaSel.nombre);
+      if (!exists) setProgramaSel(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programasDisponibles]);
-
-  // ✅ AUTO: escoger Impuesto/Programa => setea el código (3 dígitos) y el código queda deshabilitado
-  useEffect(() => {
-    if (!impuestoPrograma) {
-      setCodigoImpuesto("");
-      return;
-    }
-    setCodigoImpuesto(inferCodigoDesdePrograma(impuestoPrograma));
-    setMostrarResultados(false);
-  }, [impuestoPrograma]);
 
   // ============================
   // ✅ actividad económica multi
@@ -263,31 +259,17 @@ const ConsultasDeEstado: React.FC = () => {
       );
     }
 
-    // 3) Código Impuesto (auto) - se filtra por “3 dígitos”
-    if (codigoImpuesto) {
+    // 3) Programa seleccionado
+    // - Preferimos filtrar por programaCodigo si el row lo trae
+    // - Si no lo trae (mocks/compat), filtramos por nombre
+    if (programaSel) {
       rows = rows.filter((r) => {
-        const v =
-          r.codigoImpuesto ??
-          r.codigo_impuesto ??
-          r.impuestoCodigo ??
-          r.codigo_impuesto_programa ??
-          "";
-        const s = String(v).trim();
-        if (!s) return true;
+        const cod = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
+        if (cod) return cod === programaSel.codigo;
 
-        const cod3 = toCodigo3(s);
-        if (!cod3) return true;
-
-        return cod3 === codigoImpuesto;
-      });
-    }
-
-    // 4) Impuesto / Programa
-    if (impuestoPrograma) {
-      rows = rows.filter((r) => {
         const imp = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim();
         if (!imp) return true;
-        return imp.toLowerCase() === impuestoPrograma.toLowerCase();
+        return imp.toLowerCase() === programaSel.nombre.toLowerCase();
       });
     }
 
@@ -332,31 +314,27 @@ const ConsultasDeEstado: React.FC = () => {
     }
 
     return rows as FilaEstado[];
-  }, [data, tipoInc, actividad, codigoImpuesto, impuestoPrograma, actividadEcon, red, sem, desde, hasta]);
+  }, [data, tipoInc, actividad, programaSel, actividadEcon, red, sem, desde, hasta]);
 
-  /** ✅ Inyectamos campos para la tabla (SIN romper lo que ya funciona) */
+  /** ✅ Inyectamos campos para la tabla (SIN romper nada) */
   const filasParaTabla = useMemo(() => {
     const periodoInicial = desde || "";
     const periodoFinal = hasta || "";
 
     return filtrados.map((r: any) => {
-      const impProg = r.impuestoPrograma ?? r.impuesto_programa ?? impuestoPrograma;
-      const codRaw =
-        r.codigoImpuesto ??
-        r.codigo_impuesto ??
-        r.impuestoCodigo ??
-        r.codigo_impuesto_programa ??
-        "";
+      const impProg = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim() || (programaSel?.nombre ?? "");
+      const programaCodigo = String(r.programaCodigo ?? r.programa_codigo ?? "").trim() || (programaSel?.codigo ?? "");
 
-      const cod3 = toCodigo3(codRaw) || (impProg ? inferCodigoDesdePrograma(String(impProg)) : "") || codigoImpuesto;
+      const impuestoProgramaLabel =
+        programaCodigo && impProg ? `${programaCodigo} - ${impProg}` : impProg;
 
-      // nombre completo SIN números (para que no se repita 4331)
+      // nombre sin números (solo por estética)
       const impuestoNombre = String(impProg ?? "")
         .replace(/\b\d+\b/g, "")
         .replace(/\s+/g, " ")
         .trim();
 
-      // ✅ detalle: relación impuestos (bonito en dialog, sin tabla extra arriba)
+      // ✅ relación impuestos (se mantiene)
       const montoLiquidado =
         Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) ||
         Math.round((500 + Math.random() * 9500) * 100) / 100;
@@ -365,7 +343,8 @@ const ConsultasDeEstado: React.FC = () => {
         ? r.relacionImpuestos
         : [
             {
-              codigoImpuesto: cod3,
+              // acá usamos programaCodigo como “código” para mostrar en el detalle (código/impuesto)
+              codigoImpuesto: programaCodigo || "",
               nombreImpuesto: impuestoNombre,
               montoLiquidado,
             },
@@ -374,11 +353,11 @@ const ConsultasDeEstado: React.FC = () => {
       return {
         ...r,
         tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? tipoInc,
-        impuestoPrograma: impProg,
 
-        // display/compat tabla
-        codigoImpuesto: cod3,
-        impuestoNombre, // <- lo usa la tabla para mostrar nombre completo
+        // ✅ programa para tabla
+        impuestoPrograma: impProg,
+        programaCodigo,
+        impuestoProgramaLabel,
 
         // detalle
         periodoInicial,
@@ -391,7 +370,7 @@ const ConsultasDeEstado: React.FC = () => {
         tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
       };
     }) as any as FilaEstado[];
-  }, [filtrados, tipoInc, impuestoPrograma, actividadEcon, red, codigoImpuesto, desde, hasta]);
+  }, [filtrados, tipoInc, programaSel, actividadEcon, red, desde, hasta]);
 
   // =========================
   // ✅ GARANTIZAR RESULTADOS
@@ -423,12 +402,14 @@ const ConsultasDeEstado: React.FC = () => {
     const now = dayjs();
     const num = `MCK-${now.format("YYMMDDHHmmss")}`;
 
-    const f1 = fechaParaSemaforo(sem);
-    const fecha = fechaDentroDeRango(f1);
+    const fecha = fechaDentroDeRango(fechaParaSemaforo(sem));
 
-    const impProg = impuestoPrograma || "Omisos vs ITBMS";
-    const cod3 = inferCodigoDesdePrograma(impProg) || "433";
-    const impuestoNombre = String(impProg).replace(/\b\d+\b/g, "").replace(/\s+/g, " ").trim();
+    const fallbackOpt = toProgramaOpt("Omisos vs ITBMS");
+    const sel = programaSel ?? (programasDisponibles[0] ?? fallbackOpt);
+
+    const programaCodigo = sel.codigo ?? "";
+    const impProg = sel.nombre ?? "";
+    const impuestoProgramaLabel = sel.label ?? `${programaCodigo} - ${impProg}`;
 
     return {
       numeroTramite: num,
@@ -439,16 +420,17 @@ const ConsultasDeEstado: React.FC = () => {
       fecha,
 
       tipoInconsistencia: tipoInc || "Omiso",
+
       impuestoPrograma: impProg,
-      impuestoNombre,
-      codigoImpuesto: cod3,
+      programaCodigo,
+      impuestoProgramaLabel,
 
       periodoInicial: desde || "",
       periodoFinal: hasta || "",
       relacionImpuestos: [
         {
-          codigoImpuesto: cod3,
-          nombreImpuesto: impuestoNombre,
+          codigoImpuesto: programaCodigo || "",
+          nombreImpuesto: impProg,
           montoLiquidado: Math.round((500 + Math.random() * 9500) * 100) / 100,
         },
       ],
@@ -469,9 +451,7 @@ const ConsultasDeEstado: React.FC = () => {
   const limpiar = () => {
     setTipoInc("");
     setActividad("");
-
-    setImpuestoPrograma("");
-    setCodigoImpuesto("");
+    setProgramaSel(null);
 
     setActividadEcon([]);
     setRed("");
@@ -506,36 +486,32 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Impuesto / Programa (depende del tipoInc) */}
+        {/* ✅ Impuesto / Programa (Autocomplete: código + nombre) */}
         <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            select
-            fullWidth
-            label="Impuesto / Programa"
-            value={impuestoPrograma}
-            onChange={(e) => {
-              setImpuestoPrograma(e.target.value as ImpuestoProgramaSel);
+          <Autocomplete
+            options={programasDisponibles}
+            value={programaSel}
+            onChange={(_e, newValue) => {
+              setProgramaSel(newValue);
               setMostrarResultados(false);
             }}
-            disabled={programasDisponibles.length === 0}
-          >
-            <MenuItem value="">— Todos —</MenuItem>
-            {programasDisponibles.map((op) => (
-              <MenuItem key={op} value={op}>
-                {op}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Código de Impuesto (AUTO + DESHABILITADO) */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            label="Código de Impuesto"
-            value={codigoImpuesto}
-            disabled
-            helperText="Se asigna automáticamente al seleccionar Impuesto / Programa"
+            getOptionLabel={(opt) => opt?.label ?? ""}
+            isOptionEqualToValue={(opt, val) => opt.nombre === val.nombre && opt.codigo === val.codigo}
+            filterOptions={(options, state) => {
+              const q = state.inputValue.trim().toLowerCase();
+              if (!q) return options;
+              return options.filter((o) =>
+                `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q)
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Impuesto / Programa"
+                placeholder="Buscar código o nombre"
+                fullWidth
+              />
+            )}
           />
         </Grid>
 

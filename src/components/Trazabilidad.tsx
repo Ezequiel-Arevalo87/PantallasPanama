@@ -177,7 +177,7 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
       { field: "actividad", headerName: "Actividad", minWidth: 220, flex: 1 },
       {
         field: "estado",
-        headerName: "Estado",
+        headerName: "Resultado",
         minWidth: 140,
         renderCell: (params) => <EstadoChip value={params.value as EstadoAprobacion} />,
       },
