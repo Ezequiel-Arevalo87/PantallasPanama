@@ -36,6 +36,8 @@ import { NuevosCasos } from "./NuevosCasos";
 import { readAprobados } from "../lib/workflowStorage";
 import ActaInicio from "./ActaInicio";
 import ComunicacionesForm from "./ComunicacionesForm";
+import { CrearInformeAuditoria } from "./CrearInformeAuditoria";
+import { Tramite } from "./Tramite";
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
@@ -128,6 +130,12 @@ export const Layout: React.FC = () => {
             setReadOnly={setReadOnly}
           />
         );
+
+      case "INFORME AUDITORIA":
+        return <CrearInformeAuditoria />;
+      case "TRAMITE":
+        return <Tramite />;
+
 
       case "ACTA DE INICIO":
         return <ActaInicio />;

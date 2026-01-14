@@ -72,9 +72,7 @@ const useMenuData = () => {
   const asignacion: MenuNode[] = [{ label: 'ASIGNACIÓN' }];
 
   const auditorias: MenuNode[] = [
-    { label: 'CONTROL Y SEGUIMIENTO' },
-  //  { label: 'INICIO DE AUDITORIA' },
-    {
+      {
       label: 'GESTIÓN DE AUDITORIA',
       children: [
         { label: 'ACTA DE INICIO' },
@@ -82,8 +80,13 @@ const useMenuData = () => {
         { label: 'PROCESO DE AUDITORIA' },
         { label: 'SUPERVISOR' },
         { label: 'DIRECTOR' },
+        { label: 'INFORME AUDITORIA' },
+        { label: 'TRAMITE' },
       ],
     },
+    { label: 'CONTROL Y SEGUIMIENTO' },
+  //  { label: 'INICIO DE AUDITORIA' },
+  
    
    
     { label: 'VARIACIÓN EN INGRESOS' },
