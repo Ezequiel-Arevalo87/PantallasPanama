@@ -1,4 +1,18 @@
+// src/pages/Tramite.tsx
 import React, { useState } from "react";
+
+/** ===================== TIPOS ===================== */
+export type TramitePayload = {
+  numeroTramite: string;
+  red: string;
+  actividad: string;
+  estadoTramite: string;
+  fechaInicio: string;
+  usuarioGestion: string;
+  ruc: string;
+  contribuyente: string;
+  ubicacionExpediente: string;
+};
 
 type DocumentoAsociado = {
   numero: string;
@@ -14,41 +28,74 @@ type FormularioCrear = {
   nombre: string;
 };
 
+type Props = {
+  onGo: (ruta: string, state?: any) => void;
+};
+
+/** ===================== ESTILOS (igual HTML) ===================== */
+const pageStyle: React.CSSProperties = {
+  fontFamily: "Arial, sans-serif",
+  margin: 20,
+};
+
+const h2Style: React.CSSProperties = {
+  marginTop: 30,
+};
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: 10,
+};
+
 const thStyle: React.CSSProperties = {
   border: "1px solid #ccc",
   padding: 8,
-  background: "#f2f2f2",
   textAlign: "left",
+  backgroundColor: "#f2f2f2",
 };
 
 const tdStyle: React.CSSProperties = {
   border: "1px solid #ccc",
   padding: 8,
+  textAlign: "left",
 };
 
 const btnBase: React.CSSProperties = {
   padding: "8px 12px",
   margin: "5px",
-  border: "none",
   cursor: "pointer",
-  borderRadius: 5,
-  fontWeight: 600,
+  border: "none",
 };
 
 const btnPrimary: React.CSSProperties = {
   ...btnBase,
-  background: "#007bff",
-  color: "#fff",
+  backgroundColor: "#007bff",
+  color: "white",
 };
 
 const btnSecondary: React.CSSProperties = {
   ...btnBase,
-  background: "#6c757d",
-  color: "#fff",
+  backgroundColor: "#6c757d",
+  color: "white",
 };
 
-export const Tramite: React.FC = () => {
+/** ===================== COMPONENTE ===================== */
+export const Tramite: React.FC<Props> = ({ onGo }) => {
   const [nota, setNota] = useState("");
+
+  // ✅ Igual al HTML
+  const tramite: TramitePayload = {
+    numeroTramite: "675000001027",
+    red: "Control Extensivo v2",
+    actividad: "2 - Análisis Auditor Control Extensivo",
+    estadoTramite: "ASIGNADO",
+    fechaInicio: "17/02/2025",
+    usuarioGestion: "ZULEIMA ISABEL MORAN",
+    ruc: "987654321-2-2021",
+    contribuyente: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
+    ubicacionExpediente: "SECCIÓN DE CONTROL DE SERVICIO AL CONTRIBUYENTE",
+  };
 
   const documentosAsociados: DocumentoAsociado[] = [
     {
@@ -72,19 +119,24 @@ export const Tramite: React.FC = () => {
   const formulariosCrear: FormularioCrear[] = [
     { codigo: "706", nombre: "INFORME FINAL AUDITORIA" },
     { codigo: "720", nombre: "AUTO DE ARCHIVO" },
-    {
-      codigo: "725",
-      nombre: "REQUERIMIENTO DE REGULARIZACIÓN (CONTROL EXTENSIVO)",
-    },
+    { codigo: "725", nombre: "REQUERIMIENTO DE REGULARIZACIÓN (CONTROL EXTENSIVO)" },
   ];
 
   const crearFormulario = (codigo: string) => {
-    alert(`Crear formulario código ${codigo} (pendiente integración)`);
-    // aquí luego navegas o abres el componente correspondiente
+    // ✅ flujo que pediste: Trámite -> Informe de auditoría al crear 706
+    if (codigo === "706") {
+      onGo("PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/INFORME AUDITORIA", {
+        tramite,
+      });
+      return;
+    }
+
+    // otros formularios (simulación)
+    alert(`Crear formulario código ${codigo} (demo)`);
   };
 
   const guardar = () => {
-    alert("Nota guardada (demo)");
+    alert("Nota guardada (demo).");
   };
 
   const limpiar = () => {
@@ -94,48 +146,38 @@ export const Tramite: React.FC = () => {
   const enviar = () => {
     const ok = window.confirm("¿Está seguro que desea enviar el trámite?");
     if (!ok) return;
-
-    alert("Trámite enviado (demo)");
+    alert("Trámite enviado (demo).");
   };
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", margin: 20 }}>
+    <div style={pageStyle}>
       <h1>Pantalla BPM - Gestión de la Actividad</h1>
 
-      {/* ================= DATOS GENERALES ================= */}
-      <h2>Datos Generales del Proceso</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <h2 style={h2Style}>Datos Generales del Proceso</h2>
+      <table style={tableStyle}>
         <tbody>
           <tr>
-            <td style={tdStyle}>Número de Trámite: <b>675000001027</b></td>
-            <td style={tdStyle}>Red: <b>Control Extensivo v2</b></td>
-            <td style={tdStyle}>
-              Actividad: <b>2 - Análisis Auditor Control Extensivo</b>
-            </td>
+            <td style={tdStyle}>Número de Trámite: {tramite.numeroTramite}</td>
+            <td style={tdStyle}>Red: {tramite.red}</td>
+            <td style={tdStyle}>Actividad: {tramite.actividad}</td>
           </tr>
           <tr>
-            <td style={tdStyle}>Estado del Trámite: <b>ASIGNADO</b></td>
-            <td style={tdStyle}>Fecha de Inicio: <b>17/02/2025</b></td>
-            <td style={tdStyle}>
-              Usuario de Gestión: <b>ZULEIMA ISABEL MORAN</b>
-            </td>
+            <td style={tdStyle}>Estado del Trámite: {tramite.estadoTramite}</td>
+            <td style={tdStyle}>Fecha de Inicio: {tramite.fechaInicio}</td>
+            <td style={tdStyle}>Usuario de Gestión: {tramite.usuarioGestion}</td>
           </tr>
           <tr>
-            <td style={tdStyle}>RUC: <b>987654321-2-2021</b></td>
+            <td style={tdStyle}>RUC: {tramite.ruc}</td>
+            <td style={tdStyle}>Contribuyente: {tramite.contribuyente}</td>
             <td style={tdStyle}>
-              Contribuyente: <b>TRANSPORTES Y SERVICIOS LOGISTICOS S A</b>
-            </td>
-            <td style={tdStyle}>
-              Ubicación Expediente Físico:
-              <b> SECCIÓN DE CONTROL DE SERVICIO AL CONTRIBUYENTE</b>
+              Ubicación Expediente Físico: {tramite.ubicacionExpediente}
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* ================= DOCUMENTOS ASOCIADOS ================= */}
-      <h2>Documentos Asociados</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <h2 style={h2Style}>Documentos Asociados</h2>
+      <table style={tableStyle}>
         <thead>
           <tr>
             <th style={thStyle} colSpan={6}>
@@ -143,12 +185,12 @@ export const Tramite: React.FC = () => {
             </th>
           </tr>
           <tr>
-            <th style={thStyle}>Número</th>
-            <th style={thStyle}>Nombre</th>
+            <th style={thStyle}>Número del documento</th>
+            <th style={thStyle}>Nombre del documento</th>
             <th style={thStyle}>Actividad</th>
             <th style={thStyle}>Estado</th>
-            <th style={thStyle}>Fecha</th>
-            <th style={thStyle}>Usuario</th>
+            <th style={thStyle}>Fecha de creación</th>
+            <th style={thStyle}>Usuario de creación</th>
           </tr>
         </thead>
         <tbody>
@@ -165,11 +207,10 @@ export const Tramite: React.FC = () => {
         </tbody>
       </table>
 
-      {/* ================= GESTIÓN DE DOCUMENTOS ================= */}
-      <h2>Gestión de Documentos</h2>
+      <h2 style={h2Style}>Gestión de Documentos</h2>
 
-      {/* Crear */}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      {/* Lista de formularios para creación */}
+      <table style={tableStyle}>
         <thead>
           <tr>
             <th style={thStyle} colSpan={3}>
@@ -178,18 +219,15 @@ export const Tramite: React.FC = () => {
           </tr>
           <tr>
             <th style={thStyle}>Crear</th>
-            <th style={thStyle}>Código</th>
-            <th style={thStyle}>Nombre</th>
+            <th style={thStyle}>Código del formulario</th>
+            <th style={thStyle}>Nombre del formulario</th>
           </tr>
         </thead>
         <tbody>
           {formulariosCrear.map((f) => (
             <tr key={f.codigo}>
               <td style={tdStyle}>
-                <button
-                  style={btnPrimary}
-                  onClick={() => crearFormulario(f.codigo)}
-                >
+                <button style={btnPrimary} onClick={() => crearFormulario(f.codigo)}>
                   Crear
                 </button>
               </td>
@@ -200,14 +238,8 @@ export const Tramite: React.FC = () => {
         </tbody>
       </table>
 
-      {/* Gestión */}
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          marginTop: 15,
-        }}
-      >
+      {/* Lista de formularios para gestión */}
+      <table style={tableStyle}>
         <thead>
           <tr>
             <th style={thStyle} colSpan={7}>
@@ -218,10 +250,10 @@ export const Tramite: React.FC = () => {
             <th style={thStyle}>Editar</th>
             <th style={thStyle}>Aprobar</th>
             <th style={thStyle}>Eliminar</th>
-            <th style={thStyle}>Número</th>
-            <th style={thStyle}>Nombre</th>
+            <th style={thStyle}>Número del documento</th>
+            <th style={thStyle}>Nombre del documento</th>
             <th style={thStyle}>Estado</th>
-            <th style={thStyle}>Fecha</th>
+            <th style={thStyle}>Fecha de creación</th>
           </tr>
         </thead>
         <tbody>
@@ -233,27 +265,26 @@ export const Tramite: React.FC = () => {
         </tbody>
       </table>
 
-      {/* ================= NOTA ================= */}
-      <h2>Nota</h2>
-      <textarea
-        rows={4}
-        style={{ width: "100%", padding: 8 }}
-        value={nota}
-        onChange={(e) => setNota(e.target.value)}
-      />
-
-      {/* ================= BOTONES ================= */}
-      <div style={{ marginTop: 15 }}>
-        <button style={btnSecondary} onClick={guardar}>
-          Guardar
-        </button>
-        <button style={btnSecondary} onClick={limpiar}>
-          Limpiar
-        </button>
-        <button style={btnPrimary} onClick={enviar}>
-          Enviar
-        </button>
+      <h2 style={h2Style}>Nota</h2>
+      <div>
+        <textarea
+          rows={4}
+          cols={80}
+          style={{ width: "100%" }}
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+        />
       </div>
+
+      <button style={btnSecondary} onClick={guardar}>
+        Guardar
+      </button>
+      <button style={btnSecondary} onClick={limpiar}>
+        Limpiar
+      </button>
+      <button style={btnPrimary} onClick={enviar}>
+        Enviar
+      </button>
     </div>
   );
 };

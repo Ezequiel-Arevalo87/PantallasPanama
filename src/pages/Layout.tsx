@@ -47,7 +47,7 @@ const DIR_PATH = "PROCESOS DE AUDITORIAS/DIRECTOR";
 export const Layout: React.FC = () => {
   const [selectedPath, setSelectedPath] = useState<string>("HOME");
   const [readOnly, setReadOnly] = useState<boolean>(false);
-
+const [routeState, setRouteState] = useState<any>(null);
   const leaf = useMemo(() => {
     if (!selectedPath) return "";
     const parts = selectedPath.split("/");
@@ -74,15 +74,20 @@ export const Layout: React.FC = () => {
     }
   }, [readOnly, leaf, selectedPath]);
 
-  const handleSelect = (ruta: string) => {
-    setSelectedPath(ruta);
-    setReadOnly(
-      ruta === SUP_PATH ||
-        ruta.endsWith("/SUPERVISOR") ||
-        ruta === DIR_PATH ||
-        ruta.endsWith("/DIRECTOR")
-    );
-  };
+  
+const handleGo = (ruta: string, state?: any) => {
+  setSelectedPath(ruta);
+  setRouteState(state ?? null);
+  setReadOnly(
+    ruta === SUP_PATH ||
+      ruta.endsWith("/SUPERVISOR") ||
+      ruta === DIR_PATH ||
+      ruta.endsWith("/DIRECTOR")
+  );
+};
+ const handleSelect = (ruta: string) => {
+  handleGo(ruta);
+};
 
   const renderContent = () => {
     switch (leaf) {
@@ -131,10 +136,11 @@ export const Layout: React.FC = () => {
           />
         );
 
-      case "INFORME AUDITORIA":
-        return <CrearInformeAuditoria />;
       case "TRAMITE":
-        return <Tramite />;
+  return <Tramite onGo={handleGo} />;
+
+case "INFORME AUDITORIA":
+  return <CrearInformeAuditoria tramite={routeState?.tramite} />;
 
 
       case "ACTA DE INICIO":
