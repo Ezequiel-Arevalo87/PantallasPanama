@@ -6,10 +6,17 @@ import type { TramitePayload } from "./Tramite";
 /** ===================== TIPOS ===================== */
 type Impuesto = string;
 
+type Periodicidad = "MENSUAL" | "ANUAL";
+
+type TaxConfig = {
+  label: Impuesto;
+  periodicidad: Periodicidad;
+};
+
 type AlcanceRow = {
   id: string; // impuesto__periodo
   impuesto: Impuesto;
-  periodo: string; // AAAAMM
+  periodo: string; // AAAAMM o AAAA
 
   // moneda (enteros)
   monto1: number;
@@ -92,6 +99,8 @@ const card: React.CSSProperties = {
 const isYYYYMM = (v: string) =>
   /^\d{6}$/.test(v) && Number(v.slice(4, 6)) >= 1 && Number(v.slice(4, 6)) <= 12;
 
+const isYYYY = (v: string) => /^\d{4}$/.test(v);
+
 const yyyymmToParts = (yyyymm: string) => {
   const y = Number(yyyymm.slice(0, 4));
   const m = Number(yyyymm.slice(4, 6));
@@ -100,10 +109,10 @@ const yyyymmToParts = (yyyymm: string) => {
 
 const partsToYYYYMM = (y: number, m: number) => `${y}${String(m).padStart(2, "0")}`;
 
-const compareYYYYMM = (a: string, b: string) => a.localeCompare(b);
+const compareString = (a: string, b: string) => a.localeCompare(b);
 
 /** genera todos los meses entre desde/hasta (incluye ambos) */
-const buildPeriodRange = (desde: string, hasta: string): string[] => {
+const buildMonthlyRange = (desde: string, hasta: string): string[] => {
   const a = yyyymmToParts(desde);
   const b = yyyymmToParts(hasta);
 
@@ -125,6 +134,19 @@ const buildPeriodRange = (desde: string, hasta: string): string[] => {
   return out;
 };
 
+/** genera todos los años entre desde/hasta (incluye ambos) */
+const buildYearRange = (desdeYYYY: string, hastaYYYY: string): string[] => {
+  const a = Number(desdeYYYY);
+  const b = Number(hastaYYYY);
+
+  const out: string[] = [];
+  for (let y = a; y <= b; y += 1) {
+    out.push(String(y));
+    if (out.length > 60) break; // safety
+  }
+  return out;
+};
+
 const sumRow = (r: Omit<AlcanceRow, "total">): number =>
   r.monto1 + r.recargo1 + r.monto2 + r.recargo2 + r.multa;
 
@@ -133,6 +155,8 @@ const toIntMoney = (value: string): number => {
   if (!Number.isFinite(n)) return 0;
   return Math.trunc(n); // moneda enteros
 };
+
+const fmt = (v?: string) => (v && String(v).trim() ? String(v) : "-");
 
 /** ===================== UI PIEZAS ===================== */
 const Accordion: React.FC<{
@@ -230,28 +254,52 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
   const [openPdf, setOpenPdf] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string>("");
 
+  /** ===== Word + upload ===== */
+  const [uploadedWord, setUploadedWord] = useState<File | null>(null);
+
   /** ===== Resultado ===== */
   const [resultado, setResultado] = useState<
     "PRODUCTIVO" | "IMPRODUCTIVO" | "PRESENTACIÓN VOLUNTARIA"
   >("PRODUCTIVO");
   const [detalleInvestigacion, setDetalleInvestigacion] = useState("");
 
-  /** ===== Datos actualizados (NUEVO y funcional) ===== */
+  /** ===== Datos actualizados ===== */
   const [mostrarDatosActualizados, setMostrarDatosActualizados] = useState(false);
 
   const [avisoOperacionActualizado, setAvisoOperacionActualizado] = useState("");
+
+  // contacto actualizado
   const [telFijo, setTelFijo] = useState("");
   const [telMovil, setTelMovil] = useState("");
   const [fax, setFax] = useState("");
   const [correo, setCorreo] = useState("");
 
-  /** ===== Alcance: filtros para generar tablas ===== */
-  const impuestosCatalogo: Impuesto[] = [
-    "102 - ISR",
-    "140 - Aviso de Operación",
-    "202 - ITBMS",
-    "316 - Multa Renta",
+  // dirección actualizada
+  const [provincia, setProvincia] = useState("");
+  const [distrito, setDistrito] = useState("");
+  const [corregimiento, setCorregimiento] = useState("");
+  const [barrio, setBarrio] = useState("");
+  const [calleAvenida, setCalleAvenida] = useState("");
+  const [nombreEdificio, setNombreEdificio] = useState("");
+  const [numeroCasaApto, setNumeroCasaApto] = useState("");
+  const [referencia, setReferencia] = useState("");
+
+  /** ===== Alcance: impuestos con periodicidad ===== */
+  const impuestosCatalogo: TaxConfig[] = [
+    { label: "202 - ITBMS", periodicidad: "MENSUAL" },
+    { label: "Retenciones ITBMS", periodicidad: "MENSUAL" },
+
+    // ejemplos anuales (ajusta a tu catálogo real)
+    { label: "102 - ISR", periodicidad: "ANUAL" },
+    { label: "140 - Aviso de Operación", periodicidad: "ANUAL" },
+    { label: "316 - Multa Renta", periodicidad: "ANUAL" },
   ];
+
+  const taxByLabel = useMemo(() => {
+    const m = new Map<Impuesto, TaxConfig>();
+    impuestosCatalogo.forEach((x) => m.set(x.label, x));
+    return m;
+  }, []);
 
   const [impuestoSel, setImpuestoSel] = useState<Impuesto | "">("");
   const [desde, setDesde] = useState<string>("");
@@ -275,16 +323,33 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
       alert("Seleccione un impuesto.");
       return;
     }
-    if (!isYYYYMM(desde) || !isYYYYMM(hasta)) {
-      alert("Desde/Hasta debe ser AAAAMM (ej: 202301).");
-      return;
-    }
-    if (compareYYYYMM(desde, hasta) > 0) {
-      alert("Desde no puede ser mayor que Hasta.");
-      return;
+
+    const cfg = taxByLabel.get(impuestoSel);
+    const periodicidad: Periodicidad = cfg?.periodicidad ?? "MENSUAL";
+
+    // ✅ validación según periodicidad
+    if (periodicidad === "MENSUAL") {
+      if (!isYYYYMM(desde) || !isYYYYMM(hasta)) {
+        alert("Desde/Hasta debe ser AAAAMM (ej: 202301) para este impuesto.");
+        return;
+      }
+      if (compareString(desde, hasta) > 0) {
+        alert("Desde no puede ser mayor que Hasta.");
+        return;
+      }
+    } else {
+      if (!isYYYY(desde) || !isYYYY(hasta)) {
+        alert("Desde/Hasta debe ser AAAA (ej: 2023) para este impuesto.");
+        return;
+      }
+      if (Number(desde) > Number(hasta)) {
+        alert("Desde no puede ser mayor que Hasta.");
+        return;
+      }
     }
 
-    const periodos = buildPeriodRange(desde, hasta);
+    const periodos =
+      periodicidad === "MENSUAL" ? buildMonthlyRange(desde, hasta) : buildYearRange(desde, hasta);
 
     setRowsByTax((prev) => {
       const current = prev[impuestoSel] ?? [];
@@ -366,11 +431,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
     });
   };
 
-  const toggleSelectAll = (
-    impuesto: Impuesto,
-    checked: boolean,
-    visibleRowIds: Set<string>
-  ) => {
+  const toggleSelectAll = (impuesto: Impuesto, checked: boolean, visibleRowIds: Set<string>) => {
     setRowsByTax((prev) => {
       const arr = prev[impuesto] ?? [];
       const nextArr = arr.map((r) => (visibleRowIds.has(r.id) ? { ...r, checked } : r));
@@ -400,6 +461,67 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
       .flat()
       .reduce((acc, r) => acc + r.total, 0);
   }, [rowsByTax]);
+
+  /** ✅ Word: descarga plantilla (Word abre HTML sin problema) */
+  const descargarWord = () => {
+    const html = `
+      <html>
+        <head><meta charset="utf-8"/></head>
+        <body style="font-family: Arial, sans-serif;">
+          <h2>Informe de Auditoría</h2>
+
+          <h3>Datos del Trámite</h3>
+          <p><b>Número:</b> ${fmt(tramite?.numeroTramite)}</p>
+          <p><b>Actividad:</b> ${fmt(tramite?.actividad)}</p>
+          <p><b>RUC:</b> ${fmt(tramite?.ruc)}</p>
+          <p><b>Contribuyente:</b> ${fmt(tramite?.contribuyente)}</p>
+
+          <h3>Datos actuales (contribuyente)</h3>
+          <p><b>Aviso de Operación:</b> ${fmt(tramite?.avisoOperacionActual)}</p>
+          <p><b>Contacto:</b>
+            Tel fijo: ${fmt(tramite?.contactoActual?.telFijo)} |
+            Tel móvil: ${fmt(tramite?.contactoActual?.telMovil)} |
+            Fax: ${fmt(tramite?.contactoActual?.fax)} |
+            Correo: ${fmt(tramite?.contactoActual?.correo)}
+          </p>
+          <p><b>Dirección:</b>
+            Provincia: ${fmt(tramite?.direccionActual?.provincia)} |
+            Distrito: ${fmt(tramite?.direccionActual?.distrito)} |
+            Corregimiento: ${fmt(tramite?.direccionActual?.corregimiento)} |
+            Barrio: ${fmt(tramite?.direccionActual?.barrio)} |
+            Calle/Avenida: ${fmt(tramite?.direccionActual?.calleAvenida)} |
+            Edificio: ${fmt(tramite?.direccionActual?.nombreEdificio)} |
+            Casa/Apto: ${fmt(tramite?.direccionActual?.numeroCasaApto)} |
+            Referencia: ${fmt(tramite?.direccionActual?.referencia)}
+          </p>
+
+          <h3>Resultado</h3>
+          <p><b>Resultado:</b> ${resultado}</p>
+          <p><b>Detalle:</b><br/>${(detalleInvestigacion || "(Sin detalle)").replace(/\n/g, "<br/>")}</p>
+
+          <h3>Alcance</h3>
+          <p><b>Total general (B/.):</b> ${totalGeneral.toFixed(2)}</p>
+
+          <p style="color:#666; font-size:12px;">
+            Nota: esta plantilla se descarga en Word para completar y luego subir al sistema.
+          </p>
+        </body>
+      </html>
+    `.trim();
+
+    const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    const name = tramite?.numeroTramite ? `InformeAuditoria_${tramite.numeroTramite}.doc` : "InformeAuditoria.doc";
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
 
   const generarPdf = () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -435,6 +557,37 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         doc.setFont("helvetica", "normal");
         doc.text(String(v), 140, y);
       }
+
+      // ✅ datos actuales en PDF (para comparación)
+      doc.setFont("helvetica", "bold");
+      doc.text("Datos actuales (contribuyente)", 40, (y += 18));
+      doc.setFont("helvetica", "normal");
+      doc.text(`Aviso operación: ${fmt(tramite.avisoOperacionActual)}`, 40, (y += 14));
+      doc.text(
+        `Tel fijo: ${fmt(tramite.contactoActual?.telFijo)}  |  Tel móvil: ${fmt(
+          tramite.contactoActual?.telMovil
+        )}  |  Fax: ${fmt(tramite.contactoActual?.fax)}`,
+        40,
+        (y += 14)
+      );
+      doc.text(`Correo: ${fmt(tramite.contactoActual?.correo)}`, 40, (y += 14));
+      doc.text(
+        `Dirección: Prov ${fmt(tramite.direccionActual?.provincia)}, Dist ${fmt(
+          tramite.direccionActual?.distrito
+        )}, Corr ${fmt(tramite.direccionActual?.corregimiento)}, Barrio ${fmt(
+          tramite.direccionActual?.barrio
+        )}`,
+        40,
+        (y += 14)
+      );
+      doc.text(
+        `Calle/Av: ${fmt(tramite.direccionActual?.calleAvenida)}  |  Edif: ${fmt(
+          tramite.direccionActual?.nombreEdificio
+        )}  |  Casa/Apto: ${fmt(tramite.direccionActual?.numeroCasaApto)}`,
+        40,
+        (y += 14)
+      );
+      doc.text(`Ref: ${fmt(tramite.direccionActual?.referencia)}`, 40, (y += 14));
     }
 
     doc.setFont("helvetica", "bold");
@@ -484,6 +637,11 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
     if (!ok) return;
     alert("Enviado (demo).");
   };
+
+  const cfgSel = impuestoSel ? taxByLabel.get(impuestoSel) : undefined;
+  const periodicidadSel: Periodicidad = cfgSel?.periodicidad ?? "MENSUAL";
+  const placeDesde = periodicidadSel === "MENSUAL" ? "202301" : "2023";
+  const placeHasta = periodicidadSel === "MENSUAL" ? "202312" : "2025";
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", margin: 20 }}>
@@ -586,7 +744,88 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         )}
       </div>
 
-      {/* ================= DATOS ACTUALIZADOS (NUEVO, como HTML) ================= */}
+      {/* ================= DATOS ACTUALES (SIEMPRE) ================= */}
+      <div style={card}>
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos actuales del contribuyente</div>
+
+        {!tramite ? (
+          <div style={{ color: "#666" }}>Seleccione un trámite para ver los datos actuales.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <b>Número de Aviso de Operación (actual):</b> {fmt(tramite.avisoOperacionActual)}
+            </div>
+
+            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
+              <b>Datos de contacto (actual)</b>
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Teléfono fijo</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.telFijo)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Teléfono móvil</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.telMovil)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Fax</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.fax)}</div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <div style={{ color: "#666", fontSize: 12 }}>Correo electrónico</div>
+                <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.correo)}</div>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
+              <b>Dirección (actual)</b>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Provincia</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.provincia)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Distrito</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.distrito)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Corregimiento</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.corregimiento)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Barrio</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.barrio)}</div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "2 1 260px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Calle o Avenida</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.calleAvenida)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Nombre de Edificio</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.nombreEdificio)}</div>
+                </div>
+                <div style={{ flex: "1 1 220px" }}>
+                  <div style={{ color: "#666", fontSize: 12 }}>Número Apartamento/Casa</div>
+                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.numeroCasaApto)}</div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <div style={{ color: "#666", fontSize: 12 }}>Referencia</div>
+                <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.referencia)}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ================= DATOS ACTUALIZADOS (como HTML) ================= */}
       <div style={{ marginTop: 12 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600 }}>
           <input
@@ -666,6 +905,103 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
               />
             </div>
           </div>
+
+          <div
+            style={{
+              marginTop: 16,
+              border: "1px solid #ccc",
+              padding: 10,
+              borderRadius: 6,
+            }}
+          >
+            <strong>Dirección actualizada</strong>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 220px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Provincia</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={provincia}
+                  onChange={(e) => setProvincia(e.target.value)}
+                />
+              </div>
+
+              <div style={{ flex: "1 1 220px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Distrito</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={distrito}
+                  onChange={(e) => setDistrito(e.target.value)}
+                />
+              </div>
+
+              <div style={{ flex: "1 1 220px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Corregimiento</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={corregimiento}
+                  onChange={(e) => setCorregimiento(e.target.value)}
+                />
+              </div>
+
+              <div style={{ flex: "1 1 220px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Barrio</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={barrio}
+                  onChange={(e) => setBarrio(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "2 1 260px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Calle o Avenida</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={calleAvenida}
+                  onChange={(e) => setCalleAvenida(e.target.value)}
+                />
+              </div>
+
+              <div style={{ flex: "1 1 260px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>Nombre de Edificio</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={nombreEdificio}
+                  onChange={(e) => setNombreEdificio(e.target.value)}
+                />
+              </div>
+
+              <div style={{ flex: "1 1 260px" }}>
+                <label style={{ display: "block", fontWeight: 700 }}>
+                  Número de Apartamento/Casa
+                </label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={numeroCasaApto}
+                  onChange={(e) => setNumeroCasaApto(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <label style={{ display: "block", fontWeight: 700 }}>Referencia</label>
+              <input
+                type="text"
+                style={inputStyle}
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+              />
+            </div>
+          </div>
         </fieldset>
       )}
 
@@ -699,64 +1035,90 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
       <fieldset style={{ marginTop: 12 }}>
         <legend>Alcance</legend>
 
-        {/* filtros (NO mostramos tablas hasta agregar) */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+        {/* ✅ instrucción ANTES de los controles */}
+        {!hasAnyTable && (
+          <div style={{ marginBottom: 10, color: "#666" }}>
+            Seleccione un <b>Impuesto</b> y un rango de <b>Períodos</b>, luego presione{" "}
+            <b>Agregar</b> para mostrar la tabla.
+          </div>
+        )}
+
+        {/* ✅ una sola línea (responsive) */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(260px, 1.2fr) minmax(160px, 0.6fr) minmax(160px, 0.6fr) auto auto 1fr",
+            gap: 10,
+            alignItems: "end",
+          }}
+        >
           <label style={{ fontWeight: 700 }}>
             Impuesto
             <select
-              style={{ ...inputStyle, width: 260 }}
+              style={inputStyle}
               value={impuestoSel}
-              onChange={(e) => setImpuestoSel(e.target.value as Impuesto)}
+              onChange={(e) => {
+                const v = e.target.value as Impuesto;
+                setImpuestoSel(v);
+                // limpia campos cuando cambia periodicidad
+                setDesde("");
+                setHasta("");
+              }}
             >
               <option value="">Seleccione...</option>
               {impuestosCatalogo.map((x) => (
-                <option key={x} value={x}>
-                  {x}
+                <option key={x.label} value={x.label}>
+                  {x.label} {x.periodicidad === "ANUAL" ? "(Anual)" : "(Mensual)"}
                 </option>
               ))}
             </select>
           </label>
 
           <label style={{ fontWeight: 700 }}>
-            Desde (AAAAMM)
+            Desde ({periodicidadSel === "MENSUAL" ? "AAAAMM" : "AAAA"})
             <input
-              style={{ ...inputStyle, width: 160 }}
+              style={inputStyle}
               value={desde}
-              onChange={(e) => setDesde(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="202301"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setDesde(periodicidadSel === "MENSUAL" ? digits.slice(0, 6) : digits.slice(0, 4));
+              }}
+              placeholder={placeDesde}
             />
           </label>
 
           <label style={{ fontWeight: 700 }}>
-            Hasta (AAAAMM)
+            Hasta ({periodicidadSel === "MENSUAL" ? "AAAAMM" : "AAAA"})
             <input
-              style={{ ...inputStyle, width: 160 }}
+              style={inputStyle}
               value={hasta}
-              onChange={(e) => setHasta(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="202312"
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setHasta(periodicidadSel === "MENSUAL" ? digits.slice(0, 6) : digits.slice(0, 4));
+              }}
+              placeholder={placeHasta}
             />
           </label>
 
-          <button style={btnSuccess} onClick={addRange}>
+          <button style={{ ...btnSuccess, margin: 0 }} onClick={addRange}>
             Agregar
           </button>
 
-          {/* eliminar seleccionados (sin columna eliminar por fila) */}
-          <button style={btnDanger} onClick={eliminarSeleccionados}>
-            Eliminar seleccionados
-          </button>
+          {/* ✅ “Eliminar seleccionados” solo si hay tablas */}
+          {hasAnyTable ? (
+            <button style={{ ...btnDanger, margin: 0 }} onClick={eliminarSeleccionados}>
+              Eliminar seleccionados
+            </button>
+          ) : (
+            <div />
+          )}
 
-          <div style={{ marginLeft: "auto", fontWeight: 900 }}>
+          <div style={{ justifySelf: "end", fontWeight: 900 }}>
             Total general (B/.): {totalGeneral.toFixed(2)}
           </div>
         </div>
 
-        {!hasAnyTable ? (
-          <div style={{ marginTop: 12, color: "#666" }}>
-            Seleccione un <b>Impuesto</b> y un rango de <b>Periodos</b>, luego presione{" "}
-            <b>Agregar</b> para mostrar la tabla.
-          </div>
-        ) : (
+        {hasAnyTable && (
           <div style={{ marginTop: 12 }}>
             {(Object.keys(rowsByTax) as Impuesto[]).map((tax) => {
               const allRows = rowsByTax[tax] ?? [];
@@ -776,6 +1138,9 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
 
               const totalTax = allRows.reduce((acc, r) => acc + r.total, 0);
 
+              const cfg = taxByLabel.get(tax);
+              const periodicidad: Periodicidad = cfg?.periodicidad ?? "MENSUAL";
+
               return (
                 <Accordion
                   key={tax}
@@ -784,17 +1149,20 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                 >
                   {/* filtros dentro de la tabla */}
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 800 }}>Filtro periodo:</div>
+                    <div style={{ fontWeight: 800 }}>
+                      Filtro período ({periodicidad === "MENSUAL" ? "AAAAMM" : "AAAA"}):
+                    </div>
                     <input
                       style={{ ...inputStyle, maxWidth: 220 }}
                       value={filter.searchPeriodo}
                       onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "");
                         setFilter(tax, {
-                          searchPeriodo: e.target.value.replace(/\D/g, "").slice(0, 6),
+                          searchPeriodo: periodicidad === "MENSUAL" ? digits.slice(0, 6) : digits.slice(0, 4),
                         });
                         setPager(tax, { page: 1 });
                       }}
-                      placeholder="Ej: 2023 o 202301"
+                      placeholder={periodicidad === "MENSUAL" ? "Ej: 2023 o 202301" : "Ej: 2023"}
                     />
                     <div style={{ color: "#666" }}>Mostrando {filteredRows.length} registros</div>
                   </div>
@@ -814,7 +1182,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                         </th>
 
                         <th style={thStyle} rowSpan={2}>
-                          Periodo
+                          Período
                         </th>
 
                         <th style={thStyle} colSpan={2}>
@@ -832,7 +1200,6 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                         <th style={thStyle} rowSpan={2}>
                           Total (B/.)
                         </th>
-                        {/* ❌ No existe columna "Eliminar" por fila */}
                       </tr>
 
                       <tr>
@@ -874,9 +1241,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                               inputMode="numeric"
                               style={inputStyle}
                               value={r.recargo1}
-                              onChange={(e) =>
-                                updateMoneyField(tax, r.id, "recargo1", e.target.value)
-                              }
+                              onChange={(e) => updateMoneyField(tax, r.id, "recargo1", e.target.value)}
                             />
                           </td>
 
@@ -898,9 +1263,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                               inputMode="numeric"
                               style={inputStyle}
                               value={r.recargo2}
-                              onChange={(e) =>
-                                updateMoneyField(tax, r.id, "recargo2", e.target.value)
-                              }
+                              onChange={(e) => updateMoneyField(tax, r.id, "recargo2", e.target.value)}
                             />
                           </td>
 
@@ -943,10 +1306,37 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         )}
       </fieldset>
 
+      {/* ================= WORD: Descargar + Subir ================= */}
+      <div style={card}>
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>Documento Word</div>
+
+        <button style={btnSecondary} onClick={descargarWord}>
+          Descargar informe en Word
+        </button>
+
+        <div style={{ marginTop: 10 }}>
+          <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
+            Subir informe completado
+          </label>
+          <input
+            type="file"
+            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setUploadedWord(f);
+              if (f) alert(`Archivo cargado (demo): ${f.name}`);
+            }}
+          />
+          <div style={{ marginTop: 6, color: "#666" }}>
+            Archivo: <b>{uploadedWord ? uploadedWord.name : "Ninguno"}</b>
+          </div>
+        </div>
+      </div>
+
       <hr style={{ marginTop: 16 }} />
 
       <button style={btnSecondary} onClick={generarPdf}>
-        Vista Previa
+        Vista Previa (PDF)
       </button>
       <button style={btnSuccess} onClick={guardar}>
         Guardar

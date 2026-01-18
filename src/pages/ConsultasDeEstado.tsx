@@ -53,10 +53,9 @@ const ACTIVIDADES: EstadoActividad[] = [
 ];
 
 /* ================== Catálogos ================== */
-const TIPOS_INCONSISTENCIA = ["Omiso", "Inexacto", "Extemporáneo", "Todos"] as const;
-type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number] | "";
+const TIPOS_INCONSISTENCIA = ["Omiso", "Inexacto", "Extemporáneo"] as const;
+type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number];
 
-// (los mismos textos que ya tenías)
 const PROGRAMAS_OMISO = [
   "Omisos vs retenciones 4331 ITBMS",
   "Omisos vs informes",
@@ -77,18 +76,20 @@ const PROGRAMAS_EXTEMPORANEO = [
   "Base contribuyentes VS Calendario retenciones ITBMS",
 ] as const;
 
-const REDS = ["Todos", "675", "659"] as const;
-type RedSel = (typeof REDS)[number] | "";
+const REDS = ["675", "659"] as const;
+type Red = (typeof REDS)[number];
 
 const uniqCaseInsensitive = (items: string[]) =>
   Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values()).filter(Boolean);
 
-type ActividadSel = EstadoActividad | "Todos" | "";
-type SemaforoSel = Semaforo | "Todos" | "";
+type ActividadSel = EstadoActividad;
+type SemaforoSel = Semaforo;
 
-// ✅ Multi-select actividad económica (igual que Priorización)
-const ALL_VALUE = "__ALL__";
-type ActividadEconSel = string[];
+// ✅ Valor real de "TODOS" (NO VACÍO)
+const ALL = "__ALL__";
+
+// ✅ Multi-select actividad económica
+type ActividadEconSel = string[]; // lista de códigos (vacía => TODOS)
 
 const parseFecha = (f: any) => {
   const s = (f ?? "").toString().trim();
@@ -98,19 +99,14 @@ const parseFecha = (f: any) => {
 };
 
 // ============================
-// ✅ Programa con CÓDIGO ÚNICO (para Autocomplete + tabla)
+// ✅ Programa con CÓDIGO ÚNICO (Autocomplete + tabla)
 // ============================
 type ProgramaOpt = {
-  codigo: string; // único
-  nombre: string; // (texto original)
+  codigo: string;
+  nombre: string;
   label: string; // `${codigo} - ${nombre}`
 };
 
-/**
- * ⚠️ Ajusta si cambian los códigos.
- * Clave: EL CÓDIGO NO SE REPITE.
- * (Basado en tu screenshot)
- */
 const PROGRAMA_CODIGO: Record<string, string> = {
   "Omisos vs retenciones 4331 ITBMS": "115",
   "Omisos vs informes": "116",
@@ -128,31 +124,46 @@ const PROGRAMA_CODIGO: Record<string, string> = {
 };
 
 const toProgramaOpt = (nombre: string): ProgramaOpt => {
-  const codigo = PROGRAMA_CODIGO[nombre] ?? ""; // si faltara, no rompe
+  const codigo = PROGRAMA_CODIGO[nombre] ?? "";
   return { codigo, nombre, label: codigo ? `${codigo} - ${nombre}` : nombre };
 };
 
+// ============================
+// ✅ Código-Impuesto (nuevo selector)
+// ============================
+type ImpuestoOpt = { codigo: string; nombre: string; label: string };
+const makeImpuestoOpt = (codigo: string, nombre: string): ImpuestoOpt => {
+  const c = String(codigo ?? "").trim();
+  const n = String(nombre ?? "").trim();
+  return { codigo: c, nombre: n, label: c && n ? `${c} - ${n}` : c || n || "—" };
+};
+
 const ConsultasDeEstado: React.FC = () => {
-  const [tipoInc, setTipoInc] = useState<TipoInconsistencia>("");
-  const [actividad, setActividad] = useState<ActividadSel>("");
+  // ✅ selects con ALL por defecto (TODOS visible)
+  const [tipoInc, setTipoInc] = useState<string>(ALL);
+  const [actividad, setActividad] = useState<string>(ALL);
+  const [red, setRed] = useState<string>(ALL);
+  const [sem, setSem] = useState<string>(ALL);
 
-  // ✅ Autocomplete: guardamos el objeto seleccionado
+  // ✅ Autocomplete: null = TODOS
   const [programaSel, setProgramaSel] = useState<ProgramaOpt | null>(null);
+  const [impuestoSel, setImpuestoSel] = useState<ImpuestoOpt | null>(null);
 
-  // ✅ filtros
+  // ✅ multi: [] = TODOS
   const [actividadEcon, setActividadEcon] = useState<ActividadEconSel>([]);
-  const [red, setRed] = useState<RedSel>("");
 
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
-  const [sem, setSem] = useState<SemaforoSel>("");
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const [data, setData] = useState<FilaEstado[]>([]);
 
-  // ✅ catálogo actividades económicas
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loadingAct, setLoadingAct] = useState(true);
+
+  // ✅ Control input de Autocomplete (para que se vea "TODOS")
+  const [programaInput, setProgramaInput] = useState("TODOS");
+  const [impuestoInput, setImpuestoInput] = useState("TODOS");
 
   useEffect(() => {
     setData(buildMockEstados(250));
@@ -171,36 +182,30 @@ const ConsultasDeEstado: React.FC = () => {
     return m;
   }, [actividades]);
 
-  /** ✅ Programas dependen del tipo de inconsistencia (MISMA LÓGICA) */
+  /** ✅ Programas por tipo inconsistencia */
   const programasDisponibles = useMemo(() => {
     let base: string[] = [];
-    switch (tipoInc) {
-      case "Omiso":
-        base = [...PROGRAMAS_OMISO];
-        break;
-      case "Inexacto":
-        base = [...PROGRAMAS_INEXACTO];
-        break;
-      case "Extemporáneo":
-        base = [...PROGRAMAS_EXTEMPORANEO];
-        break;
-      case "Todos":
-      default:
-        base = uniqCaseInsensitive([
-          ...PROGRAMAS_OMISO,
-          ...PROGRAMAS_INEXACTO,
-          ...PROGRAMAS_EXTEMPORANEO,
-        ]);
-        break;
-    }
+    if (tipoInc === ALL) {
+      base = uniqCaseInsensitive([
+        ...PROGRAMAS_OMISO,
+        ...PROGRAMAS_INEXACTO,
+        ...PROGRAMAS_EXTEMPORANEO,
+      ]);
+    } else if (tipoInc === "Omiso") base = [...PROGRAMAS_OMISO];
+    else if (tipoInc === "Inexacto") base = [...PROGRAMAS_INEXACTO];
+    else if (tipoInc === "Extemporáneo") base = [...PROGRAMAS_EXTEMPORANEO];
+
     return base.map(toProgramaOpt);
   }, [tipoInc]);
 
-  // Si cambia tipoInc y el programa ya no existe -> limpiar (MISMO COMPORTAMIENTO)
+  // Si cambia tipoInc y el programa ya no existe -> limpiar
   useEffect(() => {
     if (programaSel) {
       const exists = programasDisponibles.some((p) => p.nombre === programaSel.nombre);
-      if (!exists) setProgramaSel(null);
+      if (!exists) {
+        setProgramaSel(null);
+        setProgramaInput("TODOS");
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programasDisponibles]);
@@ -211,20 +216,22 @@ const ConsultasDeEstado: React.FC = () => {
   const handleActividadesChange = (e: SelectChangeEvent<string[]>) => {
     const raw = e.target.value as unknown as string[];
 
-    if (raw.includes(ALL_VALUE)) {
+    // Si elige TODOS
+    if (raw.includes(ALL)) {
       setActividadEcon([]);
       setMostrarResultados(false);
       return;
     }
 
-    const next = uniqCaseInsensitive(raw.filter((v) => v !== ALL_VALUE));
+    const next = uniqCaseInsensitive(raw.filter((v) => v !== ALL));
     setActividadEcon(next);
     setMostrarResultados(false);
   };
 
+  // ✅ FIX: si llega "__ALL__" => mostrar "TODOS"
   const renderActividadChips = (selected: any) => {
-    const arr: string[] = selected as string[];
-    if (!arr?.length) return "Todas";
+    const arr: string[] = (selected as string[]) ?? [];
+    if (!arr.length || (arr.length === 1 && arr[0] === ALL)) return "TODOS";
 
     const first = arr[0];
     const label = actividadesMap.get(first) ?? first;
@@ -238,30 +245,109 @@ const ConsultasDeEstado: React.FC = () => {
   };
 
   // ============================
+  // ✅ Enriquecer filas
+  // ============================
+  const filasEnriquecidas = useMemo(() => {
+    const periodoInicial = desde || "";
+    const periodoFinal = hasta || "";
+
+    return (data as any[]).map((r: any) => {
+      const impProg = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim();
+      const programaCodigo = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
+
+      const impuestoProgramaLabel =
+        programaCodigo && impProg ? `${programaCodigo} - ${impProg}` : impProg;
+
+      const impuestoNombre = String(impProg ?? "")
+        .replace(/\b\d+\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const montoLiquidadoFallback =
+        Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) ||
+        Math.round((500 + Math.random() * 9500) * 100) / 100;
+
+      const relacionImpuestos = Array.isArray(r.relacionImpuestos)
+        ? r.relacionImpuestos
+        : [
+            {
+              codigoImpuesto: programaCodigo || "",
+              nombreImpuesto: impuestoNombre || impProg || "",
+              montoLiquidado: montoLiquidadoFallback,
+            },
+          ];
+
+      const montoLiquidadoTotalRuc = (relacionImpuestos as any[]).reduce(
+        (acc, it) => acc + (Number(it?.montoLiquidado) || 0),
+        0
+      );
+
+      return {
+        ...r,
+        tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "",
+        impuestoPrograma: impProg,
+        programaCodigo,
+        impuestoProgramaLabel,
+        periodoInicial,
+        periodoFinal,
+        relacionImpuestos,
+        actividadEconomica: r.actividadEconomica ?? r.actividad_economica ?? "",
+        red: r.red ?? r.redDgi ?? "",
+        tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
+        montoLiquidadoTotalRuc,
+      } as any as FilaEstado;
+    });
+  }, [data, desde, hasta]);
+
+  // Opciones de Código-Impuesto desde data
+  const impuestosDisponibles = useMemo(() => {
+    const map = new Map<string, ImpuestoOpt>();
+    for (const r of filasEnriquecidas as any[]) {
+      const rel = Array.isArray(r.relacionImpuestos) ? r.relacionImpuestos : [];
+      for (const it of rel) {
+        const cod = String(it?.codigoImpuesto ?? "").trim();
+        const nom = String(it?.nombreImpuesto ?? "").trim();
+        if (!cod && !nom) continue;
+        const key = `${cod}__${nom}`.toLowerCase();
+        if (!map.has(key)) map.set(key, makeImpuestoOpt(cod, nom));
+      }
+    }
+    return Array.from(map.values());
+  }, [filasEnriquecidas]);
+
+  useEffect(() => {
+    if (impuestoSel) {
+      const exists = impuestosDisponibles.some(
+        (x) => x.codigo === impuestoSel.codigo && x.nombre === impuestoSel.nombre
+      );
+      if (!exists) {
+        setImpuestoSel(null);
+        setImpuestoInput("TODOS");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [impuestosDisponibles]);
+
+  // ============================
   // ✅ Filtrado
   // ============================
   const filtrados = useMemo(() => {
-    let rows = data as any[];
+    let rows = filasEnriquecidas as any[];
 
-    // 1) Tipo inconsistencia
-    if (tipoInc && tipoInc !== "Todos") {
+    if (tipoInc !== ALL) {
       rows = rows.filter((r) => {
         const t = (r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "").toString().trim();
         if (!t) return true;
-        return t.toLowerCase() === tipoInc.toLowerCase();
+        return t.toLowerCase() === String(tipoInc).toLowerCase();
       });
     }
 
-    // 2) Estado / Actividad
-    if (actividad && actividad !== "Todos") {
+    if (actividad !== ALL) {
       rows = rows.filter(
         (r) => String(r.estado).toLowerCase() === String(actividad).toLowerCase()
       );
     }
 
-    // 3) Programa seleccionado
-    // - Preferimos filtrar por programaCodigo si el row lo trae
-    // - Si no lo trae (mocks/compat), filtramos por nombre
     if (programaSel) {
       rows = rows.filter((r) => {
         const cod = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
@@ -273,7 +359,20 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // Actividad Económica (multi)
+    if (impuestoSel) {
+      rows = rows.filter((r) => {
+        const rel = Array.isArray(r.relacionImpuestos) ? r.relacionImpuestos : [];
+        if (!rel.length) return true;
+        return rel.some((it: any) => {
+          const cod = String(it?.codigoImpuesto ?? "").trim();
+          const nom = String(it?.nombreImpuesto ?? "").trim();
+          const codOk = impuestoSel.codigo ? cod === impuestoSel.codigo : true;
+          const nomOk = impuestoSel.nombre ? nom.toLowerCase() === impuestoSel.nombre.toLowerCase() : true;
+          return codOk && nomOk;
+        });
+      });
+    }
+
     if (actividadEcon.length > 0) {
       rows = rows.filter((r) => {
         const ae = (r.actividadEconomica ?? r.actividad_economica ?? "").toString().trim();
@@ -282,8 +381,7 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // Red
-    if (red && red !== "Todos") {
+    if (red !== ALL) {
       rows = rows.filter((r) => {
         const rr = (r.red ?? r.redDgi ?? "").toString().trim();
         if (!rr) return true;
@@ -291,12 +389,10 @@ const ConsultasDeEstado: React.FC = () => {
       });
     }
 
-    // Semáforo
-    if (sem && sem !== "Todos") {
+    if (sem !== ALL) {
       rows = rows.filter((r) => calcularSemaforo(r.fecha) === sem);
     }
 
-    // Fechas robustas
     const d = desde ? dayjs(desde, "YYYY-MM-DD", true) : null;
     const h = hasta ? dayjs(hasta, "YYYY-MM-DD", true) : null;
 
@@ -314,68 +410,12 @@ const ConsultasDeEstado: React.FC = () => {
     }
 
     return rows as FilaEstado[];
-  }, [data, tipoInc, actividad, programaSel, actividadEcon, red, sem, desde, hasta]);
-
-  /** ✅ Inyectamos campos para la tabla (SIN romper nada) */
-  const filasParaTabla = useMemo(() => {
-    const periodoInicial = desde || "";
-    const periodoFinal = hasta || "";
-
-    return filtrados.map((r: any) => {
-      const impProg = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim() || (programaSel?.nombre ?? "");
-      const programaCodigo = String(r.programaCodigo ?? r.programa_codigo ?? "").trim() || (programaSel?.codigo ?? "");
-
-      const impuestoProgramaLabel =
-        programaCodigo && impProg ? `${programaCodigo} - ${impProg}` : impProg;
-
-      // nombre sin números (solo por estética)
-      const impuestoNombre = String(impProg ?? "")
-        .replace(/\b\d+\b/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      // ✅ relación impuestos (se mantiene)
-      const montoLiquidado =
-        Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) ||
-        Math.round((500 + Math.random() * 9500) * 100) / 100;
-
-      const relacionImpuestos = Array.isArray(r.relacionImpuestos)
-        ? r.relacionImpuestos
-        : [
-            {
-              // acá usamos programaCodigo como “código” para mostrar en el detalle (código/impuesto)
-              codigoImpuesto: programaCodigo || "",
-              nombreImpuesto: impuestoNombre,
-              montoLiquidado,
-            },
-          ];
-
-      return {
-        ...r,
-        tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? tipoInc,
-
-        // ✅ programa para tabla
-        impuestoPrograma: impProg,
-        programaCodigo,
-        impuestoProgramaLabel,
-
-        // detalle
-        periodoInicial,
-        periodoFinal,
-        relacionImpuestos,
-
-        actividadEconomica:
-          r.actividadEconomica ?? r.actividad_economica ?? (actividadEcon[0] ?? ""),
-        red: r.red ?? r.redDgi ?? red,
-        tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
-      };
-    }) as any as FilaEstado[];
-  }, [filtrados, tipoInc, programaSel, actividadEcon, red, desde, hasta]);
+  }, [filasEnriquecidas, tipoInc, actividad, programaSel, impuestoSel, actividadEcon, red, sem, desde, hasta]);
 
   // =========================
-  // ✅ GARANTIZAR RESULTADOS
+  // ✅ Garantizar resultados
   // =========================
-  const fechaParaSemaforo = (s: SemaforoSel) => {
+  const fechaParaSemaforo = (s: string) => {
     const hoy = dayjs();
     if (s === "VERDE") return hoy.add(20, "day").format("YYYY-MM-DD");
     if (s === "AMARILLO") return hoy.add(6, "day").format("YYYY-MM-DD");
@@ -402,7 +442,8 @@ const ConsultasDeEstado: React.FC = () => {
     const now = dayjs();
     const num = `MCK-${now.format("YYMMDDHHmmss")}`;
 
-    const fecha = fechaDentroDeRango(fechaParaSemaforo(sem));
+    const semTarget = sem === ALL ? "AMARILLO" : sem;
+    const fecha = fechaDentroDeRango(fechaParaSemaforo(semTarget));
 
     const fallbackOpt = toProgramaOpt("Omisos vs ITBMS");
     const sel = programaSel ?? (programasDisponibles[0] ?? fallbackOpt);
@@ -411,15 +452,22 @@ const ConsultasDeEstado: React.FC = () => {
     const impProg = sel.nombre ?? "";
     const impuestoProgramaLabel = sel.label ?? `${programaCodigo} - ${impProg}`;
 
+    const relacionImpuestos = [
+      {
+        codigoImpuesto: programaCodigo || "",
+        nombreImpuesto: impProg,
+        montoLiquidado: Math.round((500 + Math.random() * 9500) * 100) / 100,
+      },
+    ];
+
     return {
       numeroTramite: num,
       ruc: "100200999",
       contribuyente: "Contribuyente Mock (Auto)",
       categoria: "Fiscalización Masiva",
-      estado: (actividad && actividad !== "Todos" ? actividad : "asignacion") as EstadoActividad,
+      estado: (actividad !== ALL ? actividad : "asignacion") as EstadoActividad,
       fecha,
-
-      tipoInconsistencia: tipoInc || "Omiso",
+      tipoInconsistencia: tipoInc === ALL ? "Omiso" : tipoInc,
 
       impuestoPrograma: impProg,
       programaCodigo,
@@ -427,36 +475,36 @@ const ConsultasDeEstado: React.FC = () => {
 
       periodoInicial: desde || "",
       periodoFinal: hasta || "",
-      relacionImpuestos: [
-        {
-          codigoImpuesto: programaCodigo || "",
-          nombreImpuesto: impProg,
-          montoLiquidado: Math.round((500 + Math.random() * 9500) * 100) / 100,
-        },
-      ],
+      relacionImpuestos,
 
       actividadEconomica: actividadEcon[0] || (actividades[0]?.code ?? "Servicios"),
-      red: (red && red !== "Todos" ? red : "675") || "675",
+      red: (red !== ALL ? red : "675") || "675",
       tipoPersona: "Jurídica",
+
+      montoLiquidadoTotalRuc: relacionImpuestos.reduce((a, it) => a + (Number(it.montoLiquidado) || 0), 0),
     };
   };
 
   const consultar = () => {
-    if (filasParaTabla.length === 0) {
+    if (filtrados.length === 0) {
       setData((prev) => [crearFilaQueCumpla(), ...prev]);
     }
     setMostrarResultados(true);
   };
 
   const limpiar = () => {
-    setTipoInc("");
-    setActividad("");
+    setTipoInc(ALL);
+    setActividad(ALL);
+    setRed(ALL);
+    setSem(ALL);
+
     setProgramaSel(null);
+    setProgramaInput("TODOS");
+    setImpuestoSel(null);
+    setImpuestoInput("TODOS");
 
     setActividadEcon([]);
-    setRed("");
 
-    setSem("");
     setDesde(dayjs().add(-5, "day").format("YYYY-MM-DD"));
     setHasta(dayjs().add(30, "day").format("YYYY-MM-DD"));
     setMostrarResultados(false);
@@ -473,11 +521,15 @@ const ConsultasDeEstado: React.FC = () => {
             label="Tipo de Inconsistencia"
             value={tipoInc}
             onChange={(e) => {
-              setTipoInc(e.target.value as TipoInconsistencia);
+              setTipoInc(e.target.value);
               setMostrarResultados(false);
             }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (v) => (v === ALL ? "TODOS" : String(v)),
+            }}
           >
-            <MenuItem value="">— Todos —</MenuItem>
+            <MenuItem value={ALL}>TODOS</MenuItem>
             {TIPOS_INCONSISTENCIA.map((t) => (
               <MenuItem key={t} value={t}>
                 {t}
@@ -486,49 +538,108 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Impuesto / Programa (Autocomplete: código + nombre) */}
+        {/* ✅ Programa (Autocomplete) - FIX reset */}
         <Grid item xs={12} sm={6} md={3}>
           <Autocomplete
             options={programasDisponibles}
             value={programaSel}
+            inputValue={programaInput}
+            onInputChange={(_e, val, reason) => {
+              // ✅ FIX: cuando MUI resetea a "" con value=null, mantener "TODOS"
+              if (reason === "reset" && !programaSel && (val ?? "").trim() === "") {
+                setProgramaInput("TODOS");
+                return;
+              }
+              // si no hay selección y queda vacío -> mostrar TODOS
+              if (!programaSel && (val ?? "").trim() === "" && reason !== "reset") {
+                setProgramaInput("TODOS");
+                return;
+              }
+              setProgramaInput(val);
+            }}
             onChange={(_e, newValue) => {
               setProgramaSel(newValue);
+              setProgramaInput(newValue ? newValue.label : "TODOS");
               setMostrarResultados(false);
             }}
             getOptionLabel={(opt) => opt?.label ?? ""}
             isOptionEqualToValue={(opt, val) => opt.nombre === val.nombre && opt.codigo === val.codigo}
             filterOptions={(options, state) => {
               const q = state.inputValue.trim().toLowerCase();
-              if (!q) return options;
+              if (!q || q === "todos") return options;
               return options.filter((o) =>
                 `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q)
               );
             }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Impuesto / Programa"
-                placeholder="Buscar código o nombre"
-                fullWidth
-              />
-            )}
+            renderInput={(params) => <TextField {...params} label="Programa" fullWidth />}
+            onOpen={() => {
+              if (!programaSel && programaInput === "TODOS") setProgramaInput("");
+            }}
+            onClose={() => {
+              if (!programaSel && (programaInput ?? "").trim() === "") setProgramaInput("TODOS");
+            }}
           />
         </Grid>
 
-        {/* Estado / Actividad */}
+        {/* ✅ Código-Impuesto (Autocomplete) - FIX reset */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Autocomplete
+            options={impuestosDisponibles}
+            value={impuestoSel}
+            inputValue={impuestoInput}
+            onInputChange={(_e, val, reason) => {
+              // ✅ FIX: cuando MUI resetea a "" con value=null, mantener "TODOS"
+              if (reason === "reset" && !impuestoSel && (val ?? "").trim() === "") {
+                setImpuestoInput("TODOS");
+                return;
+              }
+              if (!impuestoSel && (val ?? "").trim() === "" && reason !== "reset") {
+                setImpuestoInput("TODOS");
+                return;
+              }
+              setImpuestoInput(val);
+            }}
+            onChange={(_e, newValue) => {
+              setImpuestoSel(newValue);
+              setImpuestoInput(newValue ? newValue.label : "TODOS");
+              setMostrarResultados(false);
+            }}
+            getOptionLabel={(opt) => opt?.label ?? ""}
+            isOptionEqualToValue={(opt, val) => opt.codigo === val.codigo && opt.nombre === val.nombre}
+            filterOptions={(options, state) => {
+              const q = state.inputValue.trim().toLowerCase();
+              if (!q || q === "todos") return options;
+              return options.filter((o) =>
+                `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q)
+              );
+            }}
+            renderInput={(params) => <TextField {...params} label="Código-Impuesto" fullWidth />}
+            onOpen={() => {
+              if (!impuestoSel && impuestoInput === "TODOS") setImpuestoInput("");
+            }}
+            onClose={() => {
+              if (!impuestoSel && (impuestoInput ?? "").trim() === "") setImpuestoInput("TODOS");
+            }}
+          />
+        </Grid>
+
+        {/* Actividad */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
             fullWidth
-            label="Estado / Actividad"
+            label="Actividad"
             value={actividad}
             onChange={(e) => {
-              setActividad(e.target.value as ActividadSel);
+              setActividad(e.target.value);
               setMostrarResultados(false);
             }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (v) => (v === ALL ? "TODOS" : String(v)),
+            }}
           >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
+            <MenuItem value={ALL}>TODOS</MenuItem>
             {ACTIVIDADES.map((a) => (
               <MenuItem key={a} value={a}>
                 {a}
@@ -537,20 +648,24 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* Actividad Económica (MULTI) */}
+        {/* ✅ Actividad Económica (MULTI) - FIX value */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
             fullWidth
             label="Actividad Económica"
-            value={actividadEcon}
+            value={actividadEcon} // ✅ FIX: no pasar [ALL]
             onChange={handleActividadesChange as any}
-            SelectProps={{ multiple: true, renderValue: renderActividadChips }}
+            SelectProps={{
+              multiple: true,
+              displayEmpty: true, // ✅ para que se vea "TODOS" cuando está vacío
+              renderValue: renderActividadChips,
+            }}
             disabled={loadingAct}
           >
-            <MenuItem value={ALL_VALUE}>
+            <MenuItem value={ALL}>
               <Checkbox checked={actividadEcon.length === 0} />
-              <ListItemText primary="Todas" />
+              <ListItemText primary="TODOS" />
             </MenuItem>
 
             {actividades.map((a) => (
@@ -570,11 +685,15 @@ const ConsultasDeEstado: React.FC = () => {
             label="Red"
             value={red}
             onChange={(e) => {
-              setRed(e.target.value as RedSel);
+              setRed(e.target.value);
               setMostrarResultados(false);
             }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (v) => (v === ALL ? "TODOS" : String(v)),
+            }}
           >
-            <MenuItem value="">— Todos —</MenuItem>
+            <MenuItem value={ALL}>TODOS</MenuItem>
             {REDS.map((r) => (
               <MenuItem key={r} value={r}>
                 {r}
@@ -621,12 +740,15 @@ const ConsultasDeEstado: React.FC = () => {
             label="Semáforo"
             value={sem}
             onChange={(e) => {
-              setSem(e.target.value as SemaforoSel);
+              setSem(e.target.value);
               setMostrarResultados(false);
             }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (v) => (v === ALL ? "TODOS" : String(v)),
+            }}
           >
-            <MenuItem value="">— Todos —</MenuItem>
-            <MenuItem value="Todos">Todos</MenuItem>
+            <MenuItem value={ALL}>TODOS</MenuItem>
             <MenuItem value="VERDE">VERDE</MenuItem>
             <MenuItem value="AMARILLO">AMARILLO</MenuItem>
             <MenuItem value="ROJO">ROJO</MenuItem>
@@ -646,11 +768,11 @@ const ConsultasDeEstado: React.FC = () => {
         </Grid>
       </Grid>
 
-      {mostrarResultados && <TablaResultadosEstado rows={filasParaTabla} />}
+      {mostrarResultados && <TablaResultadosEstado rows={filtrados} />}
 
-      {mostrarResultados && filasParaTabla[0] && (
+      {mostrarResultados && (filtrados as any)[0] && (
         <Box mt={1} fontSize={12} color="text.secondary">
-          Ejemplo formato fecha: {toDDMMYYYY((filasParaTabla as any)[0].fecha)}
+          Ejemplo formato fecha: {toDDMMYYYY((filtrados as any)[0].fecha)}
         </Box>
       )}
     </Box>

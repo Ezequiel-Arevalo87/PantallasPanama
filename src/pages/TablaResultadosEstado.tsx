@@ -80,7 +80,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     impuestos?: string[];
     actividadActual?: string;
 
-    // ✅ NUEVO (mínimo) para mostrar en detalle
+    // ✅ para mostrar en detalle
     programaCodigo?: string;
     impuestoProgramaLabel?: string;
 
@@ -91,6 +91,9 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       nombreImpuesto: string;
       montoLiquidado: number;
     }>;
+
+    // ✅ nuevo
+    montoLiquidadoTotalRuc?: number;
   } | null>(null);
 
   const [semaforoSeleccionado, setSemaforoSeleccionado] = useState<Semaforo | "">("");
@@ -110,15 +113,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
 
     const periodoInicial = anyFila?.periodoInicial ?? "";
     const periodoFinal = anyFila?.periodoFinal ?? "";
-    const relacionImpuestos = Array.isArray(anyFila?.relacionImpuestos)
-      ? anyFila.relacionImpuestos
-      : [];
+    const relacionImpuestos = Array.isArray(anyFila?.relacionImpuestos) ? anyFila.relacionImpuestos : [];
 
-    // ✅ NUEVO: traer código + label (inyectados desde ConsultasDeEstado)
     const programaCodigo = String(anyFila?.programaCodigo ?? "").trim();
     const impuestoProgramaLabel = String(
       anyFila?.impuestoProgramaLabel ?? anyFila?.impuestoPrograma ?? ""
     ).trim();
+
+    const montoLiquidadoTotalRuc = Number(anyFila?.montoLiquidadoTotalRuc ?? 0);
 
     setDetalleHeader({
       numeroTramite: tramite ?? "",
@@ -131,6 +133,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       periodoInicial,
       periodoFinal,
       relacionImpuestos,
+      montoLiquidadoTotalRuc,
     });
 
     setTramiteActual(tramite || "");
@@ -150,11 +153,10 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return rows.map((r, i) => {
       const anyR = r as any;
 
-      // ✅ YA NO ES CODIGO IMPUESTO. AHORA ES CODIGO PROGRAMA (inyectado)
       const programaCodigo = anyR.programaCodigo ?? "";
-
       const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
       const impuestoProgramaLabel = anyR.impuestoProgramaLabel ?? anyR.impuestoPrograma ?? "";
+      const montoLiquidadoTotalRuc = Number(anyR.montoLiquidadoTotalRuc ?? 0);
 
       return {
         id: i,
@@ -162,6 +164,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         programaCodigo,
         impuestoProgramaLabel,
         tipoPersona,
+        montoLiquidadoTotalRuc,
       };
     });
   }, [rows]);
@@ -197,7 +200,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return { rojo, amarillo, verde, total: base.length };
   }, [gridRows, gridRowsBase, semaforoSeleccionado]);
 
-  // ✅ Excel general (misma estructura, solo cambia código)
+  // ✅ Excel general (+ Monto liquidado)
   const exportar = () => {
     const data = (gridRows as any[]).map((r) => ({
       "No Trámite": r.numeroTramite ?? "",
@@ -212,6 +215,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       Fecha: toDDMMYYYY(r.fecha ?? ""),
       Semáforo: r.fecha ? calcularSemaforo(r.fecha) : "",
       "Días restantes": r.fecha ? diasRestantes(r.fecha) : "",
+      "Monto liquidado (RUC)": Number(r.montoLiquidadoTotalRuc ?? 0),
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -220,7 +224,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     XLSX.writeFile(wb, "consulta_estado.xlsx");
   };
 
-  // ✅ Excel del DETALLE (NO lo tocamos, queda igual)
+  // ✅ Excel del DETALLE (incluye monto total)
   const exportarDetalle = () => {
     if (!detalleHeader) return;
 
@@ -234,20 +238,21 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         Programa: detalleHeader.impuestoProgramaLabel ?? "",
         "Periodo Inicial": detalleHeader.periodoInicial ?? "",
         "Periodo Final": detalleHeader.periodoFinal ?? "",
+        "Monto liquidado (RUC)": Number(detalleHeader.montoLiquidadoTotalRuc ?? 0),
       },
     ];
 
     const relacion = (detalleHeader.relacionImpuestos ?? []).map((x) => ({
-      "Código Impuesto": x.codigoImpuesto ?? "",
-      "Nombre Impuesto": x.nombreImpuesto ?? "",
+      "Código/Impuesto": `${String(x.codigoImpuesto ?? "").trim()} - ${String(x.nombreImpuesto ?? "").trim()}`.replace(
+        /^\s*-\s*/g,
+        ""
+      ),
       "Monto liquidado": Number(x.montoLiquidado ?? 0),
     }));
 
     const ws1 = XLSX.utils.json_to_sheet(encabezado);
     const ws2 = XLSX.utils.json_to_sheet(
-      relacion.length
-        ? relacion
-        : [{ "Código Impuesto": "", "Nombre Impuesto": "", "Monto liquidado": "" }]
+      relacion.length ? relacion : [{ "Código/Impuesto": "", "Monto liquidado": "" }]
     );
 
     const wb = XLSX.utils.book_new();
@@ -282,6 +287,15 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
           if (!nom) return cod || "—";
           return `${cod} - ${nom.replace(/^\d+\s*-\s*/g, "")}`;
         },
+      },
+
+      // ✅ NUEVO: Monto liquidado por RUC
+      {
+        field: "montoLiquidadoTotalRuc",
+        headerName: "Monto liquidado",
+        type: "number",
+        width: 170,
+        valueFormatter: (p) => money((p as any).value),
       },
 
       {
@@ -372,7 +386,8 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       >
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography variant="body2" sx={{ mr: 1 }}>
-            Total: <b>{resumenSemaforos.total}</b>
+            Filtro: <b>{semaforoSeleccionado || "TODOS"}</b> | Total:{" "}
+            <b>{resumenSemaforos.total}</b>
           </Typography>
 
           <Chip
@@ -397,11 +412,11 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
             onClick={() => handleToggleFiltroSemaforo("VERDE")}
           />
 
-          {semaforoSeleccionado && (
+          {semaforoSeleccionado ? (
             <Button size="small" variant="text" onClick={() => setSemaforoSeleccionado("")}>
-              Quitar filtro
+              Ver TODOS
             </Button>
-          )}
+          ) : null}
         </Stack>
 
         <Button variant="outlined" onClick={exportar}>
@@ -461,7 +476,6 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
-                {/* ✅ NUEVO: mostrar código + programa */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
                     <b>Código Programa:</b> {detalleHeader.programaCodigo || "—"}
@@ -490,7 +504,13 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
-                {/* ✅ CAMBIO PEDIDO: 1 sola columna Código/Impuesto */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2">
+                    <b>Monto liquidado (RUC):</b> {money(detalleHeader.montoLiquidadoTotalRuc ?? 0)}
+                  </Typography>
+                </Grid>
+
+                {/* ✅ 1 sola columna Código/Impuesto */}
                 <Grid item xs={12}>
                   <Paper variant="outlined" sx={{ mt: 1, p: 1.5, borderRadius: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -513,14 +533,11 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                           (detalleHeader.relacionImpuestos ?? []).map((x, idx) => {
                             const cod = String(x.codigoImpuesto ?? "").trim();
                             const nom = String(x.nombreImpuesto ?? "").trim();
-                            const codNom =
-                              cod && nom ? `${cod} - ${nom}` : nom || cod || "—";
+                            const codNom = cod && nom ? `${cod} - ${nom}` : nom || cod || "—";
 
                             return (
                               <TableRow key={idx}>
-                                <TableCell sx={{ maxWidth: 420 }}>
-                                  {codNom}
-                                </TableCell>
+                                <TableCell sx={{ maxWidth: 420 }}>{codNom}</TableCell>
                                 <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                                   {money(x.montoLiquidado)}
                                 </TableCell>

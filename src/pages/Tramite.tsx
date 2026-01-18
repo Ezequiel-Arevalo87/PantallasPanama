@@ -12,6 +12,27 @@ export type TramitePayload = {
   ruc: string;
   contribuyente: string;
   ubicacionExpediente: string;
+
+  /** ✅ NUEVO: Datos actuales (para comparación) */
+  avisoOperacionActual?: string;
+
+  contactoActual?: {
+    telFijo?: string;
+    telMovil?: string;
+    fax?: string;
+    correo?: string;
+  };
+
+  direccionActual?: {
+    provincia?: string;
+    distrito?: string;
+    corregimiento?: string;
+    barrio?: string;
+    calleAvenida?: string;
+    nombreEdificio?: string;
+    numeroCasaApto?: string;
+    referencia?: string;
+  };
 };
 
 type DocumentoAsociado = {
@@ -84,7 +105,7 @@ const btnSecondary: React.CSSProperties = {
 export const Tramite: React.FC<Props> = ({ onGo }) => {
   const [nota, setNota] = useState("");
 
-  // ✅ Igual al HTML
+  // ✅ Igual al HTML (con extras para “datos actuales”)
   const tramite: TramitePayload = {
     numeroTramite: "675000001027",
     red: "Control Extensivo v2",
@@ -95,6 +116,26 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     ruc: "987654321-2-2021",
     contribuyente: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
     ubicacionExpediente: "SECCIÓN DE CONTROL DE SERVICIO AL CONTRIBUYENTE",
+
+    avisoOperacionActual: "AO-189233",
+
+    contactoActual: {
+      telFijo: "203-4455",
+      telMovil: "6677-8899",
+      fax: "203-4400",
+      correo: "contacto@transportes.com",
+    },
+
+    direccionActual: {
+      provincia: "Panamá",
+      distrito: "Panamá",
+      corregimiento: "Bella Vista",
+      barrio: "El Cangrejo",
+      calleAvenida: "Vía España",
+      nombreEdificio: "Edif. Torre Centro",
+      numeroCasaApto: "Apto 12B",
+      referencia: "Frente a farmacia X",
+    },
   };
 
   const documentosAsociados: DocumentoAsociado[] = [
@@ -131,7 +172,6 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
       return;
     }
 
-    // otros formularios (simulación)
     alert(`Crear formulario código ${codigo} (demo)`);
   };
 
@@ -209,7 +249,6 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
 
       <h2 style={h2Style}>Gestión de Documentos</h2>
 
-      {/* Lista de formularios para creación */}
       <table style={tableStyle}>
         <thead>
           <tr>
@@ -238,7 +277,6 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
         </tbody>
       </table>
 
-      {/* Lista de formularios para gestión */}
       <table style={tableStyle}>
         <thead>
           <tr>
