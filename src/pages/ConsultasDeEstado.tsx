@@ -1,3 +1,4 @@
+// src/pages/ConsultasDeEstado.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -23,70 +24,33 @@ import {
   toDDMMYYYY,
   type EstadoActividad,
   type FilaEstado,
-  type Semaforo,
 } from "../services/mockEstados";
+
 import TablaResultadosEstado from "./TablaResultadosEstado";
 
 // ✅ Igual que Priorización
 import { Actividad, loadActividades } from "../services/actividadesLoader";
 
+// ✅ Catálogo fijo de impuestos (Excel)
+import { IMPUESTOS, type ImpuestoOpt } from "../catalogos/impuestos";
+
+// ✅ Catálogos separados
+import {
+  ALL,
+  ACTIVIDADES,
+  TIPOS_INCONSISTENCIA,
+  PROGRAMAS_OMISO,
+  PROGRAMAS_INEXACTO,
+  PROGRAMAS_EXTEMPORANEO,
+  REDS,
+  uniqCaseInsensitive,
+  toProgramaOpt,
+  type ProgramaOpt,
+} from "../catalogos/consultasEstado.catalogos";
+
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
-
-/** ✅ Actividades (incluye AN1/AN2) */
-const ACTIVIDADES: EstadoActividad[] = [
-  "asignacion",
-  "acta de inicio",
-  "notificacion acta de inicio",
-  "informe auditoria",
-  "propuesta de regularizacion",
-  "Revisión Análisis Normativo 1",
-  "Revisión Análisis Normativo 2",
-  "notificación propuesta de regularizacion",
-  "aceptacion total",
-  "aceptacion parcial",
-  "rechazo",
-  "resolucion en firme",
-  "notificación de resolución",
-  "cierre y archivo",
-];
-
-/* ================== Catálogos ================== */
-const TIPOS_INCONSISTENCIA = ["Omiso", "Inexacto", "Extemporáneo"] as const;
-type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number];
-
-const PROGRAMAS_OMISO = [
-  "Omisos vs retenciones 4331 ITBMS",
-  "Omisos vs informes",
-  "Omisos vs ISR Renta",
-  "Omisos vs ITBMS",
-] as const;
-
-const PROGRAMAS_INEXACTO = [
-  "Costos y gastos vs Anexos",
-  "Ventas e ingresos vs Anexos",
-  "Inexactos vs retenciones 4331 ITBMS",
-  "Inexactos vs ITBMS",
-] as const;
-
-const PROGRAMAS_EXTEMPORANEO = [
-  "Base contribuyentes VS Calendario ISR",
-  "Base contribuyentes VS Calendario ITBMS",
-  "Base contribuyentes VS Calendario retenciones ITBMS",
-] as const;
-
-const REDS = ["675", "659"] as const;
-type Red = (typeof REDS)[number];
-
-const uniqCaseInsensitive = (items: string[]) =>
-  Array.from(new Map(items.map((s) => [s.trim().toLowerCase(), s])).values()).filter(Boolean);
-
-type ActividadSel = EstadoActividad;
-type SemaforoSel = Semaforo;
-
-// ✅ Valor real de "TODOS" (NO VACÍO)
-const ALL = "__ALL__";
 
 // ✅ Multi-select actividad económica
 type ActividadEconSel = string[]; // lista de códigos (vacía => TODOS)
@@ -99,43 +63,30 @@ const parseFecha = (f: any) => {
 };
 
 // ============================
-// ✅ Programa con CÓDIGO ÚNICO (Autocomplete + tabla)
+// ✅ util: hash simple para seleccionar impuesto "estable" por trámite
 // ============================
-type ProgramaOpt = {
-  codigo: string;
-  nombre: string;
-  label: string; // `${codigo} - ${nombre}`
+const hashStr = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
 };
 
-const PROGRAMA_CODIGO: Record<string, string> = {
-  "Omisos vs retenciones 4331 ITBMS": "115",
-  "Omisos vs informes": "116",
-  "Omisos vs ISR Renta": "113",
-  "Omisos vs ITBMS": "114",
-
-  "Costos y gastos vs Anexos": "210",
-  "Ventas e ingresos vs Anexos": "211",
-  "Inexactos vs retenciones 4331 ITBMS": "212",
-  "Inexactos vs ITBMS": "213",
-
-  "Base contribuyentes VS Calendario ISR": "310",
-  "Base contribuyentes VS Calendario ITBMS": "311",
-  "Base contribuyentes VS Calendario retenciones ITBMS": "312",
+const pickImpuestoFromCatalog = (seed: string, fallbackNombre?: string) => {
+  const list = Array.isArray(IMPUESTOS) ? IMPUESTOS : [];
+  if (!list.length) {
+    return { codigo: "", nombre: fallbackNombre ?? "" };
+  }
+  const idx = hashStr(seed || "seed") % list.length;
+  const it = list[idx];
+  return { codigo: String(it.codigo ?? "").trim(), nombre: String(it.nombre ?? "").trim() };
 };
 
-const toProgramaOpt = (nombre: string): ProgramaOpt => {
-  const codigo = PROGRAMA_CODIGO[nombre] ?? "";
-  return { codigo, nombre, label: codigo ? `${codigo} - ${nombre}` : nombre };
-};
-
-// ============================
-// ✅ Código-Impuesto (nuevo selector)
-// ============================
-type ImpuestoOpt = { codigo: string; nombre: string; label: string };
-const makeImpuestoOpt = (codigo: string, nombre: string): ImpuestoOpt => {
-  const c = String(codigo ?? "").trim();
-  const n = String(nombre ?? "").trim();
-  return { codigo: c, nombre: n, label: c && n ? `${c} - ${n}` : c || n || "—" };
+const randomMonto = (seed: string) => {
+  // determinístico por seed
+  const h = hashStr(seed || "seed");
+  const base = 500 + (h % 9500);
+  const cents = (h % 100) / 100;
+  return Math.round((base + cents) * 100) / 100;
 };
 
 const ConsultasDeEstado: React.FC = () => {
@@ -245,76 +196,13 @@ const ConsultasDeEstado: React.FC = () => {
   };
 
   // ============================
-  // ✅ Enriquecer filas
+  // ✅ Opciones Código-Impuesto (catálogo fijo)
   // ============================
-  const filasEnriquecidas = useMemo(() => {
-    const periodoInicial = desde || "";
-    const periodoFinal = hasta || "";
+  const impuestosDisponibles = useMemo<ImpuestoOpt[]>(() => {
+    return IMPUESTOS ?? [];
+  }, []);
 
-    return (data as any[]).map((r: any) => {
-      const impProg = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim();
-      const programaCodigo = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
-
-      const impuestoProgramaLabel =
-        programaCodigo && impProg ? `${programaCodigo} - ${impProg}` : impProg;
-
-      const impuestoNombre = String(impProg ?? "")
-        .replace(/\b\d+\b/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      const montoLiquidadoFallback =
-        Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) ||
-        Math.round((500 + Math.random() * 9500) * 100) / 100;
-
-      const relacionImpuestos = Array.isArray(r.relacionImpuestos)
-        ? r.relacionImpuestos
-        : [
-            {
-              codigoImpuesto: programaCodigo || "",
-              nombreImpuesto: impuestoNombre || impProg || "",
-              montoLiquidado: montoLiquidadoFallback,
-            },
-          ];
-
-      const montoLiquidadoTotalRuc = (relacionImpuestos as any[]).reduce(
-        (acc, it) => acc + (Number(it?.montoLiquidado) || 0),
-        0
-      );
-
-      return {
-        ...r,
-        tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "",
-        impuestoPrograma: impProg,
-        programaCodigo,
-        impuestoProgramaLabel,
-        periodoInicial,
-        periodoFinal,
-        relacionImpuestos,
-        actividadEconomica: r.actividadEconomica ?? r.actividad_economica ?? "",
-        red: r.red ?? r.redDgi ?? "",
-        tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
-        montoLiquidadoTotalRuc,
-      } as any as FilaEstado;
-    });
-  }, [data, desde, hasta]);
-
-  // Opciones de Código-Impuesto desde data
-  const impuestosDisponibles = useMemo(() => {
-    const map = new Map<string, ImpuestoOpt>();
-    for (const r of filasEnriquecidas as any[]) {
-      const rel = Array.isArray(r.relacionImpuestos) ? r.relacionImpuestos : [];
-      for (const it of rel) {
-        const cod = String(it?.codigoImpuesto ?? "").trim();
-        const nom = String(it?.nombreImpuesto ?? "").trim();
-        if (!cod && !nom) continue;
-        const key = `${cod}__${nom}`.toLowerCase();
-        if (!map.has(key)) map.set(key, makeImpuestoOpt(cod, nom));
-      }
-    }
-    return Array.from(map.values());
-  }, [filasEnriquecidas]);
-
+  // Si cambian opciones (o llega vacío) y la selección ya no existe -> limpiar
   useEffect(() => {
     if (impuestoSel) {
       const exists = impuestosDisponibles.some(
@@ -329,6 +217,96 @@ const ConsultasDeEstado: React.FC = () => {
   }, [impuestosDisponibles]);
 
   // ============================
+  // ✅ Enriquecer filas (FIX REAL)
+  // - Garantiza relacionImpuestos con codigoImpuesto REAL del catálogo
+  // - Calcula montoLiquidadoTotalRuc correcto
+  // - Expone codigoImpuestoPrincipal para la tabla
+  // ============================
+  const filasEnriquecidas = useMemo(() => {
+    const periodoInicial = desde || "";
+    const periodoFinal = hasta || "";
+
+    return (data as any[]).map((r: any) => {
+      const tramite = String(r.numeroTramite ?? r.tramite ?? r.noTramite ?? "").trim();
+      const seed = tramite || String(r.ruc ?? "") || JSON.stringify(r);
+
+      const impProg = String(r.impuestoPrograma ?? r.impuesto_programa ?? "").trim();
+      const programaCodigo = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
+
+      // ✅ IMPORTANTE: el programa en tabla debe ser SOLO nombre (NO "TODOS" ni código)
+      const impuestoProgramaLabel = impProg || "";
+
+      // monto fallback si no viene
+      const montoFallback = Number(r.montoLiquidado ?? r.monto_liquidado ?? 0) || randomMonto(seed);
+
+      // relación existente
+      const relIn = Array.isArray(r.relacionImpuestos) ? r.relacionImpuestos : [];
+
+      // ✅ Si el mock trae "codigoImpuesto" = programaCodigo (error típico),
+      // lo corregimos con un impuesto real del catálogo
+      const elegido = pickImpuestoFromCatalog(seed, impProg);
+
+      const relOut =
+        relIn.length > 0
+          ? relIn.map((it: any, idx: number) => {
+              const cod = String(it?.codigoImpuesto ?? "").trim();
+              const nom = String(it?.nombreImpuesto ?? "").trim();
+              const monto =
+                Number(it?.montoLiquidado ?? it?.monto_liquidado ?? 0) ||
+                randomMonto(`${seed}|${idx}`);
+
+              const codCorregido =
+                !cod || cod === programaCodigo ? String(elegido.codigo) : cod;
+
+              const nomCorregido =
+                !nom || nom.toLowerCase() === impProg.toLowerCase()
+                  ? String(elegido.nombre || nom || impProg)
+                  : nom;
+
+              return {
+                codigoImpuesto: codCorregido,
+                nombreImpuesto: nomCorregido,
+                montoLiquidado: Math.round(Number(monto) * 100) / 100,
+              };
+            })
+          : [
+              {
+                codigoImpuesto: String(elegido.codigo),
+                nombreImpuesto: String(elegido.nombre || impProg),
+                montoLiquidado: Math.round(Number(montoFallback) * 100) / 100,
+              },
+            ];
+
+      const montoLiquidadoTotalRuc = relOut.reduce(
+        (acc: number, it: any) => acc + (Number(it?.montoLiquidado) || 0),
+        0
+      );
+
+      const codigoImpuestoPrincipal = String(relOut?.[0]?.codigoImpuesto ?? "").trim();
+
+      return {
+        ...r,
+        tipoInconsistencia: r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "",
+        impuestoPrograma: impProg,
+        programaCodigo,
+        impuestoProgramaLabel,
+
+        periodoInicial,
+        periodoFinal,
+
+        relacionImpuestos: relOut,
+        codigoImpuestoPrincipal,
+
+        actividadEconomica: r.actividadEconomica ?? r.actividad_economica ?? "",
+        red: r.red ?? r.redDgi ?? "",
+        tipoPersona: r.tipoPersona ?? r.tipo_persona ?? "Jurídica",
+
+        montoLiquidadoTotalRuc: Math.round(Number(montoLiquidadoTotalRuc) * 100) / 100,
+      } as any as FilaEstado;
+    });
+  }, [data, desde, hasta]);
+
+  // ============================
   // ✅ Filtrado
   // ============================
   const filtrados = useMemo(() => {
@@ -336,46 +314,40 @@ const ConsultasDeEstado: React.FC = () => {
 
     if (tipoInc !== ALL) {
       rows = rows.filter((r) => {
-        const t = (r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "").toString().trim();
+        const t = String(r.tipoInconsistencia ?? r.tipo_inconsistencia ?? "").trim();
         if (!t) return true;
         return t.toLowerCase() === String(tipoInc).toLowerCase();
       });
     }
 
     if (actividad !== ALL) {
-      rows = rows.filter(
-        (r) => String(r.estado).toLowerCase() === String(actividad).toLowerCase()
-      );
+      rows = rows.filter((r) => String(r.estado).toLowerCase() === String(actividad).toLowerCase());
     }
 
+    // Programa (usa codigo internamente, muestra nombre)
     if (programaSel) {
       rows = rows.filter((r) => {
         const cod = String(r.programaCodigo ?? r.programa_codigo ?? "").trim();
         if (cod) return cod === programaSel.codigo;
 
-        const imp = (r.impuestoPrograma ?? r.impuesto_programa ?? "").toString().trim();
+        const imp = String(r.impuestoPrograma ?? r.impuesto_programa ?? "").trim();
         if (!imp) return true;
         return imp.toLowerCase() === programaSel.nombre.toLowerCase();
       });
     }
 
-    if (impuestoSel) {
+    // ✅ Código-Impuesto: filtra por relaciónImpuestos.codigoImpuesto (ya corregido)
+    if (impuestoSel?.codigo) {
       rows = rows.filter((r) => {
         const rel = Array.isArray(r.relacionImpuestos) ? r.relacionImpuestos : [];
-        if (!rel.length) return true;
-        return rel.some((it: any) => {
-          const cod = String(it?.codigoImpuesto ?? "").trim();
-          const nom = String(it?.nombreImpuesto ?? "").trim();
-          const codOk = impuestoSel.codigo ? cod === impuestoSel.codigo : true;
-          const nomOk = impuestoSel.nombre ? nom.toLowerCase() === impuestoSel.nombre.toLowerCase() : true;
-          return codOk && nomOk;
-        });
+        if (!rel.length) return false;
+        return rel.some((it: any) => String(it?.codigoImpuesto ?? "").trim() === impuestoSel.codigo);
       });
     }
 
     if (actividadEcon.length > 0) {
       rows = rows.filter((r) => {
-        const ae = (r.actividadEconomica ?? r.actividad_economica ?? "").toString().trim();
+        const ae = String(r.actividadEconomica ?? r.actividad_economica ?? "").trim();
         if (!ae) return true;
         return actividadEcon.some((sel) => sel.toLowerCase() === ae.toLowerCase());
       });
@@ -383,7 +355,7 @@ const ConsultasDeEstado: React.FC = () => {
 
     if (red !== ALL) {
       rows = rows.filter((r) => {
-        const rr = (r.red ?? r.redDgi ?? "").toString().trim();
+        const rr = String(r.red ?? r.redDgi ?? "").trim();
         if (!rr) return true;
         return rr.toLowerCase() === String(red).toLowerCase();
       });
@@ -412,9 +384,9 @@ const ConsultasDeEstado: React.FC = () => {
     return rows as FilaEstado[];
   }, [filasEnriquecidas, tipoInc, actividad, programaSel, impuestoSel, actividadEcon, red, sem, desde, hasta]);
 
-  // =========================
+  // ============================
   // ✅ Garantizar resultados
-  // =========================
+  // ============================
   const fechaParaSemaforo = (s: string) => {
     const hoy = dayjs();
     if (s === "VERDE") return hoy.add(20, "day").format("YYYY-MM-DD");
@@ -448,15 +420,15 @@ const ConsultasDeEstado: React.FC = () => {
     const fallbackOpt = toProgramaOpt("Omisos vs ITBMS");
     const sel = programaSel ?? (programasDisponibles[0] ?? fallbackOpt);
 
-    const programaCodigo = sel.codigo ?? "";
     const impProg = sel.nombre ?? "";
-    const impuestoProgramaLabel = sel.label ?? `${programaCodigo} - ${impProg}`;
 
+    // ✅ Impuesto real del catálogo
+    const elegido = pickImpuestoFromCatalog(num, impProg);
     const relacionImpuestos = [
       {
-        codigoImpuesto: programaCodigo || "",
-        nombreImpuesto: impProg,
-        montoLiquidado: Math.round((500 + Math.random() * 9500) * 100) / 100,
+        codigoImpuesto: String(elegido.codigo),
+        nombreImpuesto: String(elegido.nombre || impProg),
+        montoLiquidado: randomMonto(num),
       },
     ];
 
@@ -470,18 +442,23 @@ const ConsultasDeEstado: React.FC = () => {
       tipoInconsistencia: tipoInc === ALL ? "Omiso" : tipoInc,
 
       impuestoPrograma: impProg,
-      programaCodigo,
-      impuestoProgramaLabel,
+      programaCodigo: sel.codigo ?? "",
+      impuestoProgramaLabel: impProg, // ✅ SOLO nombre
 
       periodoInicial: desde || "",
       periodoFinal: hasta || "",
+
       relacionImpuestos,
+      codigoImpuestoPrincipal: String(relacionImpuestos[0].codigoImpuesto),
 
       actividadEconomica: actividadEcon[0] || (actividades[0]?.code ?? "Servicios"),
       red: (red !== ALL ? red : "675") || "675",
       tipoPersona: "Jurídica",
 
-      montoLiquidadoTotalRuc: relacionImpuestos.reduce((a, it) => a + (Number(it.montoLiquidado) || 0), 0),
+      montoLiquidadoTotalRuc: relacionImpuestos.reduce(
+        (a, it) => a + (Number(it.montoLiquidado) || 0),
+        0
+      ),
     };
   };
 
@@ -538,19 +515,17 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Programa (Autocomplete) - FIX reset */}
+        {/* ✅ Programa (Autocomplete) - SOLO NOMBRE */}
         <Grid item xs={12} sm={6} md={3}>
           <Autocomplete
             options={programasDisponibles}
             value={programaSel}
             inputValue={programaInput}
             onInputChange={(_e, val, reason) => {
-              // ✅ FIX: cuando MUI resetea a "" con value=null, mantener "TODOS"
               if (reason === "reset" && !programaSel && (val ?? "").trim() === "") {
                 setProgramaInput("TODOS");
                 return;
               }
-              // si no hay selección y queda vacío -> mostrar TODOS
               if (!programaSel && (val ?? "").trim() === "" && reason !== "reset") {
                 setProgramaInput("TODOS");
                 return;
@@ -559,17 +534,15 @@ const ConsultasDeEstado: React.FC = () => {
             }}
             onChange={(_e, newValue) => {
               setProgramaSel(newValue);
-              setProgramaInput(newValue ? newValue.label : "TODOS");
+              setProgramaInput(newValue ? newValue.nombre : "TODOS");
               setMostrarResultados(false);
             }}
-            getOptionLabel={(opt) => opt?.label ?? ""}
+            getOptionLabel={(opt) => opt?.nombre ?? ""}
             isOptionEqualToValue={(opt, val) => opt.nombre === val.nombre && opt.codigo === val.codigo}
             filterOptions={(options, state) => {
               const q = state.inputValue.trim().toLowerCase();
               if (!q || q === "todos") return options;
-              return options.filter((o) =>
-                `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q)
-              );
+              return options.filter((o) => `${o.nombre} ${o.codigo}`.toLowerCase().includes(q));
             }}
             renderInput={(params) => <TextField {...params} label="Programa" fullWidth />}
             onOpen={() => {
@@ -581,14 +554,13 @@ const ConsultasDeEstado: React.FC = () => {
           />
         </Grid>
 
-        {/* ✅ Código-Impuesto (Autocomplete) - FIX reset */}
+        {/* ✅ Código-Impuesto (Autocomplete) */}
         <Grid item xs={12} sm={6} md={3}>
           <Autocomplete
             options={impuestosDisponibles}
             value={impuestoSel}
             inputValue={impuestoInput}
             onInputChange={(_e, val, reason) => {
-              // ✅ FIX: cuando MUI resetea a "" con value=null, mantener "TODOS"
               if (reason === "reset" && !impuestoSel && (val ?? "").trim() === "") {
                 setImpuestoInput("TODOS");
                 return;
@@ -609,9 +581,7 @@ const ConsultasDeEstado: React.FC = () => {
             filterOptions={(options, state) => {
               const q = state.inputValue.trim().toLowerCase();
               if (!q || q === "todos") return options;
-              return options.filter((o) =>
-                `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q)
-              );
+              return options.filter((o) => `${o.codigo} ${o.nombre} ${o.label}`.toLowerCase().includes(q));
             }}
             renderInput={(params) => <TextField {...params} label="Código-Impuesto" fullWidth />}
             onOpen={() => {
@@ -648,17 +618,17 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Actividad Económica (MULTI) - FIX value */}
+        {/* ✅ Actividad Económica (MULTI) */}
         <Grid item xs={12} sm={6} md={3}>
           <TextField
             select
             fullWidth
             label="Actividad Económica"
-            value={actividadEcon} // ✅ FIX: no pasar [ALL]
+            value={actividadEcon}
             onChange={handleActividadesChange as any}
             SelectProps={{
               multiple: true,
-              displayEmpty: true, // ✅ para que se vea "TODOS" cuando está vacío
+              displayEmpty: true,
               renderValue: renderActividadChips,
             }}
             disabled={loadingAct}

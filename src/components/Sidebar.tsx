@@ -84,7 +84,7 @@ const useMenuData = () => {
         { label: 'INFORME AUDITORIA' },
       ],
     },
-    { label: 'CONTROL Y SEGUIMIENTO' },
+    // { label: 'SEGUIMIENTO Y CONTROL' },
   //  { label: 'INICIO DE AUDITORIA' },
   
    
@@ -100,6 +100,10 @@ const useMenuData = () => {
     { label: 'RECTIFICATIVA' },
     { label: 'CIERRE' },
   ];
+   const seguiemiento: MenuNode[] = [
+    { label: "SEGUIMIENTO Y CONTROL" },
+   
+  ];
 
   const modulos: MenuNode[] = [
   {
@@ -112,7 +116,7 @@ const useMenuData = () => {
   { label: "MÓDULO ALERTAS" },
 ];
 
-  return { home, trazabilidad, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
+  return { home, trazabilidad, seguiemiento, auditorias, modulos, selectorCaso, priorizacion, aprobacion, asignacion };
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
@@ -121,6 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
   const {
     home,
     trazabilidad,
+    seguiemiento,
     auditorias,
     modulos,
     selectorCaso,
@@ -292,6 +297,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
         <Divider sx={{ my: 1.5 }} />
 
         {asignacion.map(a => (
+          <ListItemButton
+            key={a.label}
+            sx={{ ...SECTION_STYLE, py: 1 }}
+            onClick={() => onSelect(a.label)}
+            selected={selected === a.label}
+          >
+            <Typography variant="subtitle2">{a.label}</Typography>
+          </ListItemButton>
+        ))}
+
+        <Divider sx={{ my: 1.5 }} />
+        {seguiemiento.map(a => (
           <ListItemButton
             key={a.label}
             sx={{ ...SECTION_STYLE, py: 1 }}

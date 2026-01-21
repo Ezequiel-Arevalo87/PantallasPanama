@@ -24,12 +24,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import * as XLSX from "xlsx";
-import {
-  calcularSemaforo,
-  diasRestantes,
-  toDDMMYYYY,
-  type FilaEstado,
-} from "../services/mockEstados";
+import { calcularSemaforo, diasRestantes, toDDMMYYYY, type FilaEstado } from "../services/mockEstados";
 
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
@@ -40,33 +35,31 @@ type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 const colorDeSemaforo = (s: Semaforo) =>
   s === "VERDE" ? "success" : s === "AMARILLO" ? "warning" : "error";
 
-const normalizarImpuestos = (fila: any): string[] => {
-  const raw =
-    fila?.impuestos ??
-    fila?.impuestoS ??
-    fila?.impuesto_list ??
-    fila?.codigoImpuesto ??
-    fila?.codigo_impuesto ??
-    fila?.impuestoCodigo ??
-    fila?.impuestoPrograma ??
-    fila?.impuesto_programa ??
-    "";
-
-  if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
-
-  const s = String(raw ?? "").trim();
-  if (!s) return [];
-  return s
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-};
-
 const money = (n: any) =>
   Number(n ?? 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const getCodigoImpuestoPrincipal = (fila: any): string => {
+  // ✅ viene de ConsultasDeEstado (codigoImpuestoPrincipal)
+  const direct = String(fila?.codigoImpuestoPrincipal ?? "").trim();
+  if (direct) return direct;
+
+  // ✅ fallback: primer item de relacionImpuestos
+  const rel = Array.isArray(fila?.relacionImpuestos) ? fila.relacionImpuestos : [];
+  const cod = String(rel?.[0]?.codigoImpuesto ?? "").trim();
+  return cod;
+};
+
+const getRelacionImpuestos = (fila: any) => {
+  const rel = Array.isArray(fila?.relacionImpuestos) ? fila.relacionImpuestos : [];
+  return rel.map((x: any) => ({
+    codigoImpuesto: String(x?.codigoImpuesto ?? "").trim(),
+    nombreImpuesto: String(x?.nombreImpuesto ?? "").trim(),
+    montoLiquidado: Number(x?.montoLiquidado ?? 0),
+  }));
+};
 
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [openTraza, setOpenTraza] = useState(false);
@@ -77,22 +70,24 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     numeroTramite?: string | number;
     ruc?: string;
     contribuyente?: string;
-    impuestos?: string[];
     actividadActual?: string;
 
-    // ✅ para mostrar en detalle
-    programaCodigo?: string;
+    // ✅ Programa
     impuestoProgramaLabel?: string;
 
+    // ✅ Periodos
     periodoInicial?: string;
     periodoFinal?: string;
+
+    // ✅ Impuesto
+    codigoImpuesto?: string;
     relacionImpuestos?: Array<{
       codigoImpuesto: string;
       nombreImpuesto: string;
       montoLiquidado: number;
     }>;
 
-    // ✅ nuevo
+    // ✅ monto total
     montoLiquidadoTotalRuc?: number;
   } | null>(null);
 
@@ -108,14 +103,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     const tramite = anyFila?.numeroTramite ?? "";
     const key = `${ruc}|${tramite}`;
 
-    const impuestos = normalizarImpuestos(anyFila);
     const actividadActual = anyFila?.estado ?? anyFila?.actividadActual ?? "";
 
     const periodoInicial = anyFila?.periodoInicial ?? "";
     const periodoFinal = anyFila?.periodoFinal ?? "";
-    const relacionImpuestos = Array.isArray(anyFila?.relacionImpuestos) ? anyFila.relacionImpuestos : [];
 
-    const programaCodigo = String(anyFila?.programaCodigo ?? "").trim();
+    const relacionImpuestos = getRelacionImpuestos(anyFila);
+    const codigoImpuesto = getCodigoImpuestoPrincipal(anyFila);
+
     const impuestoProgramaLabel = String(
       anyFila?.impuestoProgramaLabel ?? anyFila?.impuestoPrograma ?? ""
     ).trim();
@@ -126,12 +121,11 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       numeroTramite: tramite ?? "",
       ruc: ruc ?? "",
       contribuyente: anyFila?.contribuyente ?? "",
-      impuestos,
       actividadActual,
-      programaCodigo,
       impuestoProgramaLabel,
       periodoInicial,
       periodoFinal,
+      codigoImpuesto,
       relacionImpuestos,
       montoLiquidadoTotalRuc,
     });
@@ -153,17 +147,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return rows.map((r, i) => {
       const anyR = r as any;
 
-      const programaCodigo = anyR.programaCodigo ?? "";
       const tipoPersona = anyR.tipoPersona ?? anyR.tipo_persona ?? "";
       const impuestoProgramaLabel = anyR.impuestoProgramaLabel ?? anyR.impuestoPrograma ?? "";
+
+      const codigoImpuestoPrincipal = getCodigoImpuestoPrincipal(anyR);
       const montoLiquidadoTotalRuc = Number(anyR.montoLiquidadoTotalRuc ?? 0);
 
       return {
         id: i,
         ...r,
-        programaCodigo,
-        impuestoProgramaLabel,
         tipoPersona,
+        impuestoProgramaLabel,
+        codigoImpuestoPrincipal,
         montoLiquidadoTotalRuc,
       };
     });
@@ -200,7 +195,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return { rojo, amarillo, verde, total: base.length };
   }, [gridRows, gridRowsBase, semaforoSeleccionado]);
 
-  // ✅ Excel general (+ Monto liquidado)
+  // ✅ Excel general
   const exportar = () => {
     const data = (gridRows as any[]).map((r) => ({
       "No Trámite": r.numeroTramite ?? "",
@@ -208,7 +203,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       "Nombre / Razón Social": r.contribuyente ?? "",
       "Tipo de Persona": r.tipoPersona ?? "",
       Estado: r.estado ?? "",
-      "Código Programa": r.programaCodigo ?? "",
+      "Código Impuesto": r.codigoImpuestoPrincipal ?? "",
       Programa: r.impuestoProgramaLabel ?? "",
       "Periodo Inicial": r.periodoInicial ?? "",
       "Periodo Final": r.periodoFinal ?? "",
@@ -224,7 +219,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     XLSX.writeFile(wb, "consulta_estado.xlsx");
   };
 
-  // ✅ Excel del DETALLE (incluye monto total)
+  // ✅ Excel del DETALLE
   const exportarDetalle = () => {
     if (!detalleHeader) return;
 
@@ -234,7 +229,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         RUC: detalleHeader.ruc ?? "",
         Contribuyente: detalleHeader.contribuyente ?? "",
         "Actividad Actual": detalleHeader.actividadActual ?? "",
-        "Código Programa": detalleHeader.programaCodigo ?? "",
+        "Código Impuesto": detalleHeader.codigoImpuesto ?? "",
         Programa: detalleHeader.impuestoProgramaLabel ?? "",
         "Periodo Inicial": detalleHeader.periodoInicial ?? "",
         "Periodo Final": detalleHeader.periodoFinal ?? "",
@@ -247,7 +242,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         /^\s*-\s*/g,
         ""
       ),
-      "Monto liquidado": Number(x.montoLiquidado ?? 0),
+      "Montso liquidado": Number(x.montoLiquidado ?? 0),
     }));
 
     const ws1 = XLSX.utils.json_to_sheet(encabezado);
@@ -276,26 +271,27 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       { field: "tipoPersona", headerName: "Tipo de Persona", width: 160 },
       { field: "estado", headerName: "Estado", width: 220 },
 
+      // ✅ FIX: Código Impuesto visible en resultados
+      { field: "codigoImpuestoPrincipal", headerName: "Código Impuesto", width: 150 },
+
+      // ✅ Programa (solo nombre)
       {
-        field: "programaCodigo",
-        headerName: "Código - Programa",
+        field: "impuestoProgramaLabel",
+        headerName: "Programa",
         width: 420,
         renderCell: (p: any) => {
-          const cod = String(p?.row?.programaCodigo ?? "").trim();
           const nom = String(p?.row?.impuestoProgramaLabel ?? "").trim();
-          if (!cod && !nom) return "—";
-          if (!nom) return cod || "—";
-          return `${cod} - ${nom.replace(/^\d+\s*-\s*/g, "")}`;
+          return nom || "—";
         },
       },
 
-      // ✅ NUEVO: Monto liquidado por RUC
+      // ✅ FIX: Monto liquidado visible en resultados
       {
         field: "montoLiquidadoTotalRuc",
         headerName: "Monto liquidado",
         type: "number",
         width: 170,
-        valueFormatter: (p) => money((p as any).value),
+        
       },
 
       {
@@ -335,10 +331,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
           if (!f) return null;
           const s = calcularSemaforo(f) as Semaforo;
           const d = diasRestantes(f);
-
-          return (
-            <Chip label={`${d} días`} color={colorDeSemaforo(s)} size="small" variant="filled" />
-          );
+          return <Chip label={`${d} días`} color={colorDeSemaforo(s)} size="small" variant="filled" />;
         },
       },
 
@@ -376,18 +369,10 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       <br />
 
       {/* Resumen + chips */}
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={2}
-        mb={1}
-        flexWrap="wrap"
-      >
+      <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} mb={1} flexWrap="wrap">
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography variant="body2" sx={{ mr: 1 }}>
-            Filtro: <b>{semaforoSeleccionado || "TODOS"}</b> | Total:{" "}
-            <b>{resumenSemaforos.total}</b>
+            Filtro: <b>{semaforoSeleccionado || "TODOS"}</b> | Total: <b>{resumenSemaforos.total}</b>
           </Typography>
 
           <Chip
@@ -447,11 +432,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
             </Button>
           </Stack>
 
-          <IconButton
-            aria-label="close"
-            onClick={handleCerrarTrazas}
-            sx={{ position: "absolute", right: 8, top: 8 }}
-          >
+          <IconButton aria-label="close" onClick={handleCerrarTrazas} sx={{ position: "absolute", right: 8, top: 8 }}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -470,17 +451,20 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                     <b>RUC:</b> {detalleHeader.ruc ?? ""}
                   </Typography>
                 </Grid>
+
                 <Grid item xs={12}>
                   <Typography variant="body2">
                     <b>Nombre / Razón Social:</b> {detalleHeader.contribuyente ?? ""}
                   </Typography>
                 </Grid>
 
+                {/* ✅ FIX: Código Impuesto visible en detalle */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
-                    <b>Código Programa:</b> {detalleHeader.programaCodigo || "—"}
+                    <b>Código Impuesto:</b> {detalleHeader.codigoImpuesto || "—"}
                   </Typography>
                 </Grid>
+
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
                     <b>Programa:</b> {detalleHeader.impuestoProgramaLabel || "—"}
@@ -504,13 +488,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
+                {/* ✅ FIX: Monto total visible en detalle */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
                     <b>Monto liquidado (RUC):</b> {money(detalleHeader.montoLiquidadoTotalRuc ?? 0)}
                   </Typography>
                 </Grid>
 
-                {/* ✅ 1 sola columna Código/Impuesto */}
+                {/* Relación de impuestos */}
                 <Grid item xs={12}>
                   <Paper variant="outlined" sx={{ mt: 1, p: 1.5, borderRadius: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>

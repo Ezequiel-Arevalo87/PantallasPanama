@@ -120,7 +120,7 @@ const handleGo = (ruta: string, state?: any) => {
         return <NuevosCasos casosAprobados={aprobados} />;
       }
 
-      case "CONTROL Y SEGUIMIENTO":
+      case "SEGUIMIENTO Y CONTROL":
         return <ConsultasDeEstado />;
 
       /*   case 'INICIO DE AUDITORIA':
