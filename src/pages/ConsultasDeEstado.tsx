@@ -618,34 +618,36 @@ const ConsultasDeEstado: React.FC = () => {
           </TextField>
         </Grid>
 
-        {/* ✅ Actividad Económica (MULTI) */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            select
-            fullWidth
-            label="Actividad Económica"
-            value={actividadEcon}
-            onChange={handleActividadesChange as any}
-            SelectProps={{
-              multiple: true,
-              displayEmpty: true,
-              renderValue: renderActividadChips,
-            }}
-            disabled={loadingAct}
-          >
-            <MenuItem value={ALL}>
-              <Checkbox checked={actividadEcon.length === 0} />
-              <ListItemText primary="TODOS" />
-            </MenuItem>
+    {/* ✅ Actividad Económica (MULTI) */}
+<Grid item xs={12} sm={6} md={3}>
+  <TextField
+    select
+    fullWidth
+    label="Actividad Económica"
+    value={actividadEcon}
+    onChange={handleActividadesChange as any}
+    InputLabelProps={{ shrink: true }}   // ✅ FIX: evita que se monte con "TODOS"
+    SelectProps={{
+      multiple: true,
+      displayEmpty: true,
+      renderValue: renderActividadChips,
+    }}
+    disabled={loadingAct}
+  >
+    <MenuItem value={ALL}>
+      <Checkbox checked={actividadEcon.length === 0} />
+      <ListItemText primary="TODOS" />
+    </MenuItem>
 
-            {actividades.map((a) => (
-              <MenuItem key={a.code} value={a.code}>
-                <Checkbox checked={actividadEcon.includes(a.code)} />
-                <ListItemText primary={`${a.code} — ${a.label}`} />
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
+    {actividades.map((a) => (
+      <MenuItem key={a.code} value={a.code}>
+        <Checkbox checked={actividadEcon.includes(a.code)} />
+        <ListItemText primary={`${a.code} — ${a.label}`} />
+      </MenuItem>
+    ))}
+  </TextField>
+</Grid>
+
 
         {/* Red */}
         <Grid item xs={12} sm={6} md={3}>

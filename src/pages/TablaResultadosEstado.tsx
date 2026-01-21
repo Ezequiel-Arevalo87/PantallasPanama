@@ -32,6 +32,14 @@ import { buildMockTrazas } from "../services/mockTrazas";
 type Props = { rows: FilaEstado[] };
 type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
 
+type RelacionImpuestoRow = {
+  codigoImpuesto: string;
+  nombreImpuesto: string;
+  montoLiquidado: number;
+  respuestaContribuyente: string;
+  resolucion: string;
+};
+
 const colorDeSemaforo = (s: Semaforo) =>
   s === "VERDE" ? "success" : s === "AMARILLO" ? "warning" : "error";
 
@@ -41,24 +49,112 @@ const money = (n: any) =>
     maximumFractionDigits: 2,
   });
 
+const safeStr = (v: any) => String(v ?? "").trim();
+
+/** ===================== IMPUESTO PRINCIPAL ===================== */
 const getCodigoImpuestoPrincipal = (fila: any): string => {
   // ✅ viene de ConsultasDeEstado (codigoImpuestoPrincipal)
-  const direct = String(fila?.codigoImpuestoPrincipal ?? "").trim();
+  const direct = safeStr(fila?.codigoImpuestoPrincipal);
   if (direct) return direct;
 
   // ✅ fallback: primer item de relacionImpuestos
   const rel = Array.isArray(fila?.relacionImpuestos) ? fila.relacionImpuestos : [];
-  const cod = String(rel?.[0]?.codigoImpuesto ?? "").trim();
+  const cod = safeStr(rel?.[0]?.codigoImpuesto);
   return cod;
 };
 
-const getRelacionImpuestos = (fila: any) => {
+const getNombreImpuestoPrincipal = (fila: any): string => {
+  // Si viene en relacionImpuestos, tomamos el primero (mismo criterio del código)
   const rel = Array.isArray(fila?.relacionImpuestos) ? fila.relacionImpuestos : [];
-  return rel.map((x: any) => ({
-    codigoImpuesto: String(x?.codigoImpuesto ?? "").trim(),
-    nombreImpuesto: String(x?.nombreImpuesto ?? "").trim(),
-    montoLiquidado: Number(x?.montoLiquidado ?? 0),
-  }));
+  const nom = safeStr(rel?.[0]?.nombreImpuesto);
+  return nom;
+};
+
+const formatCodigoNombreImpuesto = (codigo?: string, nombre?: string) => {
+  const c = safeStr(codigo);
+  const n = safeStr(nombre);
+  if (c && n) return `${c} - ${n}`;
+  return n || c || "—";
+};
+
+/** ===================== QUEMADO SIN XXX (MÁS EJEMPLOS, DETERMINÍSTICO) ===================== */
+const hashSeed = (seed: string) => {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return h;
+};
+
+const pickFrom = <T,>(arr: readonly T[], seed: string) => {
+  const h = hashSeed(seed);
+  return arr[h % arr.length];
+};
+
+const RESPUESTAS_EJEMPLO = [
+  "Acepta",
+  "Rechazo",
+  "Presentación Voluntaria",
+  "Solicita Reconsideración",
+  "Aporta Sustento / Pruebas",
+  "No contesta",
+  "Acepta Parcial",
+  "Rectifica Declaración",
+  "Solicita Prórroga",
+  "Pago Parcial",
+] as const;
+
+const SERIE_RESOLUCION = [
+  (h: number) => `R${20250000 + (h % 9999)}`, // R2025xxxx
+  (h: number) => `RES-${2025}${String(h % 9999).padStart(4, "0")}`, // RES-2025xxxx
+  (h: number) => `RJ-${2025}-${String(h % 999).padStart(3, "0")}`, // RJ-2025-xxx
+  (h: number) => `R${20240000 + (h % 9999)}`, // R2024xxxx
+] as const;
+
+const fallbackRespuesta = (seed: string) => pickFrom(RESPUESTAS_EJEMPLO, seed);
+
+const fallbackResolucion = (seed: string) => {
+  const h = hashSeed(seed);
+  const gen = SERIE_RESOLUCION[h % SERIE_RESOLUCION.length];
+  return gen(h);
+};
+
+/** ===================== RELACIÓN DE IMPUESTOS (CON RESPUESTA + RESOLUCIÓN) ===================== */
+const getRelacionImpuestos = (fila: any): RelacionImpuestoRow[] => {
+  const rel = Array.isArray(fila?.relacionImpuestos) ? fila.relacionImpuestos : [];
+
+  return rel.map((x: any) => {
+    const codigoImpuesto = safeStr(x?.codigoImpuesto);
+    const nombreImpuesto = safeStr(x?.nombreImpuesto);
+    const montoLiquidado = Number(x?.montoLiquidado ?? 0);
+
+    // semilla estable por fila (no cambia si cambia el orden)
+    const seed = `${codigoImpuesto}|${nombreImpuesto}`.toLowerCase();
+
+    // soportar posibles nombres del backend
+    const respuestaRaw =
+      x?.respuestaContribuyente ??
+      x?.respuesta ??
+      x?.respuesta_contribuyente ??
+      x?.respuestaContrib ??
+      "";
+
+    const resolucionRaw =
+      x?.resolucion ??
+      x?.numeroResolucion ??
+      x?.resolucionNumero ??
+      x?.resolucion_numero ??
+      "";
+
+    const respuestaContribuyente = safeStr(respuestaRaw) || fallbackRespuesta(seed);
+    const resolucion = safeStr(resolucionRaw) || fallbackResolucion(seed);
+
+    return {
+      codigoImpuesto,
+      nombreImpuesto,
+      montoLiquidado,
+      respuestaContribuyente,
+      resolucion,
+    };
+  });
 };
 
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
@@ -72,22 +168,17 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     contribuyente?: string;
     actividadActual?: string;
 
-    // ✅ Programa
     impuestoProgramaLabel?: string;
 
-    // ✅ Periodos
     periodoInicial?: string;
     periodoFinal?: string;
 
-    // ✅ Impuesto
     codigoImpuesto?: string;
-    relacionImpuestos?: Array<{
-      codigoImpuesto: string;
-      nombreImpuesto: string;
-      montoLiquidado: number;
-    }>;
+    nombreImpuesto?: string;
+    impuestoPrincipalLabel?: string;
 
-    // ✅ monto total
+    relacionImpuestos?: RelacionImpuestoRow[];
+
     montoLiquidadoTotalRuc?: number;
   } | null>(null);
 
@@ -104,16 +195,16 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     const key = `${ruc}|${tramite}`;
 
     const actividadActual = anyFila?.estado ?? anyFila?.actividadActual ?? "";
-
     const periodoInicial = anyFila?.periodoInicial ?? "";
     const periodoFinal = anyFila?.periodoFinal ?? "";
 
     const relacionImpuestos = getRelacionImpuestos(anyFila);
-    const codigoImpuesto = getCodigoImpuestoPrincipal(anyFila);
 
-    const impuestoProgramaLabel = String(
-      anyFila?.impuestoProgramaLabel ?? anyFila?.impuestoPrograma ?? ""
-    ).trim();
+    const codigoImpuesto = getCodigoImpuestoPrincipal(anyFila);
+    const nombreImpuesto = getNombreImpuestoPrincipal(anyFila);
+    const impuestoPrincipalLabel = formatCodigoNombreImpuesto(codigoImpuesto, nombreImpuesto);
+
+    const impuestoProgramaLabel = safeStr(anyFila?.impuestoProgramaLabel ?? anyFila?.impuestoPrograma ?? "");
 
     const montoLiquidadoTotalRuc = Number(anyFila?.montoLiquidadoTotalRuc ?? 0);
 
@@ -126,6 +217,8 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       periodoInicial,
       periodoFinal,
       codigoImpuesto,
+      nombreImpuesto,
+      impuestoPrincipalLabel,
       relacionImpuestos,
       montoLiquidadoTotalRuc,
     });
@@ -142,7 +235,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     setDetalleHeader(null);
   }, []);
 
-  // Base rows normalizados
+  /** ===================== GRID: NORMALIZACIÓN ===================== */
   const gridRowsBase = useMemo(() => {
     return rows.map((r, i) => {
       const anyR = r as any;
@@ -151,6 +244,9 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       const impuestoProgramaLabel = anyR.impuestoProgramaLabel ?? anyR.impuestoPrograma ?? "";
 
       const codigoImpuestoPrincipal = getCodigoImpuestoPrincipal(anyR);
+      const nombreImpuestoPrincipal = getNombreImpuestoPrincipal(anyR);
+      const impuestoPrincipalLabel = formatCodigoNombreImpuesto(codigoImpuestoPrincipal, nombreImpuestoPrincipal);
+
       const montoLiquidadoTotalRuc = Number(anyR.montoLiquidadoTotalRuc ?? 0);
 
       return {
@@ -159,12 +255,14 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         tipoPersona,
         impuestoProgramaLabel,
         codigoImpuestoPrincipal,
+        nombreImpuestoPrincipal,
+        impuestoPrincipalLabel,
         montoLiquidadoTotalRuc,
       };
     });
   }, [rows]);
 
-  // Filtrado por chips
+  /** ===================== GRID: FILTRO POR SEMÁFORO ===================== */
   const gridRows = useMemo(() => {
     if (!semaforoSeleccionado) return gridRowsBase;
 
@@ -175,7 +273,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     });
   }, [gridRowsBase, semaforoSeleccionado]);
 
-  // Resumen
+  /** ===================== RESUMEN ===================== */
   const resumenSemaforos = useMemo(() => {
     let rojo = 0;
     let amarillo = 0;
@@ -195,7 +293,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     return { rojo, amarillo, verde, total: base.length };
   }, [gridRows, gridRowsBase, semaforoSeleccionado]);
 
-  // ✅ Excel general
+  /** ===================== EXCEL GENERAL ===================== */
   const exportar = () => {
     const data = (gridRows as any[]).map((r) => ({
       "No Trámite": r.numeroTramite ?? "",
@@ -203,7 +301,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       "Nombre / Razón Social": r.contribuyente ?? "",
       "Tipo de Persona": r.tipoPersona ?? "",
       Estado: r.estado ?? "",
-      "Código Impuesto": r.codigoImpuestoPrincipal ?? "",
+      "Código-Impuesto": r.impuestoPrincipalLabel ?? "",
       Programa: r.impuestoProgramaLabel ?? "",
       "Periodo Inicial": r.periodoInicial ?? "",
       "Periodo Final": r.periodoFinal ?? "",
@@ -219,7 +317,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     XLSX.writeFile(wb, "consulta_estado.xlsx");
   };
 
-  // ✅ Excel del DETALLE
+  /** ===================== EXCEL DETALLE ===================== */
   const exportarDetalle = () => {
     if (!detalleHeader) return;
 
@@ -229,7 +327,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
         RUC: detalleHeader.ruc ?? "",
         Contribuyente: detalleHeader.contribuyente ?? "",
         "Actividad Actual": detalleHeader.actividadActual ?? "",
-        "Código Impuesto": detalleHeader.codigoImpuesto ?? "",
+        "Código Impuesto": detalleHeader.impuestoPrincipalLabel ?? "",
         Programa: detalleHeader.impuestoProgramaLabel ?? "",
         "Periodo Inicial": detalleHeader.periodoInicial ?? "",
         "Periodo Final": detalleHeader.periodoFinal ?? "",
@@ -238,16 +336,18 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     ];
 
     const relacion = (detalleHeader.relacionImpuestos ?? []).map((x) => ({
-      "Código/Impuesto": `${String(x.codigoImpuesto ?? "").trim()} - ${String(x.nombreImpuesto ?? "").trim()}`.replace(
-        /^\s*-\s*/g,
-        ""
-      ),
-      "Montso liquidado": Number(x.montoLiquidado ?? 0),
+      Código: safeStr(x.codigoImpuesto),
+      Impuesto: safeStr(x.nombreImpuesto),
+      "Monto liquidado": Number(x.montoLiquidado ?? 0),
+      "Respuesta Contribuyente": safeStr(x.respuestaContribuyente),
+      Resolución: safeStr(x.resolucion),
     }));
 
     const ws1 = XLSX.utils.json_to_sheet(encabezado);
     const ws2 = XLSX.utils.json_to_sheet(
-      relacion.length ? relacion : [{ "Código/Impuesto": "", "Monto liquidado": "" }]
+      relacion.length
+        ? relacion
+        : [{ Código: "", Impuesto: "", "Monto liquidado": "", "Respuesta Contribuyente": "", Resolución: "" }]
     );
 
     const wb = XLSX.utils.book_new();
@@ -258,6 +358,7 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
     XLSX.writeFile(wb, `detalle_tramite_${num}.xlsx`);
   };
 
+  /** ===================== COLUMNAS GRID ===================== */
   const columns = useMemo<GridColDef[]>(
     () => [
       { field: "numeroTramite", headerName: "No Trámite", width: 140 },
@@ -271,27 +372,31 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
       { field: "tipoPersona", headerName: "Tipo de Persona", width: 160 },
       { field: "estado", headerName: "Estado", width: 220 },
 
-      // ✅ FIX: Código Impuesto visible en resultados
-      { field: "codigoImpuestoPrincipal", headerName: "Código Impuesto", width: 150 },
+      {
+        field: "impuestoPrincipalLabel",
+        headerName: "Código Impuesto",
+        width: 260,
+        renderCell: (p: any) => {
+          const label = safeStr(p?.row?.impuestoPrincipalLabel);
+          return label || "—";
+        },
+      },
 
-      // ✅ Programa (solo nombre)
       {
         field: "impuestoProgramaLabel",
         headerName: "Programa",
         width: 420,
         renderCell: (p: any) => {
-          const nom = String(p?.row?.impuestoProgramaLabel ?? "").trim();
+          const nom = safeStr(p?.row?.impuestoProgramaLabel);
           return nom || "—";
         },
       },
 
-      // ✅ FIX: Monto liquidado visible en resultados
       {
         field: "montoLiquidadoTotalRuc",
         headerName: "Monto liquidado",
         type: "number",
         width: 170,
-        
       },
 
       {
@@ -458,10 +563,9 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
-                {/* ✅ FIX: Código Impuesto visible en detalle */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
-                    <b>Código Impuesto:</b> {detalleHeader.codigoImpuesto || "—"}
+                    <b>Código Impuesto :</b> {detalleHeader.impuestoPrincipalLabel || "—"}
                   </Typography>
                 </Grid>
 
@@ -488,50 +592,60 @@ const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
                   </Typography>
                 </Grid>
 
-                {/* ✅ FIX: Monto total visible en detalle */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2">
                     <b>Monto liquidado (RUC):</b> {money(detalleHeader.montoLiquidadoTotalRuc ?? 0)}
                   </Typography>
                 </Grid>
 
-                {/* Relación de impuestos */}
+                {/* Relación de impuestos (como el HTML) */}
                 <Grid item xs={12}>
                   <Paper variant="outlined" sx={{ mt: 1, p: 1.5, borderRadius: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, textAlign: "center", fontWeight: 700 }}>
                       Relación de impuestos
                     </Typography>
 
-                    <Table size="small" sx={{ "& td, & th": { py: 0.75 } }}>
+                    <Table
+                      size="small"
+                      sx={{
+                        border: "1px solid #000",
+                        "& th, & td": { borderBottom: "1px solid #000" },
+                        "& th": { fontWeight: 700 },
+                      }}
+                    >
                       <TableHead>
                         <TableRow>
-                          <TableCell>
-                            <b>Código/Impuesto</b>
-                          </TableCell>
-                          <TableCell align="right">
-                            <b>Monto liquidado</b>
-                          </TableCell>
+                          <TableCell>Código</TableCell>
+                          <TableCell>Impuesto</TableCell>
+                          <TableCell align="right">Monto liquidado</TableCell>
+                          <TableCell>Respuesta Contribuyente</TableCell>
+                          <TableCell>Resolución</TableCell>
                         </TableRow>
                       </TableHead>
+
                       <TableBody>
                         {(detalleHeader.relacionImpuestos ?? []).length ? (
                           (detalleHeader.relacionImpuestos ?? []).map((x, idx) => {
-                            const cod = String(x.codigoImpuesto ?? "").trim();
-                            const nom = String(x.nombreImpuesto ?? "").trim();
-                            const codNom = cod && nom ? `${cod} - ${nom}` : nom || cod || "—";
+                            const cod = safeStr(x.codigoImpuesto) || "—";
+                            const imp = safeStr(x.nombreImpuesto) || "—";
+                            const resp = safeStr(x.respuestaContribuyente) || fallbackRespuesta(`${cod}|${imp}`.toLowerCase());
+                            const res = safeStr(x.resolucion) || fallbackResolucion(`${cod}|${imp}`.toLowerCase());
 
                             return (
                               <TableRow key={idx}>
-                                <TableCell sx={{ maxWidth: 420 }}>{codNom}</TableCell>
+                                <TableCell>{cod}</TableCell>
+                                <TableCell>{imp}</TableCell>
                                 <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                                   {money(x.montoLiquidado)}
                                 </TableCell>
+                                <TableCell>{resp}</TableCell>
+                                <TableCell>{res}</TableCell>
                               </TableRow>
                             );
                           })
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={2}>—</TableCell>
+                            <TableCell colSpan={5}>—</TableCell>
                           </TableRow>
                         )}
                       </TableBody>
