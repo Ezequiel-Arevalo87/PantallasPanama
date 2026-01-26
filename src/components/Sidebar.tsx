@@ -90,8 +90,8 @@ const useMenuData = () => {
    
    
     { label: 'VARIACIÓN EN INGRESOS' },
-    { label: 'HISTORIAL CUMPLIMIENTO' },
-    { label: 'ANALISIS FISCAL' },
+    // { label: 'HISTORIAL CUMPLIMIENTO' },
+    // { label: 'ANALISIS FISCAL' },
     { label: 'REVISIÓN SUPERVISOR' },
     { label: 'REVISIÓN JEFE DE SECCIÓN' },
     { label: 'PRESENTACIÓN VOLUNTARIA' },

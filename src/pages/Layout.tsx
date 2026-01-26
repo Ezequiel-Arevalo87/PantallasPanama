@@ -160,8 +160,8 @@ case "INFORME AUDITORIA":
       case "VARIACIÓN EN INGRESOS":
         return <VariacionesIngreso />;
 
-      case "HISTORIAL CUMPLIMIENTO":
-        return <HistorialCumplimiento />;
+      // case "HISTORIAL CUMPLIMIENTO":
+      //   return <HistorialCumplimiento />;
 
       case "ANALISIS FISCAL":
         return <AnalisisFiscal />;
