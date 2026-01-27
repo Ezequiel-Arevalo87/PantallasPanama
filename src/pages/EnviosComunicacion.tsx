@@ -14,10 +14,16 @@ import {
   Checkbox,
   Alert,
   Chip,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import dayjs from "dayjs";
+
 import Trazabilidad, { type TrazaItem, type EstadoAprobacion } from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
+import { addExtraTraza, getExtraTrazas, makeTrazaKey } from "../services/trazasStore";
 
 type ModalidadEnvio = "CORREO" | "PLATAFORMA" | "TODAS";
 type TipoNotificacionPlataforma = "ELECTRONICA" | "PRESENCIAL";
@@ -74,10 +80,15 @@ const buildMockCaso = (key: string): CasoInfo => {
   };
 };
 
-const buildActividad = (m: ModalidadEnvio, tipoNotif?: TipoNotificacionPlataforma, doc?: DocumentoFormal, adj?: boolean) => {
+const buildActividad = (
+  m: ModalidadEnvio,
+  tipoNotif?: TipoNotificacionPlataforma,
+  doc?: DocumentoFormal,
+  adj?: boolean
+) => {
   if (m === "CORREO") return adj ? `Envío de correo (con adjunto${doc ? `: ${doc}` : ""})` : "Envío de correo";
   if (m === "PLATAFORMA") return `Notificación por plataforma (${tipoNotif ?? "ELECTRONICA"})`;
-  return `Envío por correo y plataforma`;
+  return "Envío por correo y plataforma";
 };
 
 const EnviosComunicacion: React.FC = () => {
@@ -89,6 +100,9 @@ const EnviosComunicacion: React.FC = () => {
   const [caso, setCaso] = React.useState<CasoInfo | null>(null);
   const [trazas, setTrazas] = React.useState<TrazaItem[]>([]);
 
+  // ✅ inicia CERRADO
+  const [expanded, setExpanded] = React.useState(false);
+
   // formulario envío
   const [modalidad, setModalidad] = React.useState<ModalidadEnvio>("CORREO");
 
@@ -99,11 +113,11 @@ const EnviosComunicacion: React.FC = () => {
   // plataforma
   const [tipoNotif, setTipoNotif] = React.useState<TipoNotificacionPlataforma>("ELECTRONICA");
 
-  // ✅ obligatorio
+  // obligatorio
   const [observacion, setObservacion] = React.useState("");
   const [error, setError] = React.useState<string>("");
 
-  const key = React.useMemo(() => `${ruc.trim()}|${tramite.trim()}`, [ruc, tramite]);
+  const key = React.useMemo(() => makeTrazaKey(ruc, tramite), [ruc, tramite]);
 
   const resetFormEnvio = React.useCallback(() => {
     setModalidad("CORREO");
@@ -114,6 +128,12 @@ const EnviosComunicacion: React.FC = () => {
     setError("");
   }, []);
 
+  const loadTrazas = React.useCallback((k: string) => {
+    const base = buildMockTrazas(k);
+    const extra = getExtraTrazas(k);
+    setTrazas([...extra, ...base]);
+  }, []);
+
   const handleBuscar = () => {
     const rucClean = ruc.trim();
     const traClean = tramite.trim();
@@ -122,13 +142,20 @@ const EnviosComunicacion: React.FC = () => {
       setCaso(null);
       setTrazas([]);
       resetFormEnvio();
+      setExpanded(false);
       return;
     }
 
-    const k = `${rucClean}|${traClean}`;
+    const k = makeTrazaKey(rucClean, traClean);
     setCaso(buildMockCaso(k));
-    setTrazas(buildMockTrazas(k)); // trae historial simulado
+
+    // base + extras guardadas
+    loadTrazas(k);
+
     resetFormEnvio();
+
+    // ✅ NO abrir: queda comprimido
+    setExpanded(false);
   };
 
   const handleLimpiar = () => {
@@ -137,6 +164,7 @@ const EnviosComunicacion: React.FC = () => {
     setCaso(null);
     setTrazas([]);
     resetFormEnvio();
+    setExpanded(false);
   };
 
   const handleEnviar = () => {
@@ -153,7 +181,6 @@ const EnviosComunicacion: React.FC = () => {
       return;
     }
 
-    // ✅ reglas mínimas: si correo seleccionado, preguntamos adjunto (y si requiereAdjunto, debe haber documento)
     if ((modalidad === "CORREO" || modalidad === "TODAS") && requiereAdjunto && !documento) {
       setError("Debes seleccionar el documento a adjuntar.");
       return;
@@ -171,18 +198,24 @@ const EnviosComunicacion: React.FC = () => {
     const nuevo: TrazaItem = {
       id: `ENV-${Date.now()}`,
       actividad,
-      usuarioGestion: "Auditor (Simulado)",
+      usuarioGestion: "Auditor",
       fechaInicialISO: nowISO,
-      fechaFinalISO: "", // queda pendiente hasta respuesta
+      fechaFinalISO: "",
       estado: "PENDIENTE" as EstadoAprobacion,
       observacion: obs,
     };
 
-    // guardamos en trazabilidad (simulado)
-    setTrazas((prev) => [nuevo, ...prev]);
+    // Persistimos para que el menú Trazabilidad también lo vea
+    addExtraTraza(key, nuevo);
 
-    // limpiamos solo observación (puedes cambiar si quieres)
+    // refrescamos vista local (base + extra)
+    loadTrazas(key);
+
+    // limpiamos observación
     setObservacion("");
+
+    // ✅ queda comprimida (no abrir)
+    setExpanded(false);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -307,8 +340,7 @@ const EnviosComunicacion: React.FC = () => {
                 label="Modalidad de Envío"
                 value={modalidad}
                 onChange={(e) => {
-                  const v = e.target.value as ModalidadEnvio;
-                  setModalidad(v);
+                  setModalidad(e.target.value as ModalidadEnvio);
                   setError("");
                 }}
               >
@@ -368,7 +400,7 @@ const EnviosComunicacion: React.FC = () => {
               </Grid>
             ) : null}
 
-            {/* ✅ Observación obligatoria */}
+            {/* Observación obligatoria */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -397,14 +429,10 @@ const EnviosComunicacion: React.FC = () => {
                   Limpiar observación
                 </Button>
                 <Button variant="contained" onClick={handleEnviar}>
-                  Enviar 
+                  Enviar
                 </Button>
               </Stack>
 
-              {/* <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                Al enviar (simulado) se crea un registro en trazabilidad con estado <b>PENDIENTE</b>, fecha inicial y
-                la <b>Observación</b>.
-              </Typography> */}
               <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                 Modalidad seleccionada: <b>{labelModalidad(modalidad)}</b>
               </Typography>
@@ -413,11 +441,19 @@ const EnviosComunicacion: React.FC = () => {
 
           <Divider sx={{ my: 2 }} />
 
-          {/* Trazabilidad */}
-          {/* <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
-            Trazabilidad del Caso
-          </Typography>
-          <Trazabilidad rows={trazas} height={460} /> */}
+          {/* Trazabilidad en acordeón (cerrado por defecto) */}
+          <Accordion expanded={expanded} onChange={(_, v) => setExpanded(v)} disableGutters>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography sx={{ fontWeight: 800 }}>Trazabilidad del Caso</Typography>
+            </AccordionSummary>
+
+            {/* solo renderiza cuando está expandido */}
+            {expanded ? (
+              <AccordionDetails>
+                <Trazabilidad rows={trazas} height={460} />
+              </AccordionDetails>
+            ) : null}
+          </Accordion>
         </>
       )}
     </Box>
