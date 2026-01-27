@@ -38,6 +38,8 @@ import ActaInicio from "./ActaInicio";
 import ComunicacionesForm from "./ComunicacionesForm";
 import { CrearInformeAuditoria } from "./CrearInformeAuditoria";
 import { Tramite } from "./Tramite";
+import EnviosComunicacion from "./EnviosComunicacion";
+
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
@@ -98,6 +100,8 @@ const handleGo = (ruta: string, state?: any) => {
       // ✅ NUEVO: COMUNICACIONES
       case "COMUNICACIONES":
         return <ComunicacionesForm />;
+      case "ENVIOS":
+        return <EnviosComunicacion />;
 
       // RESTO DE PANTALLAS
       case "TRAZABILIDAD":

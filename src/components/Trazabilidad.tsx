@@ -1,6 +1,6 @@
 // src/components/Trazabilidad.tsx
 import * as React from "react";
-import { Chip, Box } from "@mui/material";
+import { Chip, Box, Tooltip, Typography } from "@mui/material";
 import {
   DataGrid,
   type GridColDef,
@@ -16,6 +16,7 @@ export type EstadoAprobacion = "APROBADO" | "RECHAZADO" | "PENDIENTE" | "ASIGNAD
 
 /**
  * Compatible: acepta lo viejo (fechaISO/actor/accion) y lo nuevo (actividad/usuarioGestion/fechaInicialISO/fechaFinalISO)
+ * + NUEVO: observacion
  */
 export type TrazaItem = {
   id: string;
@@ -30,6 +31,9 @@ export type TrazaItem = {
   usuarioGestion?: string;
   fechaInicialISO?: string;
   fechaFinalISO?: string;
+
+  // ✅ NUEVO
+  observacion?: string;
 
   estado: EstadoAprobacion;
   periodo?: string;
@@ -112,28 +116,29 @@ const FALLBACK_USUARIOS = [
   "Andrés Ramírez",
 ];
 
+const clampText = (s: any) => String(s ?? "").trim();
+
 export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
   const rowsNormalized = React.useMemo(() => {
     const base = (rows ?? []).map((r, idx) => {
       // 1) actividad
-      let actividad = (r.actividad ?? r.accion ?? "").toString().trim();
+      let actividad = clampText(r.actividad ?? r.accion);
       if (!actividad) {
         actividad = FALLBACK_ACTIVIDADES[idx % FALLBACK_ACTIVIDADES.length];
       }
 
       // 2) usuario gestión
-      let usuarioGestion = (r.usuarioGestion ?? r.actor ?? "").toString().trim();
+      let usuarioGestion = clampText(r.usuarioGestion ?? r.actor);
       if (!usuarioGestion) {
         usuarioGestion = FALLBACK_USUARIOS[idx % FALLBACK_USUARIOS.length];
       }
 
       // 3) fecha inicial/final
-      let fechaInicialISO = (r.fechaInicialISO ?? r.fechaISO ?? "").toString().trim();
-      let fechaFinalISO = (r.fechaFinalISO ?? "").toString().trim();
+      let fechaInicialISO = clampText(r.fechaInicialISO ?? r.fechaISO);
+      let fechaFinalISO = clampText(r.fechaFinalISO);
 
       // si no viene ninguna fecha, inventamos una secuencia
       if (!fechaInicialISO) {
-        // fechas escalonadas (más reciente arriba si luego ordenas desc)
         fechaInicialISO = dayjs()
           .subtract((rows?.length ?? 8) - idx, "day")
           .hour(9)
@@ -150,12 +155,15 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
           : dayjs(fechaInicialISO).add(1, "day").hour(17).minute(0).second(0).toISOString();
       }
 
+      const observacion = clampText(r.observacion);
+
       return {
         ...r,
         actividad,
         usuarioGestion,
         fechaInicialISO,
         fechaFinalISO,
+        observacion,
 
         // mantenemos legacy por si algo más lo usa
         accion: r.accion ?? actividad,
@@ -203,6 +211,27 @@ export const Trazabilidad: React.FC<Props> = ({ rows, height = 480 }) => {
           return t1 - t2;
         },
       },
+
+      // ✅ NUEVO: Observación
+      {
+        field: "observacion",
+        headerName: "Observación",
+        minWidth: 260,
+        flex: 1,
+        sortable: false,
+        renderCell: (params) => {
+          const txt = clampText(params.value);
+          if (!txt) return <Typography variant="body2" color="text.secondary">—</Typography>;
+          return (
+            <Tooltip title={txt}>
+              <Typography variant="body2" noWrap sx={{ width: "100%" }}>
+                {txt}
+              </Typography>
+            </Tooltip>
+          );
+        },
+      },
+
       { field: "usuarioGestion", headerName: "Usuario de Gestión", minWidth: 200, flex: 1 },
     ],
     []

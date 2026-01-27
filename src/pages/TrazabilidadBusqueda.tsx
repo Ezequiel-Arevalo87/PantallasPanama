@@ -1,13 +1,6 @@
 // src/pages/TrazabilidadBusqueda.tsx
 import * as React from "react";
-import {
-  Box,
-  Paper,
-  Stack,
-  TextField,
-  Button,
-  Typography,
-} from "@mui/material";
+import { Box, Paper, Stack, TextField, Button, Typography } from "@mui/material";
 import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
 
@@ -20,13 +13,11 @@ const TrazabilidadBusqueda: React.FC = () => {
     const rucClean = ruc.trim();
     const traClean = tramite.trim();
 
-    // Requerimos al menos uno de los dos campos
     if (!rucClean && !traClean) {
       setRows([]);
       return;
     }
 
-    // Semilla combinada estable (si uno está vacío, igual funciona)
     const key = `${rucClean}|${traClean}`;
     setRows(buildMockTrazas(key));
   };
@@ -57,7 +48,7 @@ const TrazabilidadBusqueda: React.FC = () => {
           "& .MuiButton-root": {
             minWidth: 120,
             fontWeight: "bold",
-            height: "56px", // igual que los TextField
+            height: "56px",
           },
         }}
       >
@@ -87,8 +78,7 @@ const TrazabilidadBusqueda: React.FC = () => {
         <Trazabilidad rows={rows} height={420} />
       ) : (
         <Box sx={{ py: 6, textAlign: "center", color: "text.secondary" }}>
-          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona{" "}
-          <b>Buscar</b> para ver la trazabilidad simulada.
+          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona <b>Buscar</b>.
         </Box>
       )}
     </Box>

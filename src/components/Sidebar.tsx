@@ -110,6 +110,7 @@ const useMenuData = () => {
     label: "MÓDULO COMUNICACIÓN",
     children: [
       { label: "COMUNICACIONES" }, // 👈 aquí entra tu pantalla
+      { label: "ENVIOS" }, // 👈 aquí entra tu pantalla
     ],
   },
   { label: "MÓDULO CONSULTAS" },
