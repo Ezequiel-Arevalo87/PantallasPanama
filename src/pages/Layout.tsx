@@ -14,11 +14,9 @@ import { Eliminaciones } from "./Eliminaciones";
 import { Rectificativa } from "./Rectificativa";
 import { Cierre } from "./Cierre";
 import { LiquidacionesAdicionales } from "./LiquidacionesAdicionales";
-import { Apertura } from "./Apertura";
 import { Priorizacion } from "./Priorizacion";
 import { AsignacionesVarias } from "./AsignacionesVarias";
 import VariacionesIngreso from "./VariacionesIngreso";
-import HistorialCumplimiento from "./HistorialCumplimiento";
 import AnalisisFiscal from "./AnalisisFiscal";
 import Aprobaciones from "./Aprobaciones";
 import VerificacionPage from "./VerificacionPage";
@@ -38,7 +36,7 @@ import ActaInicio from "./ActaInicio";
 import ComunicacionesForm from "./ComunicacionesForm";
 import { CrearInformeAuditoria } from "./CrearInformeAuditoria";
 import { Tramite } from "./Tramite";
-import EnviosComunicacion from "./EnviosComunicacion";
+import ComunicacionesEnviosPage from "./ComunicacionesEnviosPage";
 
 
 // Rutas base
@@ -101,7 +99,7 @@ const handleGo = (ruta: string, state?: any) => {
       case "COMUNICACIONES":
         return <ComunicacionesForm />;
       case "ENVIOS":
-        return <EnviosComunicacion />;
+        return <ComunicacionesEnviosPage />;
 
       // RESTO DE PANTALLAS
       case "TRAZABILIDAD":
