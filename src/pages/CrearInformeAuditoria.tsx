@@ -33,6 +33,13 @@ type Pager = { page: number; pageSize: number };
 
 type Props = {
   tramite?: TramitePayload;
+
+  /**
+   * ✅ Para reutilizar este mismo componente en:
+   * - Informe Auditoría (706 / como ya lo tienes)
+   * - Acta de Cierre (799)
+   */
+  documentType?: "INFORME_AUDITORIA" | "ACTA_CIERRE";
 };
 
 /** ===================== ESTILOS ===================== */
@@ -249,7 +256,13 @@ const Pagination: React.FC<{
 };
 
 /** ===================== COMPONENTE ===================== */
-export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
+export const CrearInformeAuditoria: React.FC<Props> = ({
+  tramite,
+  documentType = "INFORME_AUDITORIA",
+}) => {
+  const isActaCierre = documentType === "ACTA_CIERRE";
+  const pageTitle = isActaCierre ? "Acta de Cierre de Fiscalización" : "Informe de Auditoría";
+
   /** ===== PDF ===== */
   const [openPdf, setOpenPdf] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string>("");
@@ -266,7 +279,8 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
   /** ===== Datos actualizados ===== */
   const [mostrarDatosActualizados, setMostrarDatosActualizados] = useState(false);
 
-  const [avisoOperacionActualizado, setAvisoOperacionActualizado] = useState("");
+  // ✅ QUITADO: avisoOperacionActualizado (ya no va)
+  // const [avisoOperacionActualizado, setAvisoOperacionActualizado] = useState("");
 
   // contacto actualizado
   const [telFijo, setTelFijo] = useState("");
@@ -283,6 +297,11 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
   const [nombreEdificio, setNombreEdificio] = useState("");
   const [numeroCasaApto, setNumeroCasaApto] = useState("");
   const [referencia, setReferencia] = useState("");
+
+  /** ✅ NUEVO: Razón Comercial (texto abierto) */
+  const [razonComercial, setRazonComercial] = useState<string>(
+    (tramite?.razonComercial as any) ?? ""
+  );
 
   /** ===== Alcance: impuestos con periodicidad ===== */
   const impuestosCatalogo: TaxConfig[] = [
@@ -464,11 +483,47 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
 
   /** ✅ Word: descarga plantilla (Word abre HTML sin problema) */
   const descargarWord = () => {
+    const actaNumero = fmt(tramite?.actaInicioFiscalizacion?.numero);
+    const actaFecha = fmt(tramite?.actaInicioFiscalizacion?.fecha);
+
+    const obligaciones = (tramite?.obligaciones ?? []) as Array<{
+      impuesto: string;
+      fechaDesde: string;
+      fechaHasta?: string;
+    }>;
+
+    const obligacionesHtml = obligaciones.length
+      ? `
+        <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse; width:100%;">
+          <thead>
+            <tr style="background:#f2f2f2;">
+              <th align="left">Impuesto</th>
+              <th align="left">Fecha Desde</th>
+              <th align="left">Fecha Hasta</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${obligaciones
+              .map(
+                (o) => `
+                <tr>
+                  <td>${fmt(o.impuesto)}</td>
+                  <td>${fmt(o.fechaDesde)}</td>
+                  <td>${fmt(o.fechaHasta)}</td>
+                </tr>
+              `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `
+      : `<div style="color:#666;">(Sin obligaciones)</div>`;
+
     const html = `
       <html>
         <head><meta charset="utf-8"/></head>
         <body style="font-family: Arial, sans-serif;">
-          <h2>Informe de Auditoría</h2>
+          <h2>${pageTitle}</h2>
 
           <h3>Datos del Trámite</h3>
           <p><b>Número:</b> ${fmt(tramite?.numeroTramite)}</p>
@@ -476,15 +531,26 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
           <p><b>RUC:</b> ${fmt(tramite?.ruc)}</p>
           <p><b>Contribuyente:</b> ${fmt(tramite?.contribuyente)}</p>
 
+          <p><b>Número de Acta de Inicio de Fiscalización:</b> ${actaNumero}</p>
+          <p><b>Fecha de Acta de Inicio de Fiscalización:</b> ${actaFecha}</p>
+
+          <h3>Datos del contribuyente</h3>
+          <p><b>Razón Comercial:</b> ${fmt(razonComercial)}</p>
+
+          <h4>Obligaciones</h4>
+          ${obligacionesHtml}
+
           <h3>Datos actuales (contribuyente)</h3>
-          <p><b>Aviso de Operación:</b> ${fmt(tramite?.avisoOperacionActual)}</p>
-          <p><b>Contacto:</b>
+          <p><b>Aviso de Operación (actual):</b> ${fmt(tramite?.avisoOperacionActual)}</p>
+
+          <p><b>Contacto actual:</b>
             Tel fijo: ${fmt(tramite?.contactoActual?.telFijo)} |
             Tel móvil: ${fmt(tramite?.contactoActual?.telMovil)} |
             Fax: ${fmt(tramite?.contactoActual?.fax)} |
             Correo: ${fmt(tramite?.contactoActual?.correo)}
           </p>
-          <p><b>Dirección:</b>
+
+          <p><b>Dirección actual:</b>
             Provincia: ${fmt(tramite?.direccionActual?.provincia)} |
             Distrito: ${fmt(tramite?.direccionActual?.distrito)} |
             Corregimiento: ${fmt(tramite?.direccionActual?.corregimiento)} |
@@ -514,7 +580,8 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
 
     const a = document.createElement("a");
     a.href = url;
-    const name = tramite?.numeroTramite ? `InformeAuditoria_${tramite.numeroTramite}.doc` : "InformeAuditoria.doc";
+    const baseName = tramite?.numeroTramite ? `${tramite.numeroTramite}` : "SIN_TRAMITE";
+    const name = isActaCierre ? `ActaCierre_${baseName}.doc` : `InformeAuditoria_${baseName}.doc`;
     a.download = name;
     document.body.appendChild(a);
     a.click();
@@ -527,9 +594,12 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     let y = 40;
 
+    const actaNumero = fmt(tramite?.actaInicioFiscalizacion?.numero);
+    const actaFecha = fmt(tramite?.actaInicioFiscalizacion?.fecha);
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("Informe de Auditoría", 40, y);
+    doc.text(pageTitle, 40, y);
     y += 18;
 
     doc.setFont("helvetica", "normal");
@@ -545,6 +615,8 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         ["Actividad", tramite.actividad],
         ["RUC", tramite.ruc],
         ["Contribuyente", tramite.contribuyente],
+        ["N° Acta Inicio Fiscalización", actaNumero],
+        ["Fecha Acta Inicio Fiscalización", actaFecha],
       ];
 
       for (const [k, v] of t) {
@@ -555,14 +627,46 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         doc.setFont("helvetica", "bold");
         doc.text(`${k}:`, 40, (y += 14));
         doc.setFont("helvetica", "normal");
-        doc.text(String(v), 140, y);
+        doc.text(String(v), 220, y);
+      }
+
+      // ✅ Datos del contribuyente (nuevo)
+      doc.setFont("helvetica", "bold");
+      doc.text("Datos del contribuyente", 40, (y += 18));
+      doc.setFont("helvetica", "normal");
+      doc.text(`Razón Comercial: ${fmt(razonComercial)}`, 40, (y += 14));
+
+      const obligaciones = (tramite?.obligaciones ?? []) as Array<{
+        impuesto: string;
+        fechaDesde: string;
+        fechaHasta?: string;
+      }>;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Obligaciones", 40, (y += 16));
+      doc.setFont("helvetica", "normal");
+
+      if (!obligaciones.length) {
+        doc.text("(Sin obligaciones)", 40, (y += 14));
+      } else {
+        for (const o of obligaciones) {
+          if (y > 760) {
+            doc.addPage();
+            y = 60;
+          }
+          doc.text(
+            `• ${fmt(o.impuesto)} | Desde: ${fmt(o.fechaDesde)} | Hasta: ${fmt(o.fechaHasta)}`,
+            40,
+            (y += 14)
+          );
+        }
       }
 
       // ✅ datos actuales en PDF (para comparación)
       doc.setFont("helvetica", "bold");
       doc.text("Datos actuales (contribuyente)", 40, (y += 18));
       doc.setFont("helvetica", "normal");
-      doc.text(`Aviso operación: ${fmt(tramite.avisoOperacionActual)}`, 40, (y += 14));
+      doc.text(`Aviso operación (actual): ${fmt(tramite.avisoOperacionActual)}`, 40, (y += 14));
       doc.text(
         `Tel fijo: ${fmt(tramite.contactoActual?.telFijo)}  |  Tel móvil: ${fmt(
           tramite.contactoActual?.telMovil
@@ -633,7 +737,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
 
   const guardar = () => alert("Guardado (demo).");
   const enviar = () => {
-    const ok = window.confirm("¿Está seguro que desea enviar el informe?");
+    const ok = window.confirm(`¿Está seguro que desea enviar el ${isActaCierre ? "acta" : "informe"}?`);
     if (!ok) return;
     alert("Enviado (demo).");
   };
@@ -643,9 +747,16 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
   const placeDesde = periodicidadSel === "MENSUAL" ? "202301" : "2023";
   const placeHasta = periodicidadSel === "MENSUAL" ? "202312" : "2025";
 
+  /** obligaciones (solo lectura) */
+  const obligaciones = (tramite?.obligaciones ?? []) as Array<{
+    impuesto: string;
+    fechaDesde: string;
+    fechaHasta?: string;
+  }>;
+
   return (
     <div style={{ fontFamily: "Arial, sans-serif", margin: 20 }}>
-      <h1>Informe de Auditoría</h1>
+      <h1>{pageTitle}</h1>
 
       {/* ===== Modal PDF ===== */}
       {openPdf && (
@@ -735,11 +846,84 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                   Contribuyente: <b>{tramite.contribuyente}</b>
                 </td>
               </tr>
+
+              {/* ✅ NUEVO: Acta Inicio Fiscalización (solo lectura) */}
+              <tr>
+                <td style={tdStyle}>
+                  N° Acta Inicio de Fiscalización:{" "}
+                  <b>{fmt(tramite.actaInicioFiscalizacion?.numero) || "723000001132"}</b>
+                </td>
+                <td style={tdStyle} colSpan={2}>
+                  Fecha Acta Inicio de Fiscalización:{" "}
+                  <b>{fmt(tramite.actaInicioFiscalizacion?.fecha) || "18/02/2025"}</b>
+                </td>
+              </tr>
             </tbody>
           </table>
         ) : (
           <div style={{ color: "#b00", fontWeight: 700 }}>
-            No hay trámite seleccionado. Entra a TRÁMITE y presiona “Crear (706)”.
+            No hay trámite seleccionado. Entra a TRÁMITE y presiona “Crear”.
+          </div>
+        )}
+      </div>
+
+      {/* ================= DATOS DEL CONTRIBUYENTE (NUEVO) ================= */}
+      <div style={card}>
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos del contribuyente</div>
+
+        {!tramite ? (
+          <div style={{ color: "#666" }}>Seleccione un trámite para ver los datos del contribuyente.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
+                Razón Comercial
+              </label>
+              <input
+                type="text"
+                style={inputStyle}
+                value={razonComercial}
+                onChange={(e) => setRazonComercial(e.target.value)}
+                placeholder="Escriba la razón comercial..."
+              />
+            </div>
+
+            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
+              <b>Obligaciones (solo lectura)</b>
+
+              <div style={{ marginTop: 10 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Impuesto</th>
+                      <th style={thStyle}>Fecha Desde</th>
+                      <th style={thStyle}>Fecha Hasta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {obligaciones.length ? (
+                      obligaciones.map((o, idx) => (
+                        <tr key={`${o.impuesto}-${idx}`}>
+                          <td style={tdStyle}>{fmt(o.impuesto)}</td>
+                          <td style={tdStyle}>{fmt(o.fechaDesde)}</td>
+                          <td style={tdStyle}>{fmt(o.fechaHasta)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td style={tdStyle} colSpan={3} align="center">
+                          Sin obligaciones registradas
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                <div style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
+                  * “Fecha Hasta” suele estar vacía si la obligación está activa.
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -841,21 +1025,11 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         <fieldset style={{ marginTop: 12 }}>
           <legend>Datos Actualizados</legend>
 
-          <div style={{ marginTop: 10 }}>
-            <label style={{ display: "block", fontWeight: 700 }}>
-              Número de Aviso de Operación actualizado
-            </label>
-            <input
-              type="text"
-              style={inputStyle}
-              value={avisoOperacionActualizado}
-              onChange={(e) => setAvisoOperacionActualizado(e.target.value)}
-            />
-          </div>
+          {/* ✅ QUITADO: “Número de Aviso de Operación actualizado” */}
 
           <div
             style={{
-              marginTop: 16,
+              marginTop: 10,
               border: "1px solid #ccc",
               padding: 10,
               borderRadius: 6,
@@ -1007,7 +1181,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
 
       {/* ================= RESULTADO ================= */}
       <fieldset style={{ marginTop: 12 }}>
-        <legend>Resultado de la Auditoría</legend>
+        <legend>Resultado</legend>
 
         <label style={{ display: "block", fontWeight: 700 }}>Resultado</label>
         <select
@@ -1035,7 +1209,6 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
       <fieldset style={{ marginTop: 12 }}>
         <legend>Alcance</legend>
 
-        {/* ✅ instrucción ANTES de los controles */}
         {!hasAnyTable && (
           <div style={{ marginBottom: 10, color: "#666" }}>
             Seleccione un <b>Impuesto</b> y un rango de <b>Períodos</b>, luego presione{" "}
@@ -1043,11 +1216,11 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
           </div>
         )}
 
-        {/* ✅ una sola línea (responsive) */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(260px, 1.2fr) minmax(160px, 0.6fr) minmax(160px, 0.6fr) auto auto 1fr",
+            gridTemplateColumns:
+              "minmax(260px, 1.2fr) minmax(160px, 0.6fr) minmax(160px, 0.6fr) auto auto 1fr",
             gap: 10,
             alignItems: "end",
           }}
@@ -1060,7 +1233,6 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
               onChange={(e) => {
                 const v = e.target.value as Impuesto;
                 setImpuestoSel(v);
-                // limpia campos cuando cambia periodicidad
                 setDesde("");
                 setHasta("");
               }}
@@ -1104,7 +1276,6 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
             Agregar
           </button>
 
-          {/* ✅ “Eliminar seleccionados” solo si hay tablas */}
           {hasAnyTable ? (
             <button style={{ ...btnDanger, margin: 0 }} onClick={eliminarSeleccionados}>
               Eliminar seleccionados
@@ -1147,7 +1318,6 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                   title={`${tax} — Total (B/.): ${totalTax.toFixed(2)}`}
                   defaultOpen={tax === impuestoSel}
                 >
-                  {/* filtros dentro de la tabla */}
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
                     <div style={{ fontWeight: 800 }}>
                       Filtro período ({periodicidad === "MENSUAL" ? "AAAAMM" : "AAAA"}):
@@ -1158,7 +1328,8 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                       onChange={(e) => {
                         const digits = e.target.value.replace(/\D/g, "");
                         setFilter(tax, {
-                          searchPeriodo: periodicidad === "MENSUAL" ? digits.slice(0, 6) : digits.slice(0, 4),
+                          searchPeriodo:
+                            periodicidad === "MENSUAL" ? digits.slice(0, 6) : digits.slice(0, 4),
                         });
                         setPager(tax, { page: 1 });
                       }}
@@ -1241,7 +1412,9 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                               inputMode="numeric"
                               style={inputStyle}
                               value={r.recargo1}
-                              onChange={(e) => updateMoneyField(tax, r.id, "recargo1", e.target.value)}
+                              onChange={(e) =>
+                                updateMoneyField(tax, r.id, "recargo1", e.target.value)
+                              }
                             />
                           </td>
 
@@ -1263,7 +1436,9 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
                               inputMode="numeric"
                               style={inputStyle}
                               value={r.recargo2}
-                              onChange={(e) => updateMoneyField(tax, r.id, "recargo2", e.target.value)}
+                              onChange={(e) =>
+                                updateMoneyField(tax, r.id, "recargo2", e.target.value)
+                              }
                             />
                           </td>
 
@@ -1311,12 +1486,12 @@ export const CrearInformeAuditoria: React.FC<Props> = ({ tramite }) => {
         <div style={{ fontWeight: 900, marginBottom: 8 }}>Documento Word</div>
 
         <button style={btnSecondary} onClick={descargarWord}>
-          Descargar informe en Word
+          Descargar en Word
         </button>
 
         <div style={{ marginTop: 10 }}>
           <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-            Subir informe completado
+            Subir documento completado
           </label>
           <input
             type="file"

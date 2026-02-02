@@ -24,20 +24,20 @@ import TrazabilidadBusqueda from "./TrazabilidadBusqueda";
 import ConsultasDeEstado from "./ConsultasDeEstado";
 import PantallaControNotificacion from "../components/PantallaControNotificacion";
 
-// ✅ NUEVO: Comunicaciones
-
-
 // HOMES
 import Home from "./Home";
-
 import { NuevosCasos } from "./NuevosCasos";
 import { readAprobados } from "../lib/workflowStorage";
+
 import ActaInicio from "./ActaInicio";
 import ComunicacionesForm from "./ComunicacionesForm";
-import { CrearInformeAuditoria } from "./CrearInformeAuditoria";
-import { Tramite } from "./Tramite";
 import ComunicacionesEnviosPage from "./ComunicacionesEnviosPage";
 
+import { CrearInformeAuditoria } from "./CrearInformeAuditoria";
+import { Tramite } from "./Tramite";
+
+/** ✅ NUEVO: ACTA DE CIERRE */
+import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
@@ -47,7 +47,8 @@ const DIR_PATH = "PROCESOS DE AUDITORIAS/DIRECTOR";
 export const Layout: React.FC = () => {
   const [selectedPath, setSelectedPath] = useState<string>("HOME");
   const [readOnly, setReadOnly] = useState<boolean>(false);
-const [routeState, setRouteState] = useState<any>(null);
+  const [routeState, setRouteState] = useState<any>(null);
+
   const leaf = useMemo(() => {
     if (!selectedPath) return "";
     const parts = selectedPath.split("/");
@@ -74,34 +75,38 @@ const [routeState, setRouteState] = useState<any>(null);
     }
   }, [readOnly, leaf, selectedPath]);
 
-  
-const handleGo = (ruta: string, state?: any) => {
-  setSelectedPath(ruta);
-  setRouteState(state ?? null);
-  setReadOnly(
-    ruta === SUP_PATH ||
-      ruta.endsWith("/SUPERVISOR") ||
-      ruta === DIR_PATH ||
-      ruta.endsWith("/DIRECTOR")
-  );
-};
- const handleSelect = (ruta: string) => {
-  handleGo(ruta);
-};
+  /** ===================== NAVEGACIÓN CENTRAL ===================== */
+  const handleGo = (ruta: string, state?: any) => {
+    setSelectedPath(ruta);
+    setRouteState(state ?? null);
 
+    setReadOnly(
+      ruta === SUP_PATH ||
+        ruta.endsWith("/SUPERVISOR") ||
+        ruta === DIR_PATH ||
+        ruta.endsWith("/DIRECTOR")
+    );
+  };
+
+  const handleSelect = (ruta: string) => {
+    handleGo(ruta);
+  };
+
+  /** ===================== RENDER CONTENIDO ===================== */
   const renderContent = () => {
     switch (leaf) {
-      // HOMES
+      // ================= HOMES =================
       case "HOME":
         return <Home onGo={handleSelect} contexto={selectedPath} />;
 
-      // ✅ NUEVO: COMUNICACIONES
+      // ================= COMUNICACIONES =================
       case "COMUNICACIONES":
         return <ComunicacionesForm />;
+
       case "ENVIOS":
         return <ComunicacionesEnviosPage />;
 
-      // RESTO DE PANTALLAS
+      // ================= CONSULTAS =================
       case "TRAZABILIDAD":
         return <TrazabilidadBusqueda />;
 
@@ -125,9 +130,7 @@ const handleGo = (ruta: string, state?: any) => {
       case "SEGUIMIENTO Y CONTROL":
         return <ConsultasDeEstado />;
 
-      /*   case 'INICIO DE AUDITORIA':
-        return <Apertura />;*/
-
+      // ================= BPM =================
       case "PROCESO DE AUDITORIA":
       case "SUPERVISOR":
       case "DIRECTOR":
@@ -138,13 +141,21 @@ const handleGo = (ruta: string, state?: any) => {
           />
         );
 
+      // ================= TRÁMITE =================
       case "TRAMITE":
-  return <Tramite onGo={handleGo} />;
+        return <Tramite onGo={handleGo} />;
 
-case "INFORME AUDITORIA":
-  return <CrearInformeAuditoria tramite={routeState?.tramite} />;
+      // ================= INFORME AUDITORÍA =================
+      case "INFORME AUDITORIA":
+        return <CrearInformeAuditoria tramite={routeState?.tramite} />;
 
+      // ================= ACTA DE CIERRE =================
+      case "ACTA CIERRE":
+        return (
+          <ActaCierreFiscalizacion tramite={routeState?.tramite} />
+        );
 
+      // ================= OTROS =================
       case "ACTA DE INICIO":
         return <ActaInicio />;
 
@@ -161,9 +172,6 @@ case "INFORME AUDITORIA":
 
       case "VARIACIÓN EN INGRESOS":
         return <VariacionesIngreso />;
-
-      // case "HISTORIAL CUMPLIMIENTO":
-      //   return <HistorialCumplimiento />;
 
       case "ANALISIS FISCAL":
         return <AnalisisFiscal />;
@@ -188,6 +196,7 @@ case "INFORME AUDITORIA":
     }
   };
 
+  /** ===================== LAYOUT ===================== */
   return (
     <Box
       display="flex"
@@ -211,7 +220,7 @@ case "INFORME AUDITORIA":
           sx={{
             width: 300,
             backgroundColor: "#fdfdf5",
-            borderRight: "2px solid #b5b5b5", // ⭐ línea clara y visible
+            borderRight: "2px solid #b5b5b5",
             p: 2,
             height: "100%",
             overflowY: "auto",
@@ -230,7 +239,7 @@ case "INFORME AUDITORIA":
           sx={{
             flexGrow: 1,
             p: 4,
-            pl: 5, // ⭐ separación estética
+            pl: 5,
             backgroundColor: "#fff",
             overflowY: "auto",
             overflowX: "hidden",

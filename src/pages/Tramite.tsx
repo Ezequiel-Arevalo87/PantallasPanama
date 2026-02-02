@@ -9,11 +9,12 @@ export type TramitePayload = {
   estadoTramite: string;
   fechaInicio: string;
   usuarioGestion: string;
+
   ruc: string;
   contribuyente: string;
   ubicacionExpediente: string;
 
-  /** ✅ NUEVO: Datos actuales (para comparación) */
+  /** ✅ Datos actuales (para comparación) */
   avisoOperacionActual?: string;
 
   contactoActual?: {
@@ -33,6 +34,34 @@ export type TramitePayload = {
     numeroCasaApto?: string;
     referencia?: string;
   };
+
+  /** ✅ NUEVO: Acta Inicio Fiscalización (solo lectura) */
+  actaInicioFiscalizacion?: {
+    numero: string; // ej 723000001132
+    fecha: string; // ej 18/02/2025
+  };
+
+  /** ✅ NUEVO: Datos del contribuyente */
+  razonComercial?: string;
+
+  /** ✅ NUEVO: Obligaciones (solo lectura) */
+  obligaciones?: Array<{
+    impuesto: string; // "202 - ITBMS"
+    fechaDesde: string; // "01/01/2009"
+    fechaHasta?: string; // "" / undefined si activo
+  }>;
+
+  /** =========================================================
+   * ✅ CAMPOS QUE USA ActaCierreFiscalizacion.tsx (para TS)
+   * ========================================================= */
+  digitoVerificador?: string; // ej "2"
+  razonSocial?: string; // si quieres separar de contribuyente
+  auditorAsignado?: string;
+  supervisorAsignado?: string;
+  aniosInvestigados?: string[]; // ej ["2022","2023","2024"]
+
+  /** ✅ viene del Informe de Auditoría (solo lectura en Acta Cierre) */
+  detalleInvestigacionInforme?: string;
 };
 
 type DocumentoAsociado = {
@@ -105,7 +134,7 @@ const btnSecondary: React.CSSProperties = {
 export const Tramite: React.FC<Props> = ({ onGo }) => {
   const [nota, setNota] = useState("");
 
-  // ✅ Igual al HTML (con extras para “datos actuales”)
+  // ✅ Igual al HTML (con extras)
   const tramite: TramitePayload = {
     numeroTramite: "675000001027",
     red: "Control Extensivo v2",
@@ -113,6 +142,7 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     estadoTramite: "ASIGNADO",
     fechaInicio: "17/02/2025",
     usuarioGestion: "ZULEIMA ISABEL MORAN",
+
     ruc: "987654321-2-2021",
     contribuyente: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
     ubicacionExpediente: "SECCIÓN DE CONTROL DE SERVICIO AL CONTRIBUYENTE",
@@ -136,6 +166,31 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
       numeroCasaApto: "Apto 12B",
       referencia: "Frente a farmacia X",
     },
+
+    /** ✅ Acta Inicio Fiscalización (solo lectura) */
+    actaInicioFiscalizacion: {
+      numero: "723000001132",
+      fecha: "18/02/2025",
+    },
+
+    /** ✅ Razón Comercial (editable en el futuro, aquí demo) */
+    razonComercial: "TRANSPORTES Y SERVICIOS LOGÍSTICOS (COMERCIAL)",
+
+    /** ✅ Obligaciones (solo lectura) */
+    obligaciones: [
+      { impuesto: "202 - ITBMS", fechaDesde: "01/01/2009", fechaHasta: "" },
+      { impuesto: "102 - ISR", fechaDesde: "01/01/2012", fechaHasta: "" },
+      { impuesto: "140 - Aviso de Operación", fechaDesde: "01/01/2015", fechaHasta: "" },
+    ],
+
+    /** ✅ Campos que necesita ActaCierreFiscalizacion.tsx */
+    digitoVerificador: "2",
+    razonSocial: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
+    auditorAsignado: "ZULEIMA ISABEL MORAN",
+    supervisorAsignado: "LUIS BARTLETT",
+    aniosInvestigados: ["2022", "2023", "2024"],
+    detalleInvestigacionInforme:
+      "Se realizaron cruces con facturación electrónica y declaraciones.\nHallazgos principales: diferencias en ITBMS e ISR.\nSe notificó al contribuyente y se levantaron actas internas.",
   };
 
   const documentosAsociados: DocumentoAsociado[] = [
@@ -157,17 +212,29 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     },
   ];
 
+  /** ✅ Gestión de documentos: 799 debajo de 706 */
   const formulariosCrear: FormularioCrear[] = [
     { codigo: "706", nombre: "INFORME FINAL AUDITORIA" },
+    { codigo: "799", nombre: "ACTA DE CIERRE DE FISCALIZACIÓN" },
     { codigo: "720", nombre: "AUTO DE ARCHIVO" },
     { codigo: "725", nombre: "REQUERIMIENTO DE REGULARIZACIÓN (CONTROL EXTENSIVO)" },
   ];
 
   const crearFormulario = (codigo: string) => {
-    // ✅ flujo que pediste: Trámite -> Informe de auditoría al crear 706
     if (codigo === "706") {
       onGo("PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/INFORME AUDITORIA", {
         tramite,
+        documentType: "INFORME_AUDITORIA",
+        formularioCodigo: "706",
+      });
+      return;
+    }
+
+    if (codigo === "799") {
+      onGo("PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/ACTA CIERRE", {
+        tramite,
+        documentType: "ACTA_CIERRE",
+        formularioCodigo: "799",
       });
       return;
     }
