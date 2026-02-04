@@ -31,6 +31,24 @@ type AlcanceRow = {
 
 type Pager = { page: number; pageSize: number };
 
+type Contacto = {
+  telFijo?: string;
+  telMovil?: string;
+  fax?: string;
+  correo?: string;
+};
+
+type Direccion = {
+  provincia?: string;
+  distrito?: string;
+  corregimiento?: string;
+  barrio?: string;
+  calleAvenida?: string;
+  nombreEdificio?: string;
+  numeroCasaApto?: string;
+  referencia?: string;
+};
+
 type Props = {
   tramite?: TramitePayload;
 
@@ -45,8 +63,10 @@ type Props = {
 /** ===================== ESTILOS ===================== */
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: 6,
+  padding: 8,
   boxSizing: "border-box",
+  border: "1px solid #cfcfcf",
+  borderRadius: 6,
 };
 
 const thStyle: React.CSSProperties = {
@@ -62,12 +82,12 @@ const tdStyle: React.CSSProperties = {
 };
 
 const btnBase: React.CSSProperties = {
-  padding: "10px 15px",
+  padding: "10px 14px",
   margin: "10px 6px 0 0",
   cursor: "pointer",
   border: "none",
-  borderRadius: 6,
-  fontWeight: 700,
+  borderRadius: 8,
+  fontWeight: 800,
 };
 
 const btnSecondary: React.CSSProperties = {
@@ -95,11 +115,75 @@ const btnDanger: React.CSSProperties = {
 };
 
 const card: React.CSSProperties = {
-  border: "1px solid #e5e5e5",
+  // ✅ sin bordes (pedido)
+  border: "none",
   borderRadius: 10,
   padding: 12,
   marginTop: 12,
   background: "#fff",
+  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+};
+
+const sectionTitle: React.CSSProperties = {
+  fontWeight: 900,
+  marginBottom: 10,
+  fontSize: 14,
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontWeight: 800,
+  marginBottom: 6,
+};
+
+const helpStyle: React.CSSProperties = {
+  color: "#666",
+  fontSize: 12,
+};
+
+const fieldGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(12, 1fr)",
+  gap: 10,
+};
+
+const col = (span: number): React.CSSProperties => ({
+  gridColumn: `span ${span}`,
+});
+
+const modalOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+  zIndex: 9999,
+};
+
+const modalCard: React.CSSProperties = {
+  width: "min(980px, 96vw)",
+  height: "min(760px, 92vh)",
+  background: "#fff",
+  borderRadius: 12,
+  overflow: "hidden",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const modalHeader: React.CSSProperties = {
+  padding: "12px 14px",
+  borderBottom: "1px solid #e5e5e5",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const modalBody: React.CSSProperties = {
+  padding: 14,
+  overflow: "auto",
 };
 
 /** ===================== HELPERS ===================== */
@@ -217,19 +301,19 @@ const Pagination: React.FC<{
     >
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <button
-          style={{ ...btnBase, margin: 0, background: "#f2f2f2" }}
+          style={{ ...btnBase, margin: 0, background: "#f2f2f2", color: "#111" }}
           disabled={!canPrev}
           onClick={() => onPage(page - 1)}
         >
           ◀
         </button>
 
-        <div style={{ fontWeight: 700 }}>
+        <div style={{ fontWeight: 800 }}>
           Página {page} / {totalPages}
         </div>
 
         <button
-          style={{ ...btnBase, margin: 0, background: "#f2f2f2" }}
+          style={{ ...btnBase, margin: 0, background: "#f2f2f2", color: "#111" }}
           disabled={!canNext}
           onClick={() => onPage(page + 1)}
         >
@@ -238,11 +322,11 @@ const Pagination: React.FC<{
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontWeight: 700 }}>Filas:</span>
+        <span style={{ fontWeight: 800 }}>Filas:</span>
         <select
           value={pageSize}
           onChange={(e) => onPageSize(Number(e.target.value))}
-          style={{ padding: 6 }}
+          style={{ padding: 6, borderRadius: 6, border: "1px solid #cfcfcf" }}
         >
           <option value={5}>5</option>
           <option value={10}>10</option>
@@ -274,34 +358,76 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
   const [resultado, setResultado] = useState<
     "PRODUCTIVO" | "IMPRODUCTIVO" | "PRESENTACIÓN VOLUNTARIA"
   >("PRODUCTIVO");
-  const [detalleInvestigacion, setDetalleInvestigacion] = useState("");
+  const [conclusiones, setConclusiones] = useState("");
 
-  /** ===== Datos actualizados ===== */
-  const [mostrarDatosActualizados, setMostrarDatosActualizados] = useState(false);
-
-  // ✅ QUITADO: avisoOperacionActualizado (ya no va)
-  // const [avisoOperacionActualizado, setAvisoOperacionActualizado] = useState("");
-
-  // contacto actualizado
-  const [telFijo, setTelFijo] = useState("");
-  const [telMovil, setTelMovil] = useState("");
-  const [fax, setFax] = useState("");
-  const [correo, setCorreo] = useState("");
-
-  // dirección actualizada
-  const [provincia, setProvincia] = useState("");
-  const [distrito, setDistrito] = useState("");
-  const [corregimiento, setCorregimiento] = useState("");
-  const [barrio, setBarrio] = useState("");
-  const [calleAvenida, setCalleAvenida] = useState("");
-  const [nombreEdificio, setNombreEdificio] = useState("");
-  const [numeroCasaApto, setNumeroCasaApto] = useState("");
-  const [referencia, setReferencia] = useState("");
-
-  /** ✅ NUEVO: Razón Comercial (texto abierto) */
+  /** ✅ Razón Comercial (texto abierto) */
   const [razonComercial, setRazonComercial] = useState<string>(
     (tramite?.razonComercial as any) ?? ""
   );
+
+  /** ===== Datos actualizados (en campos ocultos) ===== */
+  const [deseaActualizar, setDeseaActualizar] = useState<"NO" | "SI">("NO");
+  const [openModalActualizado, setOpenModalActualizado] = useState(false);
+
+  // ✅ valores "guardados" (ocultos)
+  const [contactoActualizado, setContactoActualizado] = useState<Contacto>({});
+  const [direccionActualizada, setDireccionActualizada] = useState<Direccion>({});
+
+  // ✅ valores temporales del modal (edición)
+  const [tmpContacto, setTmpContacto] = useState<Contacto>({});
+  const [tmpDireccion, setTmpDireccion] = useState<Direccion>({});
+
+  const openModalPrefill = () => {
+    const baseContacto: Contacto = {
+      telFijo: contactoActualizado.telFijo ?? tramite?.contactoActual?.telFijo ?? "",
+      telMovil: contactoActualizado.telMovil ?? tramite?.contactoActual?.telMovil ?? "",
+      fax: contactoActualizado.fax ?? tramite?.contactoActual?.fax ?? "",
+      correo: contactoActualizado.correo ?? tramite?.contactoActual?.correo ?? "",
+    };
+
+    const baseDireccion: Direccion = {
+      provincia: direccionActualizada.provincia ?? tramite?.direccionActual?.provincia ?? "",
+      distrito: direccionActualizada.distrito ?? tramite?.direccionActual?.distrito ?? "",
+      corregimiento:
+        direccionActualizada.corregimiento ?? tramite?.direccionActual?.corregimiento ?? "",
+      barrio: direccionActualizada.barrio ?? tramite?.direccionActual?.barrio ?? "",
+      calleAvenida:
+        direccionActualizada.calleAvenida ?? tramite?.direccionActual?.calleAvenida ?? "",
+      nombreEdificio:
+        direccionActualizada.nombreEdificio ?? tramite?.direccionActual?.nombreEdificio ?? "",
+      numeroCasaApto:
+        direccionActualizada.numeroCasaApto ?? tramite?.direccionActual?.numeroCasaApto ?? "",
+      referencia: direccionActualizada.referencia ?? tramite?.direccionActual?.referencia ?? "",
+    };
+
+    setTmpContacto(baseContacto);
+    setTmpDireccion(baseDireccion);
+    setOpenModalActualizado(true);
+  };
+
+  const onChangeDeseaActualizar = (v: "NO" | "SI") => {
+    setDeseaActualizar(v);
+    if (v === "SI") {
+      openModalPrefill();
+    } else {
+      setOpenModalActualizado(false);
+      // Nota: NO limpiamos lo guardado, por si el usuario vuelve a poner "SI" y quiere conservar
+    }
+  };
+
+  const guardarActualizado = () => {
+    setContactoActualizado(tmpContacto);
+    setDireccionActualizada(tmpDireccion);
+    setOpenModalActualizado(false);
+  };
+
+  const cancelarActualizado = () => {
+    setOpenModalActualizado(false);
+  };
+
+  const hayDatosActualizadosGuardados =
+    Object.values(contactoActualizado).some((x) => String(x ?? "").trim() !== "") ||
+    Object.values(direccionActualizada).some((x) => String(x ?? "").trim() !== "");
 
   /** ===== Alcance: impuestos con periodicidad ===== */
   const impuestosCatalogo: TaxConfig[] = [
@@ -481,16 +607,17 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
       .reduce((acc, r) => acc + r.total, 0);
   }, [rowsByTax]);
 
+  /** obligaciones (solo lectura) */
+  const obligaciones = (tramite?.obligaciones ?? []) as Array<{
+    impuesto: string;
+    fechaDesde: string;
+    fechaHasta?: string;
+  }>;
+
   /** ✅ Word: descarga plantilla (Word abre HTML sin problema) */
   const descargarWord = () => {
     const actaNumero = fmt(tramite?.actaInicioFiscalizacion?.numero);
     const actaFecha = fmt(tramite?.actaInicioFiscalizacion?.fecha);
-
-    const obligaciones = (tramite?.obligaciones ?? []) as Array<{
-      impuesto: string;
-      fechaDesde: string;
-      fechaHasta?: string;
-    }>;
 
     const obligacionesHtml = obligaciones.length
       ? `
@@ -519,6 +646,12 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
       `
       : `<div style="color:#666;">(Sin obligaciones)</div>`;
 
+    const cAct = tramite?.contactoActual ?? {};
+    const dAct = tramite?.direccionActual ?? {};
+
+    const cUpd = contactoActualizado;
+    const dUpd = direccionActualizada;
+
     const html = `
       <html>
         <head><meta charset="utf-8"/></head>
@@ -526,44 +659,71 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
           <h2>${pageTitle}</h2>
 
           <h3>Datos del Trámite</h3>
-          <p><b>Número:</b> ${fmt(tramite?.numeroTramite)}</p>
-          <p><b>Actividad:</b> ${fmt(tramite?.actividad)}</p>
-          <p><b>RUC:</b> ${fmt(tramite?.ruc)}</p>
-          <p><b>Contribuyente:</b> ${fmt(tramite?.contribuyente)}</p>
-
-          <p><b>Número de Acta de Inicio de Fiscalización:</b> ${actaNumero}</p>
-          <p><b>Fecha de Acta de Inicio de Fiscalización:</b> ${actaFecha}</p>
+          <p><b>N° Acta Inicio de Fiscalización:</b> ${actaNumero}</p>
+          <p><b>Fecha Acta Inicio de Fiscalización:</b> ${actaFecha}</p>
 
           <h3>Datos del contribuyente</h3>
-          <p><b>Razón Comercial:</b> ${fmt(razonComercial)}</p>
+          <p><b>RUC:</b> ${fmt(tramite?.ruc)} &nbsp; <b>DV:</b> ${fmt(tramite?.digitoVerificador)}</p>
+          <p><b>Razón social:</b> ${fmt(tramite?.razonSocial ?? tramite?.contribuyente)}</p>
+          <p><b>Razón comercial:</b> ${fmt(razonComercial)}</p>
+
+          <h4>Datos de contacto</h4>
+          <p>
+            Tel fijo: ${fmt(cAct.telFijo)} |
+            Tel móvil: ${fmt(cAct.telMovil)} |
+            Fax: ${fmt(cAct.fax)} |
+            Correo: ${fmt(cAct.correo)}
+          </p>
+
+          <h4>Dirección</h4>
+          <p>
+            Provincia: ${fmt(dAct.provincia)} |
+            Distrito: ${fmt(dAct.distrito)} |
+            Corregimiento: ${fmt(dAct.corregimiento)} |
+            Barrio: ${fmt(dAct.barrio)}
+          </p>
+          <p>
+            Calle/Avenida: ${fmt(dAct.calleAvenida)} |
+            Edificio: ${fmt(dAct.nombreEdificio)} |
+            Apto/Casa: ${fmt(dAct.numeroCasaApto)} |
+            Referencia: ${fmt(dAct.referencia)}
+          </p>
 
           <h4>Obligaciones</h4>
           ${obligacionesHtml}
 
-          <h3>Datos actuales (contribuyente)</h3>
-          <p><b>Aviso de Operación (actual):</b> ${fmt(tramite?.avisoOperacionActual)}</p>
-
-          <p><b>Contacto actual:</b>
-            Tel fijo: ${fmt(tramite?.contactoActual?.telFijo)} |
-            Tel móvil: ${fmt(tramite?.contactoActual?.telMovil)} |
-            Fax: ${fmt(tramite?.contactoActual?.fax)} |
-            Correo: ${fmt(tramite?.contactoActual?.correo)}
-          </p>
-
-          <p><b>Dirección actual:</b>
-            Provincia: ${fmt(tramite?.direccionActual?.provincia)} |
-            Distrito: ${fmt(tramite?.direccionActual?.distrito)} |
-            Corregimiento: ${fmt(tramite?.direccionActual?.corregimiento)} |
-            Barrio: ${fmt(tramite?.direccionActual?.barrio)} |
-            Calle/Avenida: ${fmt(tramite?.direccionActual?.calleAvenida)} |
-            Edificio: ${fmt(tramite?.direccionActual?.nombreEdificio)} |
-            Casa/Apto: ${fmt(tramite?.direccionActual?.numeroCasaApto)} |
-            Referencia: ${fmt(tramite?.direccionActual?.referencia)}
-          </p>
+          <h3>Información de contacto y/o dirección actualizada</h3>
+          <p><b>¿Desea registrar información actualizada?</b> ${deseaActualizar}</p>
+          ${
+            deseaActualizar === "SI"
+              ? `
+              <p style="color:#666;">(Se guardó en campos internos del formulario)</p>
+              <p><b>Contacto actualizado:</b>
+                Tel fijo: ${fmt(cUpd.telFijo)} |
+                Tel móvil: ${fmt(cUpd.telMovil)} |
+                Fax: ${fmt(cUpd.fax)} |
+                Correo: ${fmt(cUpd.correo)}
+              </p>
+              <p><b>Dirección actualizada:</b>
+                Prov: ${fmt(dUpd.provincia)} |
+                Dist: ${fmt(dUpd.distrito)} |
+                Corr: ${fmt(dUpd.corregimiento)} |
+                Barrio: ${fmt(dUpd.barrio)} |
+                Calle/Av: ${fmt(dUpd.calleAvenida)} |
+                Edif: ${fmt(dUpd.nombreEdificio)} |
+                Apto/Casa: ${fmt(dUpd.numeroCasaApto)} |
+                Ref: ${fmt(dUpd.referencia)}
+              </p>
+              `
+              : `<p style="color:#666;">No aplica.</p>`
+          }
 
           <h3>Resultado</h3>
           <p><b>Resultado:</b> ${resultado}</p>
-          <p><b>Detalle:</b><br/>${(detalleInvestigacion || "(Sin detalle)").replace(/\n/g, "<br/>")}</p>
+          <p><b>Conclusiones:</b><br/>${(conclusiones || "(Sin conclusiones)").replace(
+            /\n/g,
+            "<br/>"
+          )}</p>
 
           <h3>Alcance</h3>
           <p><b>Total general (B/.):</b> ${totalGeneral.toFixed(2)}</p>
@@ -605,105 +765,138 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
 
-    if (tramite) {
+    // ✅ Datos del Trámite (solo 2 campos)
+    doc.setFont("helvetica", "bold");
+    doc.text("Datos del Trámite", 40, (y += 16));
+    doc.setFont("helvetica", "normal");
+
+    const t = [
+      ["N° Acta Inicio de Fiscalización", actaNumero],
+      ["Fecha Acta Inicio de Fiscalización", actaFecha],
+    ];
+
+    for (const [k, v] of t) {
+      if (y > 760) {
+        doc.addPage();
+        y = 60;
+      }
       doc.setFont("helvetica", "bold");
-      doc.text("Datos del Trámite", 40, (y += 16));
+      doc.text(`${k}:`, 40, (y += 14));
       doc.setFont("helvetica", "normal");
+      doc.text(String(v), 280, y);
+    }
 
-      const t = [
-        ["Número", tramite.numeroTramite],
-        ["Actividad", tramite.actividad],
-        ["RUC", tramite.ruc],
-        ["Contribuyente", tramite.contribuyente],
-        ["N° Acta Inicio Fiscalización", actaNumero],
-        ["Fecha Acta Inicio Fiscalización", actaFecha],
-      ];
+    // ✅ Datos del contribuyente (fusionado)
+    doc.setFont("helvetica", "bold");
+    doc.text("Datos del contribuyente", 40, (y += 18));
+    doc.setFont("helvetica", "normal");
 
-      for (const [k, v] of t) {
+    doc.text(`RUC: ${fmt(tramite?.ruc)}   DV: ${fmt(tramite?.digitoVerificador)}`, 40, (y += 14));
+    doc.text(
+      `Razón social: ${fmt(tramite?.razonSocial ?? tramite?.contribuyente)}`,
+      40,
+      (y += 14)
+    );
+    doc.text(`Razón comercial: ${fmt(razonComercial)}`, 40, (y += 14));
+
+    const cAct = tramite?.contactoActual ?? {};
+    doc.setFont("helvetica", "bold");
+    doc.text("Datos de contacto", 40, (y += 16));
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Tel fijo: ${fmt(cAct.telFijo)}  |  Tel móvil: ${fmt(cAct.telMovil)}  |  Fax: ${fmt(
+        cAct.fax
+      )}`,
+      40,
+      (y += 14)
+    );
+    doc.text(`Correo: ${fmt(cAct.correo)}`, 40, (y += 14));
+
+    const dAct = tramite?.direccionActual ?? {};
+    doc.setFont("helvetica", "bold");
+    doc.text("Dirección", 40, (y += 16));
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Provincia: ${fmt(dAct.provincia)}  |  Distrito: ${fmt(dAct.distrito)}  |  Corregimiento: ${fmt(
+        dAct.corregimiento
+      )}`,
+      40,
+      (y += 14)
+    );
+    doc.text(`Barrio: ${fmt(dAct.barrio)}  |  Calle/Avenida: ${fmt(dAct.calleAvenida)}`, 40, (y += 14));
+    doc.text(
+      `Edificio: ${fmt(dAct.nombreEdificio)}  |  Apto/Casa: ${fmt(
+        dAct.numeroCasaApto
+      )}  |  Ref: ${fmt(dAct.referencia)}`,
+      40,
+      (y += 14)
+    );
+
+    // Obligaciones (listado simple en PDF)
+    doc.setFont("helvetica", "bold");
+    doc.text("Obligaciones", 40, (y += 18));
+    doc.setFont("helvetica", "normal");
+    if (!obligaciones.length) {
+      doc.text("(Sin obligaciones)", 40, (y += 14));
+    } else {
+      for (const o of obligaciones) {
         if (y > 760) {
           doc.addPage();
           y = 60;
         }
-        doc.setFont("helvetica", "bold");
-        doc.text(`${k}:`, 40, (y += 14));
-        doc.setFont("helvetica", "normal");
-        doc.text(String(v), 220, y);
+        doc.text(
+          `• ${fmt(o.impuesto)} | Desde: ${fmt(o.fechaDesde)} | Hasta: ${fmt(o.fechaHasta)}`,
+          40,
+          (y += 14)
+        );
       }
-
-      // ✅ Datos del contribuyente (nuevo)
-      doc.setFont("helvetica", "bold");
-      doc.text("Datos del contribuyente", 40, (y += 18));
-      doc.setFont("helvetica", "normal");
-      doc.text(`Razón Comercial: ${fmt(razonComercial)}`, 40, (y += 14));
-
-      const obligaciones = (tramite?.obligaciones ?? []) as Array<{
-        impuesto: string;
-        fechaDesde: string;
-        fechaHasta?: string;
-      }>;
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Obligaciones", 40, (y += 16));
-      doc.setFont("helvetica", "normal");
-
-      if (!obligaciones.length) {
-        doc.text("(Sin obligaciones)", 40, (y += 14));
-      } else {
-        for (const o of obligaciones) {
-          if (y > 760) {
-            doc.addPage();
-            y = 60;
-          }
-          doc.text(
-            `• ${fmt(o.impuesto)} | Desde: ${fmt(o.fechaDesde)} | Hasta: ${fmt(o.fechaHasta)}`,
-            40,
-            (y += 14)
-          );
-        }
-      }
-
-      // ✅ datos actuales en PDF (para comparación)
-      doc.setFont("helvetica", "bold");
-      doc.text("Datos actuales (contribuyente)", 40, (y += 18));
-      doc.setFont("helvetica", "normal");
-      doc.text(`Aviso operación (actual): ${fmt(tramite.avisoOperacionActual)}`, 40, (y += 14));
-      doc.text(
-        `Tel fijo: ${fmt(tramite.contactoActual?.telFijo)}  |  Tel móvil: ${fmt(
-          tramite.contactoActual?.telMovil
-        )}  |  Fax: ${fmt(tramite.contactoActual?.fax)}`,
-        40,
-        (y += 14)
-      );
-      doc.text(`Correo: ${fmt(tramite.contactoActual?.correo)}`, 40, (y += 14));
-      doc.text(
-        `Dirección: Prov ${fmt(tramite.direccionActual?.provincia)}, Dist ${fmt(
-          tramite.direccionActual?.distrito
-        )}, Corr ${fmt(tramite.direccionActual?.corregimiento)}, Barrio ${fmt(
-          tramite.direccionActual?.barrio
-        )}`,
-        40,
-        (y += 14)
-      );
-      doc.text(
-        `Calle/Av: ${fmt(tramite.direccionActual?.calleAvenida)}  |  Edif: ${fmt(
-          tramite.direccionActual?.nombreEdificio
-        )}  |  Casa/Apto: ${fmt(tramite.direccionActual?.numeroCasaApto)}`,
-        40,
-        (y += 14)
-      );
-      doc.text(`Ref: ${fmt(tramite.direccionActual?.referencia)}`, 40, (y += 14));
     }
 
+    // Info actualizada (si aplica)
+    doc.setFont("helvetica", "bold");
+    doc.text("Información actualizada", 40, (y += 18));
+    doc.setFont("helvetica", "normal");
+    doc.text(`¿Desea registrar información actualizada?: ${deseaActualizar}`, 40, (y += 14));
+    if (deseaActualizar === "SI") {
+      const cUpd = contactoActualizado;
+      const dUpd = direccionActualizada;
+      doc.text(
+        `Contacto actualizado: Fijo ${fmt(cUpd.telFijo)} | Móvil ${fmt(cUpd.telMovil)} | Fax ${fmt(
+          cUpd.fax
+        )} | Correo ${fmt(cUpd.correo)}`,
+        40,
+        (y += 14)
+      );
+      doc.text(
+        `Dirección actualizada: Prov ${fmt(dUpd.provincia)}, Dist ${fmt(dUpd.distrito)}, Corr ${fmt(
+          dUpd.corregimiento
+        )}, Barrio ${fmt(dUpd.barrio)}`,
+        40,
+        (y += 14)
+      );
+      doc.text(
+        `Calle/Av ${fmt(dUpd.calleAvenida)} | Edif ${fmt(dUpd.nombreEdificio)} | Apto/Casa ${fmt(
+          dUpd.numeroCasaApto
+        )} | Ref ${fmt(dUpd.referencia)}`,
+        40,
+        (y += 14)
+      );
+    } else {
+      doc.text("No aplica.", 40, (y += 14));
+    }
+
+    // Resultado
     doc.setFont("helvetica", "bold");
     doc.text("Resultado", 40, (y += 18));
     doc.setFont("helvetica", "normal");
     doc.text(`Resultado: ${resultado}`, 40, (y += 14));
 
-    const detalleLines = doc.splitTextToSize(detalleInvestigacion || "(Sin detalle)", 520);
-    doc.text("Detalle:", 40, (y += 14));
-    doc.text(detalleLines, 40, (y += 12));
-    y += detalleLines.length * 10;
+    const concLines = doc.splitTextToSize(conclusiones || "(Sin conclusiones)", 520);
+    doc.text("Conclusiones:", 40, (y += 14));
+    doc.text(concLines, 40, (y += 12));
+    y += concLines.length * 10;
 
+    // Alcance
     doc.setFont("helvetica", "bold");
     doc.text("Resumen de Alcance por Impuesto", 40, (y += 18));
     doc.setFont("helvetica", "normal");
@@ -747,12 +940,15 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
   const placeDesde = periodicidadSel === "MENSUAL" ? "202301" : "2023";
   const placeHasta = periodicidadSel === "MENSUAL" ? "202312" : "2025";
 
-  /** obligaciones (solo lectura) */
-  const obligaciones = (tramite?.obligaciones ?? []) as Array<{
-    impuesto: string;
-    fechaDesde: string;
-    fechaHasta?: string;
-  }>;
+  const actaNumero = fmt(tramite?.actaInicioFiscalizacion?.numero);
+  const actaFecha = fmt(tramite?.actaInicioFiscalizacion?.fecha);
+
+  const ruc = fmt(tramite?.ruc);
+  const dv = fmt(tramite?.digitoVerificador);
+  const razonSocial = fmt(tramite?.razonSocial ?? tramite?.contribuyente);
+
+  const cAct = tramite?.contactoActual ?? {};
+  const dAct = tramite?.direccionActual ?? {};
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", margin: 20 }}>
@@ -760,40 +956,9 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
 
       {/* ===== Modal PDF ===== */}
       {openPdf && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 9999,
-          }}
-          onClick={() => setOpenPdf(false)}
-        >
-          <div
-            style={{
-              width: "min(980px, 96vw)",
-              height: "min(720px, 92vh)",
-              background: "#fff",
-              borderRadius: 10,
-              overflow: "hidden",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                padding: "10px 12px",
-                borderBottom: "1px solid #e5e5e5",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
+        <div style={modalOverlay} onClick={() => setOpenPdf(false)}>
+          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeader}>
               <b>Vista previa PDF</b>
               <button
                 style={{ ...btnBase, margin: 0, background: "#dc3545", color: "#fff" }}
@@ -813,406 +978,384 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ================= DATOS TRÁMITE ================= */}
-      <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos del Trámite</div>
-        {tramite ? (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <tbody>
-              <tr>
-                <td style={tdStyle}>
-                  Número: <b>{tramite.numeroTramite}</b>
-                </td>
-                <td style={tdStyle}>
-                  Estado: <b>{tramite.estadoTramite}</b>
-                </td>
-                <td style={tdStyle}>
-                  Inicio: <b>{tramite.fechaInicio}</b>
-                </td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>
-                  Red: <b>{tramite.red}</b>
-                </td>
-                <td style={tdStyle} colSpan={2}>
-                  Actividad: <b>{tramite.actividad}</b>
-                </td>
-              </tr>
-              <tr>
-                <td style={tdStyle}>
-                  RUC: <b>{tramite.ruc}</b>
-                </td>
-                <td style={tdStyle} colSpan={2}>
-                  Contribuyente: <b>{tramite.contribuyente}</b>
-                </td>
-              </tr>
-
-              {/* ✅ NUEVO: Acta Inicio Fiscalización (solo lectura) */}
-              <tr>
-                <td style={tdStyle}>
-                  N° Acta Inicio de Fiscalización:{" "}
-                  <b>{fmt(tramite.actaInicioFiscalizacion?.numero) || "723000001132"}</b>
-                </td>
-                <td style={tdStyle} colSpan={2}>
-                  Fecha Acta Inicio de Fiscalización:{" "}
-                  <b>{fmt(tramite.actaInicioFiscalizacion?.fecha) || "18/02/2025"}</b>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ color: "#b00", fontWeight: 700 }}>
-            No hay trámite seleccionado. Entra a TRÁMITE y presiona “Crear”.
-          </div>
-        )}
-      </div>
-
-      {/* ================= DATOS DEL CONTRIBUYENTE (NUEVO) ================= */}
-      <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos del contribuyente</div>
-
-        {!tramite ? (
-          <div style={{ color: "#666" }}>Seleccione un trámite para ver los datos del contribuyente.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            <div>
-              <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-                Razón Comercial
-              </label>
-              <input
-                type="text"
-                style={inputStyle}
-                value={razonComercial}
-                onChange={(e) => setRazonComercial(e.target.value)}
-                placeholder="Escriba la razón comercial..."
-              />
+      {/* ===== Modal Información Actualizada ===== */}
+      {openModalActualizado && (
+        <div style={modalOverlay} onClick={() => setOpenModalActualizado(false)}>
+          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeader}>
+              <b>Actualizar información de contacto y dirección</b>
+              <button
+                style={{ ...btnBase, margin: 0, background: "#dc3545", color: "#fff" }}
+                onClick={() => setOpenModalActualizado(false)}
+              >
+                ✕
+              </button>
             </div>
 
-            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
-              <b>Obligaciones (solo lectura)</b>
-
-              <div style={{ marginTop: 10 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Impuesto</th>
-                      <th style={thStyle}>Fecha Desde</th>
-                      <th style={thStyle}>Fecha Hasta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {obligaciones.length ? (
-                      obligaciones.map((o, idx) => (
-                        <tr key={`${o.impuesto}-${idx}`}>
-                          <td style={tdStyle}>{fmt(o.impuesto)}</td>
-                          <td style={tdStyle}>{fmt(o.fechaDesde)}</td>
-                          <td style={tdStyle}>{fmt(o.fechaHasta)}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td style={tdStyle} colSpan={3} align="center">
-                          Sin obligaciones registradas
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-
-                <div style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
-                  * “Fecha Hasta” suele estar vacía si la obligación está activa.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ================= DATOS ACTUALES (SIEMPRE) ================= */}
-      <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos actuales del contribuyente</div>
-
-        {!tramite ? (
-          <div style={{ color: "#666" }}>Seleccione un trámite para ver los datos actuales.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div>
-              <b>Número de Aviso de Operación (actual):</b> {fmt(tramite.avisoOperacionActual)}
-            </div>
-
-            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
-              <b>Datos de contacto (actual)</b>
-              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Teléfono fijo</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.telFijo)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Teléfono móvil</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.telMovil)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Fax</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.fax)}</div>
+            <div style={modalBody}>
+              <div style={{ ...card, marginTop: 0 }}>
+                <div style={sectionTitle}>Datos de contacto</div>
+                <div style={fieldGrid}>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Teléfono fijo</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpContacto.telFijo ?? ""}
+                      onChange={(e) => setTmpContacto((p) => ({ ...p, telFijo: e.target.value }))}
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Teléfono móvil</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpContacto.telMovil ?? ""}
+                      onChange={(e) => setTmpContacto((p) => ({ ...p, telMovil: e.target.value }))}
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Fax</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpContacto.fax ?? ""}
+                      onChange={(e) => setTmpContacto((p) => ({ ...p, fax: e.target.value }))}
+                    />
+                  </div>
+                  <div style={col(12)}>
+                    <label style={labelStyle}>Correo electrónico</label>
+                    <input
+                      type="email"
+                      style={inputStyle}
+                      value={tmpContacto.correo ?? ""}
+                      onChange={(e) => setTmpContacto((p) => ({ ...p, correo: e.target.value }))}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: 8 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Correo electrónico</div>
-                <div style={{ fontWeight: 800 }}>{fmt(tramite.contactoActual?.correo)}</div>
+              <div style={card}>
+                <div style={sectionTitle}>Dirección</div>
+                <div style={fieldGrid}>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Provincia</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.provincia ?? ""}
+                      onChange={(e) => setTmpDireccion((p) => ({ ...p, provincia: e.target.value }))}
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Distrito</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.distrito ?? ""}
+                      onChange={(e) => setTmpDireccion((p) => ({ ...p, distrito: e.target.value }))}
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Corregimiento</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.corregimiento ?? ""}
+                      onChange={(e) =>
+                        setTmpDireccion((p) => ({ ...p, corregimiento: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Barrio</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.barrio ?? ""}
+                      onChange={(e) => setTmpDireccion((p) => ({ ...p, barrio: e.target.value }))}
+                    />
+                  </div>
+
+                  <div style={col(6)}>
+                    <label style={labelStyle}>Calle o Avenida</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.calleAvenida ?? ""}
+                      onChange={(e) =>
+                        setTmpDireccion((p) => ({ ...p, calleAvenida: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Nombre de Edificio</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.nombreEdificio ?? ""}
+                      onChange={(e) =>
+                        setTmpDireccion((p) => ({ ...p, nombreEdificio: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div style={col(3)}>
+                    <label style={labelStyle}>Número Apartamento/Casa</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.numeroCasaApto ?? ""}
+                      onChange={(e) =>
+                        setTmpDireccion((p) => ({ ...p, numeroCasaApto: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div style={col(12)}>
+                    <label style={labelStyle}>Referencia</label>
+                    <input
+                      style={inputStyle}
+                      value={tmpDireccion.referencia ?? ""}
+                      onChange={(e) =>
+                        setTmpDireccion((p) => ({ ...p, referencia: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
-              <b>Dirección (actual)</b>
-
-              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Provincia</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.provincia)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Distrito</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.distrito)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Corregimiento</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.corregimiento)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Barrio</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.barrio)}</div>
-                </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button style={{ ...btnSecondary, marginTop: 0 }} onClick={cancelarActualizado}>
+                  Cancelar
+                </button>
+                <button style={{ ...btnSuccess, marginTop: 0 }} onClick={guardarActualizado}>
+                  Guardar
+                </button>
               </div>
 
-              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: "2 1 260px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Calle o Avenida</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.calleAvenida)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Nombre de Edificio</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.nombreEdificio)}</div>
-                </div>
-                <div style={{ flex: "1 1 220px" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Número Apartamento/Casa</div>
-                  <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.numeroCasaApto)}</div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 8 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Referencia</div>
-                <div style={{ fontWeight: 800 }}>{fmt(tramite.direccionActual?.referencia)}</div>
+              <div style={{ marginTop: 10, ...helpStyle }}>
+                * Los cambios se guardan internamente en el formulario (campos ocultos).
               </div>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* ================= DATOS ACTUALIZADOS (como HTML) ================= */}
-      <div style={{ marginTop: 12 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600 }}>
-          <input
-            type="checkbox"
-            checked={mostrarDatosActualizados}
-            onChange={(e) => setMostrarDatosActualizados(e.target.checked)}
-          />
-          Durante la investigación se encontró información más actualizada del contribuyente
-        </label>
-      </div>
-
-      {mostrarDatosActualizados && (
-        <fieldset style={{ marginTop: 12 }}>
-          <legend>Datos Actualizados</legend>
-
-          {/* ✅ QUITADO: “Número de Aviso de Operación actualizado” */}
-
-          <div
-            style={{
-              marginTop: 10,
-              border: "1px solid #ccc",
-              padding: 10,
-              borderRadius: 6,
-            }}
-          >
-            <strong>Datos de contacto actualizados</strong>
-
-            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Teléfono fijo</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={telFijo}
-                  onChange={(e) => setTelFijo(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Teléfono móvil</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={telMovil}
-                  onChange={(e) => setTelMovil(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Fax</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={fax}
-                  onChange={(e) => setFax(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 10 }}>
-              <label style={{ display: "block", fontWeight: 700 }}>Correo electrónico</label>
-              <input
-                type="email"
-                style={inputStyle}
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: 16,
-              border: "1px solid #ccc",
-              padding: 10,
-              borderRadius: 6,
-            }}
-          >
-            <strong>Dirección actualizada</strong>
-
-            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 220px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Provincia</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={provincia}
-                  onChange={(e) => setProvincia(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 220px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Distrito</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={distrito}
-                  onChange={(e) => setDistrito(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 220px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Corregimiento</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={corregimiento}
-                  onChange={(e) => setCorregimiento(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 220px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Barrio</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={barrio}
-                  onChange={(e) => setBarrio(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: "2 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Calle o Avenida</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={calleAvenida}
-                  onChange={(e) => setCalleAvenida(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>Nombre de Edificio</label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={nombreEdificio}
-                  onChange={(e) => setNombreEdificio(e.target.value)}
-                />
-              </div>
-
-              <div style={{ flex: "1 1 260px" }}>
-                <label style={{ display: "block", fontWeight: 700 }}>
-                  Número de Apartamento/Casa
-                </label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={numeroCasaApto}
-                  onChange={(e) => setNumeroCasaApto(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 10 }}>
-              <label style={{ display: "block", fontWeight: 700 }}>Referencia</label>
-              <input
-                type="text"
-                style={inputStyle}
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-              />
-            </div>
-          </div>
-        </fieldset>
+        </div>
       )}
 
-      {/* ================= RESULTADO ================= */}
-      <fieldset style={{ marginTop: 12 }}>
-        <legend>Resultado</legend>
+      {/* ================= DATOS TRÁMITE (solo 2 campos, sin bordes) ================= */}
+      <div style={card}>
+        <div style={sectionTitle}>Datos del trámite</div>
 
-        <label style={{ display: "block", fontWeight: 700 }}>Resultado</label>
-        <select
-          style={inputStyle}
-          value={resultado}
-          onChange={(e) => setResultado(e.target.value as any)}
-        >
-          <option>PRODUCTIVO</option>
-          <option>IMPRODUCTIVO</option>
-          <option>PRESENTACIÓN VOLUNTARIA</option>
-        </select>
+        {!tramite ? (
+          <div style={{ color: "#b00", fontWeight: 800 }}>
+            No hay trámite seleccionado. Entra a TRÁMITE y presiona “Crear”.
+          </div>
+        ) : (
+          <div style={fieldGrid}>
+            <div style={col(6)}>
+              <div style={helpStyle}>N° Acta Inicio de Fiscalización</div>
+              <div style={{ fontWeight: 900 }}>{actaNumero}</div>
+            </div>
+            <div style={col(6)}>
+              <div style={helpStyle}>Fecha Acta Inicio de Fiscalización</div>
+              <div style={{ fontWeight: 900 }}>{actaFecha}</div>
+            </div>
+          </div>
+        )}
+      </div>
 
-        <label style={{ display: "block", marginTop: 10, fontWeight: 700 }}>
-          Detalle de la investigación
-        </label>
-        <textarea
-          rows={5}
-          style={inputStyle}
-          value={detalleInvestigacion}
-          onChange={(e) => setDetalleInvestigacion(e.target.value)}
-        />
-      </fieldset>
+      {/* ================= DATOS CONTRIBUYENTE (FUSIONADO con datos actuales) ================= */}
+      <div style={card}>
+        <div style={sectionTitle}>Datos del contribuyente</div>
+
+        {!tramite ? (
+          <div style={{ color: "#666" }}>Seleccione un trámite para ver los datos.</div>
+        ) : (
+          <>
+            <div style={fieldGrid}>
+              <div style={col(4)}>
+                <div style={helpStyle}>RUC</div>
+                <div style={{ fontWeight: 900 }}>{ruc}</div>
+              </div>
+              <div style={col(2)}>
+                <div style={helpStyle}>DV</div>
+                <div style={{ fontWeight: 900 }}>{dv}</div>
+              </div>
+              <div style={col(6)}>
+                <div style={helpStyle}>Razón social</div>
+                <div style={{ fontWeight: 900 }}>{razonSocial}</div>
+              </div>
+
+              <div style={col(12)}>
+                <label style={labelStyle}>Razón comercial</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={razonComercial}
+                  onChange={(e) => setRazonComercial(e.target.value)}
+                  placeholder="Escriba la razón comercial..."
+                />
+              </div>
+            </div>
+
+            {/* Datos de contacto */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos de contacto</div>
+              <div style={fieldGrid}>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Teléfono fijo</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(cAct.telFijo)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Teléfono móvil</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(cAct.telMovil)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Fax</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(cAct.fax)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Correo electrónico</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(cAct.correo)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dirección */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>Dirección</div>
+              <div style={fieldGrid}>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Provincia</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.provincia)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Distrito</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.distrito)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Corregimiento</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.corregimiento)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Barrio</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.barrio)}</div>
+                </div>
+
+                <div style={col(6)}>
+                  <div style={helpStyle}>Calle o Avenida</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.calleAvenida)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Nombre de Edificio</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.nombreEdificio)}</div>
+                </div>
+                <div style={col(3)}>
+                  <div style={helpStyle}>Número Apartamento/Casa</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.numeroCasaApto)}</div>
+                </div>
+                <div style={col(12)}>
+                  <div style={helpStyle}>Referencia</div>
+                  <div style={{ fontWeight: 900 }}>{fmt(dAct.referencia)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Obligaciones (✅ con bordes) */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>Obligaciones</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Impuesto</th>
+                    <th style={thStyle}>Fecha Desde</th>
+                    <th style={thStyle}>Fecha Hasta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {obligaciones.length ? (
+                    obligaciones.map((o, idx) => (
+                      <tr key={`${o.impuesto}-${idx}`}>
+                        <td style={tdStyle}>{fmt(o.impuesto)}</td>
+                        <td style={tdStyle}>{fmt(o.fechaDesde)}</td>
+                        <td style={tdStyle}>{fmt(o.fechaHasta)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td style={tdStyle} colSpan={3} align="center">
+                        Sin obligaciones registradas
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: 6, ...helpStyle }}>
+                * “Fecha Hasta” suele estar vacía si la obligación está activa.
+              </div>
+            </div>
+
+            {/* Pregunta + select + modal */}
+            <div style={{ marginTop: 16 }}>
+              <label style={labelStyle}>
+                Desea registrar información de contacto y/o dirección actualizada?
+              </label>
+
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <select
+                  style={{ ...inputStyle, maxWidth: 220 }}
+                  value={deseaActualizar}
+                  onChange={(e) => onChangeDeseaActualizar(e.target.value as "NO" | "SI")}
+                >
+                  <option value="NO">No</option>
+                  <option value="SI">Sí</option>
+                </select>
+
+                {deseaActualizar === "SI" && (
+                  <button style={{ ...btnPrimary, margin: 0 }} onClick={openModalPrefill}>
+                    Ver Información actualizada
+                  </button>
+                )}
+
+                {deseaActualizar === "SI" && hayDatosActualizadosGuardados && (
+                  <span style={{ ...helpStyle, fontWeight: 700 }}>
+                    (Información actualizada guardada)
+                  </span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ================= RESULTADO (sin legend repetido, select angosto, conclusiones) ================= */}
+      <div style={card}>
+        <div style={sectionTitle}>Resultado</div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <label style={labelStyle}>Resultado</label>
+            <select
+              style={{ ...inputStyle, maxWidth: 320 }} // ✅ no 100%
+              value={resultado}
+              onChange={(e) => setResultado(e.target.value as any)}
+            >
+              <option>PRODUCTIVO</option>
+              <option>IMPRODUCTIVO</option>
+              <option>PRESENTACIÓN VOLUNTARIA</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Conclusiones</label>
+            <textarea
+              rows={5}
+              style={inputStyle}
+              value={conclusiones}
+              onChange={(e) => setConclusiones(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* ================= ALCANCE ================= */}
-      <fieldset style={{ marginTop: 12 }}>
-        <legend>Alcance</legend>
+      <div style={card}>
+        <div style={sectionTitle}>Alcance</div>
 
         {!hasAnyTable && (
           <div style={{ marginBottom: 10, color: "#666" }}>
-            Seleccione un <b>Impuesto</b> y un rango de <b>Períodos</b>, luego presione{" "}
-            <b>Agregar</b> para mostrar la tabla.
+            Seleccione un <b>Impuesto</b> y un rango de <b>Períodos</b>, luego presione <b>Agregar</b>{" "}
+            para mostrar la tabla.
           </div>
         )}
 
@@ -1225,7 +1368,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
             alignItems: "end",
           }}
         >
-          <label style={{ fontWeight: 700 }}>
+          <label style={{ fontWeight: 800 }}>
             Impuesto
             <select
               style={inputStyle}
@@ -1246,7 +1389,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
             </select>
           </label>
 
-          <label style={{ fontWeight: 700 }}>
+          <label style={{ fontWeight: 800 }}>
             Desde ({periodicidadSel === "MENSUAL" ? "AAAAMM" : "AAAA"})
             <input
               style={inputStyle}
@@ -1259,7 +1402,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
             />
           </label>
 
-          <label style={{ fontWeight: 700 }}>
+          <label style={{ fontWeight: 800 }}>
             Hasta ({periodicidadSel === "MENSUAL" ? "AAAAMM" : "AAAA"})
             <input
               style={inputStyle}
@@ -1319,7 +1462,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
                   defaultOpen={tax === impuestoSel}
                 >
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 800 }}>
+                    <div style={{ fontWeight: 900 }}>
                       Filtro período ({periodicidad === "MENSUAL" ? "AAAAMM" : "AAAA"}):
                     </div>
                     <input
@@ -1479,20 +1622,18 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
             })}
           </div>
         )}
-      </fieldset>
+      </div>
 
       {/* ================= WORD: Descargar + Subir ================= */}
       <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Documento Word</div>
+        <div style={sectionTitle}>Documento Word</div>
 
         <button style={btnSecondary} onClick={descargarWord}>
           Descargar en Word
         </button>
 
         <div style={{ marginTop: 10 }}>
-          <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-            Subir documento completado
-          </label>
+          <label style={labelStyle}>Subir documento completado</label>
           <input
             type="file"
             accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -1502,7 +1643,7 @@ export const CrearInformeAuditoria: React.FC<Props> = ({
               if (f) alert(`Archivo cargado (demo): ${f.name}`);
             }}
           />
-          <div style={{ marginTop: 6, color: "#666" }}>
+          <div style={{ marginTop: 6, ...helpStyle }}>
             Archivo: <b>{uploadedWord ? uploadedWord.name : "Ninguno"}</b>
           </div>
         </div>

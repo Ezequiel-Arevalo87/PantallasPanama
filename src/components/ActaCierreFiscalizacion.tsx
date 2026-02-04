@@ -1,9 +1,7 @@
 // src/pages/ActaCierreFiscalizacion.tsx
 import React, { useMemo, useState } from "react";
 import jsPDF from "jspdf";
-
-import {TramitePayload} from "../pages/Tramite";
-
+import { TramitePayload } from "../pages/Tramite";
 
 /** ===================== TIPOS ===================== */
 type AccionConferencia =
@@ -19,41 +17,87 @@ type Props = {
 const pageStyle: React.CSSProperties = { fontFamily: "Arial, sans-serif", margin: 20 };
 
 const card: React.CSSProperties = {
-  border: "1px solid #e5e5e5",
+  // ✅ sin bordes (pedido)
+  border: "none",
   borderRadius: 10,
   padding: 12,
   marginTop: 12,
   background: "#fff",
+  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+};
+
+const sectionTitle: React.CSSProperties = {
+  fontWeight: 900,
+  marginBottom: 10,
+  fontSize: 14,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: 6,
+  padding: 8,
   boxSizing: "border-box",
+  border: "1px solid #cfcfcf",
+  borderRadius: 6,
 };
 
-const tdStyle: React.CSSProperties = { border: "1px solid #ccc", padding: 8 };
-const thStyle: React.CSSProperties = {
-  border: "1px solid #ccc",
-  padding: 8,
-  background: "#f2f2f2",
-  textAlign: "left",
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontWeight: 800,
+  marginBottom: 6,
 };
+
+const helpStyle: React.CSSProperties = { color: "#666", fontSize: 12 };
 
 const btnBase: React.CSSProperties = {
   padding: "10px 15px",
   margin: "10px 6px 0 0",
   cursor: "pointer",
   border: "none",
-  borderRadius: 6,
-  fontWeight: 700,
+  borderRadius: 8,
+  fontWeight: 800,
 };
 
 const btnSecondary: React.CSSProperties = { ...btnBase, background: "#6c757d", color: "#fff" };
 const btnSuccess: React.CSSProperties = { ...btnBase, background: "#28a745", color: "#fff" };
 const btnPrimary: React.CSSProperties = { ...btnBase, background: "#007bff", color: "#fff" };
 
+const modalOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+  zIndex: 9999,
+};
+
+const modalCard: React.CSSProperties = {
+  width: "min(980px, 96vw)",
+  height: "min(720px, 92vh)",
+  background: "#fff",
+  borderRadius: 10,
+  overflow: "hidden",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const modalHeader: React.CSSProperties = {
+  padding: "10px 12px",
+  borderBottom: "1px solid #e5e5e5",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
 const fmt = (v?: string) => (v && String(v).trim() ? String(v) : "-");
+
+const pad2 = (v?: string) => {
+  const s = (v ?? "").replace(/\D/g, "");
+  if (!s) return "-";
+  return s.padStart(2, "0").slice(-2);
+};
 
 /** ===================== COMPONENTE ===================== */
 export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
@@ -70,9 +114,15 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
   );
   const [razonOmitir, setRazonOmitir] = useState<string>("");
 
+  /** ✅ Detalle investigación editable (inicia con lo del trámite) */
+  const [detalleInvestigacionEditable, setDetalleInvestigacionEditable] = useState<string>(() => {
+    const v = tramite?.detalleInvestigacionInforme;
+    return v && String(v).trim() ? String(v) : "";
+  });
+
   /** ===== Datos solo lectura (desde tramite) ===== */
   const ruc = fmt(tramite?.ruc);
-  const dv = fmt(tramite?.digitoVerificador);
+  const dv2 = pad2(tramite?.digitoVerificador);
   const razonSocial = fmt(tramite?.razonSocial ?? tramite?.contribuyente);
   const auditor = fmt(tramite?.auditorAsignado ?? tramite?.usuarioGestion);
   const supervisor = fmt(tramite?.supervisorAsignado);
@@ -80,10 +130,10 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
   const actaInicioFecha = fmt(tramite?.actaInicioFiscalizacion?.fecha);
   const aniosInvestigados = (tramite?.aniosInvestigados ?? []) as string[];
 
-  const detalleInvestigacion = useMemo(() => {
-    const v = tramite?.detalleInvestigacionInforme;
-    return v && String(v).trim() ? String(v) : "-";
-  }, [tramite?.detalleInvestigacionInforme]);
+  const rucConDv = useMemo(() => {
+    // ✅ Formato local: "RUC: XXXXX DV 02"
+    return `RUC: ${ruc} DV ${dv2}`;
+  }, [ruc, dv2]);
 
   const validar = (): boolean => {
     if (!tramite) {
@@ -114,8 +164,7 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
           <h2>ACTA DE CIERRE DE FISCALIZACIÓN</h2>
 
           <h3>Datos del Contribuyente</h3>
-          <p><b>RUC:</b> ${ruc}</p>
-          <p><b>Dígito Verificador:</b> ${dv}</p>
+          <p><b>${rucConDv}</b></p>
           <p><b>Razón Social:</b> ${razonSocial}</p>
 
           <h3>Datos del Caso</h3>
@@ -140,8 +189,11 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
               : ""
           }
 
-          <h3>Detalle de la Investigación (solo lectura)</h3>
-          <p>${detalleInvestigacion.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>")}</p>
+          <h3>Detalle de la Investigación</h3>
+          <p>${(detalleInvestigacionEditable || "-")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\n/g, "<br/>")}</p>
 
           <hr/>
           <p style="color:#666; font-size:12px;">
@@ -196,15 +248,15 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
       doc.setFont("helvetica", "bold");
       doc.text(`${label}:`, 40, (y += 14));
       doc.setFont("helvetica", "normal");
-      doc.text(value, 200, y);
+      doc.text(value, 220, y);
     };
 
     doc.setFont("helvetica", "bold");
     doc.text("Datos del Contribuyente", 40, (y += 14));
     doc.setFont("helvetica", "normal");
 
-    line("RUC", ruc);
-    line("Dígito Verificador", dv);
+    // ✅ una sola línea RUC + DV
+    line("RUC", `${ruc} DV ${dv2}`);
     line("Razón Social", razonSocial);
 
     doc.setFont("helvetica", "bold");
@@ -237,9 +289,9 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
     }
 
     doc.setFont("helvetica", "bold");
-    doc.text("Detalle de la Investigación (solo lectura)", 40, (y += 18));
+    doc.text("Detalle de la Investigación", 40, (y += 18));
     doc.setFont("helvetica", "normal");
-    const detLines = doc.splitTextToSize(detalleInvestigacion, 520);
+    const detLines = doc.splitTextToSize(detalleInvestigacionEditable || "-", 520);
     doc.text(detLines, 40, (y += 14));
     y += detLines.length * 10;
 
@@ -272,40 +324,9 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
 
       {/* ===== Modal PDF ===== */}
       {openPdf && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            zIndex: 9999,
-          }}
-          onClick={() => setOpenPdf(false)}
-        >
-          <div
-            style={{
-              width: "min(980px, 96vw)",
-              height: "min(720px, 92vh)",
-              background: "#fff",
-              borderRadius: 10,
-              overflow: "hidden",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                padding: "10px 12px",
-                borderBottom: "1px solid #e5e5e5",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
+        <div style={modalOverlay} onClick={() => setOpenPdf(false)}>
+          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeader}>
               <b>Vista previa PDF</b>
               <button
                 style={{ ...btnBase, margin: 0, background: "#dc3545", color: "#fff" }}
@@ -321,67 +342,72 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
         </div>
       )}
 
-      {/* ================= DATOS SOLO LECTURA ================= */}
+      {/* ================= DATOS DEL CONTRIBUYENTE (sin tabla con bordes) ================= */}
       <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos del Contribuyente</div>
+        <div style={sectionTitle}>Datos del contribuyente</div>
 
         {!tramite ? (
-          <div style={{ color: "#b00", fontWeight: 700 }}>
+          <div style={{ color: "#b00", fontWeight: 800 }}>
             No hay trámite seleccionado. Regrese a Trámite y presione “Crear (799)”.
           </div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <tbody>
-              <tr>
-                <td style={tdStyle}>
-                  RUC: <b>{ruc}</b>
-                </td>
-                <td style={tdStyle}>
-                  Dígito verificador: <b>{dv}</b>
-                </td>
-                <td style={tdStyle}>
-                  Razón social: <b>{razonSocial}</b>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div style={{ display: "grid", gap: 8 }}>
+            <div>
+              <div style={helpStyle}>RUC / DV</div>
+              <div style={{ fontWeight: 900 }}>{rucConDv}</div>
+            </div>
+
+            <div>
+              <div style={helpStyle}>Razón social</div>
+              <div style={{ fontWeight: 900 }}>{razonSocial}</div>
+            </div>
+          </div>
         )}
       </div>
 
+      {/* ================= DATOS DEL CASO (tabla sin bordes) ================= */}
       <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Datos del Caso</div>
+        <div style={sectionTitle}>Datos del caso</div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <tbody>
-            <tr>
-              <td style={tdStyle}>
-                Años investigados:{" "}
-                <b>{aniosInvestigados.length ? aniosInvestigados.join(", ") : "-"}</b>
-              </td>
-              <td style={tdStyle}>
-                Auditor: <b>{auditor}</b>
-              </td>
-              <td style={tdStyle}>
-                Supervisor: <b>{supervisor}</b>
-              </td>
-            </tr>
-            <tr>
-              <td style={tdStyle}>
-                N° Acta de Inicio de Fiscalización: <b>{actaInicioNumero}</b>
-              </td>
-              <td style={tdStyle} colSpan={2}>
-                Fecha Acta de Inicio de Fiscalización: <b>{actaInicioFecha}</b>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            <div>
+              <div style={helpStyle}>Años investigados</div>
+              <div style={{ fontWeight: 900 }}>
+                {aniosInvestigados.length ? aniosInvestigados.join(", ") : "-"}
+              </div>
+            </div>
+
+            <div>
+              <div style={helpStyle}>Auditor</div>
+              <div style={{ fontWeight: 900 }}>{auditor}</div>
+            </div>
+
+            <div>
+              <div style={helpStyle}>Supervisor</div>
+              <div style={{ fontWeight: 900 }}>{supervisor}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+            <div>
+              <div style={helpStyle}>N° Acta de Inicio de Fiscalización</div>
+              <div style={{ fontWeight: 900 }}>{actaInicioNumero}</div>
+            </div>
+
+            <div>
+              <div style={helpStyle}>Fecha Acta de Inicio de Fiscalización</div>
+              <div style={{ fontWeight: 900 }}>{actaInicioFecha}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ================= ACCIÓN CONFERENCIA ================= */}
-      <fieldset style={{ marginTop: 12 }}>
-        <legend>Acción Conferencia de Cierre</legend>
+      {/* ================= ACCIÓN CONFERENCIA (sin legend) ================= */}
+      <div style={card}>
+       
 
-        <label style={{ display: "block", fontWeight: 700 }}>Acción Conferencia de Cierre</label>
+        <label style={labelStyle}>Acción conferencia de cierre</label>
         <select
           style={inputStyle}
           value={accion}
@@ -398,9 +424,7 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
 
         {accion === "Omitir la conferencia por la siguiente razón" && (
           <div style={{ marginTop: 10 }}>
-            <label style={{ display: "block", fontWeight: 700 }}>
-              Razón para omitir la conferencia de cierre
-            </label>
+            <label style={labelStyle}>Razón para omitir la conferencia de cierre</label>
             <textarea
               rows={4}
               style={inputStyle}
@@ -410,40 +434,32 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
             />
           </div>
         )}
-      </fieldset>
+      </div>
 
-      {/* ================= DETALLE INVESTIGACIÓN (SOLO LECTURA) ================= */}
+      {/* ================= DETALLE INVESTIGACIÓN (editable, sin helper text) ================= */}
       <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Detalle de la Investigación (solo lectura)</div>
-        <div
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            padding: 10,
-            background: "#fafafa",
-            whiteSpace: "pre-wrap",
-            lineHeight: 1.4,
-          }}
-        >
-          {detalleInvestigacion}
-        </div>
-        <div style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
-          * Este campo se llena en el Informe de Auditoría y aquí solo se consulta.
-        </div>
+      
+
+        <label style={labelStyle}>Detalle de la investigación</label>
+        <textarea
+          rows={6}
+          style={inputStyle}
+          value={detalleInvestigacionEditable}
+          onChange={(e) => setDetalleInvestigacionEditable(e.target.value)}
+          placeholder="Escriba el detalle / conclusiones de la investigación..."
+        />
       </div>
 
       {/* ================= WORD: Descargar + Subir ================= */}
       <div style={card}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Documento Word</div>
+        <div style={sectionTitle}>Documento Word</div>
 
         <button style={btnSecondary} onClick={descargarWord}>
           Descargar acta en Word
         </button>
 
         <div style={{ marginTop: 10 }}>
-          <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-            Adjuntar acta firmada
-          </label>
+          <label style={labelStyle}>Adjuntar acta firmada</label>
           <input
             type="file"
             accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -453,7 +469,7 @@ export const ActaCierreFiscalizacion: React.FC<Props> = ({ tramite }) => {
               if (f) alert(`Archivo cargado (demo): ${f.name}`);
             }}
           />
-          <div style={{ marginTop: 6, color: "#666" }}>
+          <div style={{ marginTop: 6, ...helpStyle }}>
             Archivo: <b>{uploadedWord ? uploadedWord.name : "Ninguno"}</b>
           </div>
         </div>
