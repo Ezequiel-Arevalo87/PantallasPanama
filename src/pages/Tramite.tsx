@@ -3,6 +3,7 @@ import React, { useState } from "react";
 
 /** ===================== TIPOS ===================== */
 export type TramitePayload = {
+  /** Datos del trámite */
   numeroTramite: string;
   red: string;
   actividad: string;
@@ -10,20 +11,17 @@ export type TramitePayload = {
   fechaInicio: string;
   usuarioGestion: string;
 
+  /** Contribuyente */
   ruc: string;
+  digitoVerificador?: string;
+  razonSocial?: string;
   contribuyente: string;
+  razonComercial?: string;
+
+  /** Ubicación */
   ubicacionExpediente: string;
 
-  /** ✅ Datos actuales (para comparación) */
-  avisoOperacionActual?: string;
-
-  contactoActual?: {
-    telFijo?: string;
-    telMovil?: string;
-    fax?: string;
-    correo?: string;
-  };
-
+  /** Dirección (solo lectura) */
   direccionActual?: {
     provincia?: string;
     distrito?: string;
@@ -35,32 +33,46 @@ export type TramitePayload = {
     referencia?: string;
   };
 
-  /** ✅ NUEVO: Acta Inicio Fiscalización (solo lectura) */
-  actaInicioFiscalizacion?: {
-    numero: string; // ej 723000001132
-    fecha: string; // ej 18/02/2025
+  /** Contacto (solo lectura) */
+  contactoActual?: {
+    telFijo?: string;
+    telMovil?: string;
+    fax?: string;
+    correo?: string;
   };
 
-  /** ✅ NUEVO: Datos del contribuyente */
-  razonComercial?: string;
+  /** Representante legal (solo lectura) */
+  representanteLegal?: {
+    nombre?: string;
+    tipoDocumento?: string;
+    cedula?: string;
+    nacionalidad?: string;
+  };
 
-  /** ✅ NUEVO: Obligaciones (solo lectura) */
+  /** Información del caso (solo lectura) */
+  proceso?: string;
+  origen?: string;
+  programa?: string;
+  numeroInformeAuditoria?: string;
+  fechaInformeAuditoria?: string;
+
+  /** Acta Inicio Fiscalización */
+  actaInicioFiscalizacion?: {
+    numero: string;
+    fecha: string;
+  };
+
+  /** Obligaciones (solo lectura) */
   obligaciones?: Array<{
-    impuesto: string; // "202 - ITBMS"
-    fechaDesde: string; // "01/01/2009"
-    fechaHasta?: string; // "" / undefined si activo
+    impuesto: string;
+    fechaDesde: string;
+    fechaHasta?: string;
   }>;
 
-  /** =========================================================
-   * ✅ CAMPOS QUE USA ActaCierreFiscalizacion.tsx (para TS)
-   * ========================================================= */
-  digitoVerificador?: string; // ej "2"
-  razonSocial?: string; // si quieres separar de contribuyente
+  /** Acta Cierre */
   auditorAsignado?: string;
   supervisorAsignado?: string;
-  aniosInvestigados?: string[]; // ej ["2022","2023","2024"]
-
-  /** ✅ viene del Informe de Auditoría (solo lectura en Acta Cierre) */
+  aniosInvestigados?: string[];
   detalleInvestigacionInforme?: string;
 };
 
@@ -74,7 +86,7 @@ type DocumentoAsociado = {
 };
 
 type FormularioCrear = {
-  codigo: string;
+  codigo: string; // OJO: lo tratamos como string SIEMPRE
   nombre: string;
 };
 
@@ -82,7 +94,7 @@ type Props = {
   onGo: (ruta: string, state?: any) => void;
 };
 
-/** ===================== ESTILOS (igual HTML) ===================== */
+/** ===================== ESTILOS ===================== */
 const pageStyle: React.CSSProperties = {
   fontFamily: "Arial, sans-serif",
   margin: 20,
@@ -134,7 +146,7 @@ const btnSecondary: React.CSSProperties = {
 export const Tramite: React.FC<Props> = ({ onGo }) => {
   const [nota, setNota] = useState("");
 
-  // ✅ Igual al HTML (con extras)
+  /** ===================== DATA DEMO ===================== */
   const tramite: TramitePayload = {
     numeroTramite: "675000001027",
     red: "Control Extensivo v2",
@@ -143,18 +155,13 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     fechaInicio: "17/02/2025",
     usuarioGestion: "ZULEIMA ISABEL MORAN",
 
-    ruc: "987654321-2-2021",
+    ruc: "987654321",
+    digitoVerificador: "02",
+    razonSocial: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
     contribuyente: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
+    razonComercial: "TRANSPORTES Y SERVICIOS LOGÍSTICOS",
+
     ubicacionExpediente: "SECCIÓN DE CONTROL DE SERVICIO AL CONTRIBUYENTE",
-
-    avisoOperacionActual: "AO-189233",
-
-    contactoActual: {
-      telFijo: "203-4455",
-      telMovil: "6677-8899",
-      fax: "203-4400",
-      correo: "contacto@transportes.com",
-    },
 
     direccionActual: {
       provincia: "Panamá",
@@ -167,32 +174,45 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
       referencia: "Frente a farmacia X",
     },
 
-    /** ✅ Acta Inicio Fiscalización (solo lectura) */
+    contactoActual: {
+      telFijo: "203-4455",
+      telMovil: "6677-8899",
+      fax: "203-4400",
+      correo: "contacto@transportes.com",
+    },
+
+    representanteLegal: {
+      nombre: "JUAN PÉREZ",
+      tipoDocumento: "CÉDULA",
+      cedula: "8-123-456",
+      nacionalidad: "PANAMEÑA",
+    },
+
+    proceso: "PROCESOS DE AUDITORIAS",
+    origen: "CONTROL EXTENSIVO",
+    programa: "CONTROL EXTENSIVO v2",
+    numeroInformeAuditoria: "INF-2025-000123",
+    fechaInformeAuditoria: "18/02/2025",
+
     actaInicioFiscalizacion: {
       numero: "723000001132",
       fecha: "18/02/2025",
     },
 
-    /** ✅ Razón Comercial (editable en el futuro, aquí demo) */
-    razonComercial: "TRANSPORTES Y SERVICIOS LOGÍSTICOS (COMERCIAL)",
-
-    /** ✅ Obligaciones (solo lectura) */
     obligaciones: [
-      { impuesto: "202 - ITBMS", fechaDesde: "01/01/2009", fechaHasta: "" },
-      { impuesto: "102 - ISR", fechaDesde: "01/01/2012", fechaHasta: "" },
-      { impuesto: "140 - Aviso de Operación", fechaDesde: "01/01/2015", fechaHasta: "" },
+      { impuesto: "202 - ITBMS", fechaDesde: "01/01/2009" },
+      { impuesto: "102 - ISR", fechaDesde: "01/01/2012" },
+      { impuesto: "140 - Aviso de Operación", fechaDesde: "01/01/2015" },
     ],
 
-    /** ✅ Campos que necesita ActaCierreFiscalizacion.tsx */
-    digitoVerificador: "2",
-    razonSocial: "TRANSPORTES Y SERVICIOS LOGISTICOS S A",
     auditorAsignado: "ZULEIMA ISABEL MORAN",
     supervisorAsignado: "LUIS BARTLETT",
     aniosInvestigados: ["2022", "2023", "2024"],
     detalleInvestigacionInforme:
-      "Se realizaron cruces con facturación electrónica y declaraciones.\nHallazgos principales: diferencias en ITBMS e ISR.\nSe notificó al contribuyente y se levantaron actas internas.",
+      "Cruces con facturación electrónica y declaraciones juradas.",
   };
 
+  /** ===================== DOCUMENTOS ===================== */
   const documentosAsociados: DocumentoAsociado[] = [
     {
       numero: "101600001131",
@@ -212,7 +232,7 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     },
   ];
 
-  /** ✅ Gestión de documentos: 799 debajo de 706 */
+  /** ===================== FORMULARIOS ===================== */
   const formulariosCrear: FormularioCrear[] = [
     { codigo: "706", nombre: "INFORME FINAL AUDITORIA" },
     { codigo: "799", nombre: "ACTA DE CIERRE DE FISCALIZACIÓN" },
@@ -220,42 +240,56 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
     { codigo: "725", nombre: "REQUERIMIENTO DE REGULARIZACIÓN (CONTROL EXTENSIVO)" },
   ];
 
-  const crearFormulario = (codigo: string) => {
-    if (codigo === "706") {
-      onGo("PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/INFORME AUDITORIA", {
-        tramite,
-        documentType: "INFORME_AUDITORIA",
-        formularioCodigo: "706",
-      });
-      return;
+  /** ✅ FIX: normalizamos el código (trim) y usamos switch */
+  const crearFormulario = (codigoRaw: string) => {
+    const codigo = String(codigoRaw).trim();
+    console.log("[Tramite] crearFormulario:", { codigoRaw, codigo });
+
+    switch (codigo) {
+      case "706":
+        onGo("PROCESOS DE AUDITORIAS/GESTIÓN/INFORME AUDITORIA", {
+          tramite,
+          formularioCodigo: "706",
+        });
+        return;
+
+      case "799":
+        onGo("PROCESOS DE AUDITORIAS/GESTIÓN/ACTA CIERRE", {
+          tramite,
+          formularioCodigo: "799",
+        });
+        return;
+
+      case "720":
+        onGo("PROCESOS DE AUDITORIAS/GESTIÓN/AUTO ARCHIVO", {
+          tramite,
+          formularioCodigo: "720",
+        });
+        return;
+
+      // ✅ 725 => REQUERIMIENTO (esto ya lo tenías, lo dejo igual)
+      case "725":
+        onGo("PROCESOS DE AUDITORIAS/GESTIÓN/REQUERIMIENTO", {
+          tramite,
+          formularioCodigo: "725",
+        });
+        return;
+
+      default:
+        alert(`Formulario ${codigo} (demo)`);
+        return;
     }
-
-    if (codigo === "799") {
-      onGo("PROCESOS DE AUDITORIAS/GESTIÓN DE AUDITORIA/ACTA CIERRE", {
-        tramite,
-        documentType: "ACTA_CIERRE",
-        formularioCodigo: "799",
-      });
-      return;
-    }
-
-    alert(`Crear formulario código ${codigo} (demo)`);
   };
 
-  const guardar = () => {
-    alert("Nota guardada (demo).");
-  };
-
-  const limpiar = () => {
-    setNota("");
-  };
-
+  const guardar = () => alert("Nota guardada (demo)");
+  const limpiar = () => setNota("");
   const enviar = () => {
-    const ok = window.confirm("¿Está seguro que desea enviar el trámite?");
-    if (!ok) return;
-    alert("Trámite enviado (demo).");
+    if (window.confirm("¿Enviar trámite?")) {
+      alert("Trámite enviado (demo)");
+    }
   };
 
+  /** ===================== UI ===================== */
   return (
     <div style={pageStyle}>
       <h1>Pantalla BPM - Gestión de la Actividad</h1>
@@ -269,16 +303,17 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
             <td style={tdStyle}>Actividad: {tramite.actividad}</td>
           </tr>
           <tr>
-            <td style={tdStyle}>Estado del Trámite: {tramite.estadoTramite}</td>
-            <td style={tdStyle}>Fecha de Inicio: {tramite.fechaInicio}</td>
-            <td style={tdStyle}>Usuario de Gestión: {tramite.usuarioGestion}</td>
+            <td style={tdStyle}>Estado: {tramite.estadoTramite}</td>
+            <td style={tdStyle}>Inicio: {tramite.fechaInicio}</td>
+            <td style={tdStyle}>Usuario: {tramite.usuarioGestion}</td>
           </tr>
           <tr>
-            <td style={tdStyle}>RUC: {tramite.ruc}</td>
-            <td style={tdStyle}>Contribuyente: {tramite.contribuyente}</td>
             <td style={tdStyle}>
-              Ubicación Expediente Físico: {tramite.ubicacionExpediente}
+              RUC: {tramite.ruc}
+              {tramite.digitoVerificador ? `-${tramite.digitoVerificador}` : ""}
             </td>
+            <td style={tdStyle}>Contribuyente: {tramite.contribuyente}</td>
+            <td style={tdStyle}>Ubicación: {tramite.ubicacionExpediente}</td>
           </tr>
         </tbody>
       </table>
@@ -287,17 +322,12 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th style={thStyle} colSpan={6}>
-              Lista de documentos asociados al proceso
-            </th>
-          </tr>
-          <tr>
-            <th style={thStyle}>Número del documento</th>
-            <th style={thStyle}>Nombre del documento</th>
+            <th style={thStyle}>Número</th>
+            <th style={thStyle}>Nombre</th>
             <th style={thStyle}>Actividad</th>
             <th style={thStyle}>Estado</th>
-            <th style={thStyle}>Fecha de creación</th>
-            <th style={thStyle}>Usuario de creación</th>
+            <th style={thStyle}>Fecha</th>
+            <th style={thStyle}>Usuario</th>
           </tr>
         </thead>
         <tbody>
@@ -315,14 +345,8 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
       </table>
 
       <h2 style={h2Style}>Gestión de Documentos</h2>
-
       <table style={tableStyle}>
         <thead>
-          <tr>
-            <th style={thStyle} colSpan={3}>
-              Lista de formularios para creación
-            </th>
-          </tr>
           <tr>
             <th style={thStyle}>Crear</th>
             <th style={thStyle}>Código del formulario</th>
@@ -344,52 +368,25 @@ export const Tramite: React.FC<Props> = ({ onGo }) => {
         </tbody>
       </table>
 
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={thStyle} colSpan={7}>
-              Lista de formularios para gestión
-            </th>
-          </tr>
-          <tr>
-            <th style={thStyle}>Editar</th>
-            <th style={thStyle}>Aprobar</th>
-            <th style={thStyle}>Eliminar</th>
-            <th style={thStyle}>Número del documento</th>
-            <th style={thStyle}>Nombre del documento</th>
-            <th style={thStyle}>Estado</th>
-            <th style={thStyle}>Fecha de creación</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={tdStyle} colSpan={7} align="center">
-              No hay formularios pendientes de gestión
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
       <h2 style={h2Style}>Nota</h2>
-      <div>
-        <textarea
-          rows={4}
-          cols={80}
-          style={{ width: "100%" }}
-          value={nota}
-          onChange={(e) => setNota(e.target.value)}
-        />
-      </div>
+      <textarea
+        rows={4}
+        style={{ width: "100%" }}
+        value={nota}
+        onChange={(e) => setNota(e.target.value)}
+      />
 
-      <button style={btnSecondary} onClick={guardar}>
-        Guardar
-      </button>
-      <button style={btnSecondary} onClick={limpiar}>
-        Limpiar
-      </button>
-      <button style={btnPrimary} onClick={enviar}>
-        Enviar
-      </button>
+      <div>
+        <button style={btnSecondary} onClick={guardar}>
+          Guardar
+        </button>
+        <button style={btnSecondary} onClick={limpiar}>
+          Limpiar
+        </button>
+        <button style={btnPrimary} onClick={enviar}>
+          Enviar
+        </button>
+      </div>
     </div>
   );
 };

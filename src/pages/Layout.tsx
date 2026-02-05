@@ -38,7 +38,8 @@ import { Tramite } from "./Tramite";
 
 /** ✅ NUEVO: ACTA DE CIERRE */
 import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
-
+import AutoArchivo from "../components/AutoArchivo";
+import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
 const SUP_PATH = "PROCESOS DE AUDITORIAS/SUPERVISOR";
@@ -84,7 +85,7 @@ export const Layout: React.FC = () => {
       ruta === SUP_PATH ||
         ruta.endsWith("/SUPERVISOR") ||
         ruta === DIR_PATH ||
-        ruta.endsWith("/DIRECTOR")
+        ruta.endsWith("/DIRECTOR"),
     );
   };
 
@@ -151,9 +152,13 @@ export const Layout: React.FC = () => {
 
       // ================= ACTA DE CIERRE =================
       case "ACTA CIERRE":
-        return (
-          <ActaCierreFiscalizacion tramite={routeState?.tramite} />
-        );
+        return <ActaCierreFiscalizacion tramite={routeState?.tramite} />;
+
+      case "AUTO ARCHIVO":
+        return <AutoArchivo tramite={routeState?.tramite} />;
+
+     case "REQUERIMIENTO":
+  return <RequerimientoRegularizacion tramite={routeState?.tramite} />;
 
       // ================= OTROS =================
       case "ACTA DE INICIO":
