@@ -1,7 +1,7 @@
 // src/pages/AutoArchivo.tsx
 import React, { useMemo, useState } from "react";
+import jsPDF from "jspdf";
 import { TramitePayload } from "../pages/Tramite";
-
 
 type Props = {
   tramite?: TramitePayload;
@@ -36,27 +36,97 @@ const tdStyle: React.CSSProperties = {
 };
 
 const btnBase: React.CSSProperties = {
-  padding: "8px 12px",
-  margin: "5px",
+  padding: "10px 14px",
+  margin: "10px 6px 0 0",
   cursor: "pointer",
   border: "none",
-};
-
-const btnPrimary: React.CSSProperties = {
-  ...btnBase,
-  backgroundColor: "#007bff",
-  color: "white",
+  borderRadius: 8,
+  fontWeight: 800,
 };
 
 const btnSecondary: React.CSSProperties = {
   ...btnBase,
-  backgroundColor: "#6c757d",
-  color: "white",
+  background: "#6c757d",
+  color: "#fff",
+};
+
+const btnSuccess: React.CSSProperties = {
+  ...btnBase,
+  background: "#28a745",
+  color: "#fff",
+};
+
+const btnPrimary: React.CSSProperties = {
+  ...btnBase,
+  background: "#007bff",
+  color: "#fff",
+};
+
+const btnDanger: React.CSSProperties = {
+  ...btnBase,
+  background: "#dc3545",
+  color: "#fff",
 };
 
 const muted: React.CSSProperties = { color: "#666", fontSize: 12 };
 
+const card: React.CSSProperties = {
+  border: "none",
+  borderRadius: 10,
+  padding: 12,
+  marginTop: 12,
+  background: "#fff",
+  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+};
+
+const sectionTitle: React.CSSProperties = {
+  fontWeight: 900,
+  marginBottom: 10,
+  fontSize: 14,
+};
+
+const modalOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 16,
+  zIndex: 9999,
+};
+
+const modalCard: React.CSSProperties = {
+  width: "min(980px, 96vw)",
+  height: "min(760px, 92vh)",
+  background: "#fff",
+  borderRadius: 12,
+  overflow: "hidden",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const modalHeader: React.CSSProperties = {
+  padding: "12px 14px",
+  borderBottom: "1px solid #e5e5e5",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
 const safe = (v?: string) => (v && v.trim() ? v : "—");
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
 
 export const AutoArchivo: React.FC<Props> = ({ tramite, onGo }) => {
   const demo: TramitePayload = useMemo(
@@ -110,6 +180,7 @@ export const AutoArchivo: React.FC<Props> = ({ tramite, onGo }) => {
 
   const t = tramite ?? demo;
 
+  /** ===== Motivo ===== */
   const [motivo, setMotivo] = useState("");
   const maxChars = 8000;
 
@@ -118,10 +189,95 @@ export const AutoArchivo: React.FC<Props> = ({ tramite, onGo }) => {
     else setMotivo(val.slice(0, maxChars));
   };
 
-  const guardar = () => alert("Motivo guardado (demo).");
+  /** ===== Word upload ===== */
+  const [uploadedWord, setUploadedWord] = useState<File | null>(null);
+
+  /** ===== PDF Preview ===== */
+  const [openPdf, setOpenPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>("");
+
+  const descargarWord = () => {
+    // Word abre HTML como .doc sin problema (demo)
+    const html = `
+      <html>
+        <head><meta charset="utf-8"/></head>
+        <body style="font-family: Arial, sans-serif;">
+          <h2>AUTO DE ARCHIVO</h2>
+          <p><b>RUC:</b> ${safe(t.ruc)} &nbsp; <b>DV:</b> ${safe(t.digitoVerificador)}</p>
+          <p><b>Razón social:</b> ${safe(t.razonSocial ?? t.contribuyente)}</p>
+          <p><b>Proceso:</b> ${safe(t.proceso)} | <b>Origen:</b> ${safe(t.origen)} | <b>Programa:</b> ${safe(
+      t.programa
+    )}</p>
+          <p><b>N° Informe auditoría:</b> ${safe(t.numeroInformeAuditoria)}</p>
+          <p><b>Fecha informe auditoría:</b> ${safe(t.fechaInformeAuditoria)}</p>
+          <hr/>
+          <h3>Motivo para archivar</h3>
+          <p>${(motivo || "—").replace(/\n/g, "<br/>")}</p>
+          <p style="color:#666; font-size:12px;">Plantilla para completar y adjuntar al sistema.</p>
+        </body>
+      </html>
+    `.trim();
+
+    const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+    const ruc = (t.ruc ?? "SIN_RUC").replace(/\s+/g, "_");
+    downloadBlob(blob, `AutoArchivo_${ruc}.doc`);
+  };
+
+  const generarPdf = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    let y = 44;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("AUTO DE ARCHIVO", 40, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    const line = (label: string, value: string) => {
+      y += 18;
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label}:`, 40, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(value || "—", 240, y);
+    };
+
+    line("RUC", safe(t.ruc));
+    line("DV", safe(t.digitoVerificador));
+    line("Razón social", safe(t.razonSocial ?? t.contribuyente));
+    line("Proceso", safe(t.proceso));
+    line("Origen", safe(t.origen));
+    line("Programa", safe(t.programa));
+    line("N° Informe auditoría", safe(t.numeroInformeAuditoria));
+    line("Fecha informe auditoría", safe(t.fechaInformeAuditoria));
+
+    y += 26;
+    doc.setFont("helvetica", "bold");
+    doc.text("Motivo para archivar", 40, y);
+
+    y += 14;
+    doc.setFont("helvetica", "normal");
+    const motivoTxt = motivo.trim() ? motivo.trim() : "—";
+    const lines = doc.splitTextToSize(motivoTxt, 515);
+    doc.text(lines, 40, y);
+
+    const blob = doc.output("blob");
+    const url = URL.createObjectURL(blob);
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(url);
+    setOpenPdf(true);
+  };
+
+  const guardar = () => alert("Guardado (demo).");
+
   const limpiar = () => setMotivo("");
+
   const enviar = () => {
     if (!window.confirm("¿Está seguro que desea enviar el Auto de Archivo?")) return;
+
+    // Si quieres obligar Word/PDF adjunto, descomenta:
+    // if (!uploadedWord) return alert("Debe subir el documento completado.");
+
     alert("Auto de Archivo enviado (demo).");
   };
 
@@ -133,9 +289,28 @@ export const AutoArchivo: React.FC<Props> = ({ tramite, onGo }) => {
   return (
     <div style={pageStyle}>
       <h1>AUTO DE ARCHIVO</h1>
-      <div style={muted}>
-        Estos campos son de solo lectura y no pueden ser modificados por el auditor.
-      </div>
+      <div style={muted}>Estos campos son de solo lectura y no pueden ser modificados por el auditor.</div>
+
+      {/* ===== Modal PDF (igual patrón que tu ejemplo) ===== */}
+      {openPdf && (
+        <div style={modalOverlay} onClick={() => setOpenPdf(false)}>
+          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeader}>
+              <b>Vista previa PDF</b>
+              <button style={{ ...btnDanger, margin: 0 }} onClick={() => setOpenPdf(false)}>
+                Cerrar
+              </button>
+            </div>
+            <div style={{ flex: 1 }}>
+              <iframe
+                title="pdf-preview"
+                src={pdfUrl}
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <h2 style={h2Style}>Información básica del contribuyente (solo lectura)</h2>
       <table style={tableStyle}>
@@ -305,29 +480,63 @@ export const AutoArchivo: React.FC<Props> = ({ tramite, onGo }) => {
       <div style={{ marginTop: 10 }}>
         <textarea
           rows={10}
-          style={{ width: "100%", padding: 10, boxSizing: "border-box" }}
+          style={{
+            width: "100%",
+            padding: 10,
+            boxSizing: "border-box",
+            borderRadius: 8,
+            border: "1px solid #ccc",
+          }}
           value={motivo}
           onChange={(e) => onChangeMotivo(e.target.value)}
           placeholder="Escriba el motivo del archivo del expediente..."
         />
       </div>
 
-      <div style={{ marginTop: 10 }}>
-        <button style={btnSecondary} onClick={guardar}>
-          Guardar
+      {/* ===================== ✅ ABAJO como tu ejemplo ===================== */}
+      <div style={card}>
+        <div style={sectionTitle}>Documento Word</div>
+
+        <button style={btnSecondary} onClick={descargarWord}>
+          Descargar en Word
         </button>
-        <button style={btnSecondary} onClick={limpiar}>
-          Limpiar
-        </button>
-        <button style={btnPrimary} onClick={enviar}>
-          Enviar
-        </button>
-        {onGo && (
-          <button style={btnSecondary} onClick={volver}>
-            Volver
-          </button>
-        )}
+
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Subir documento completado</div>
+          <input
+            type="file"
+            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setUploadedWord(f);
+            }}
+          />
+          <div style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
+            Archivo: <b>{uploadedWord ? uploadedWord.name : "Ninguno"}</b>
+          </div>
+        </div>
       </div>
+
+      <hr style={{ marginTop: 16 }} />
+
+      <button style={btnSecondary} onClick={generarPdf}>
+        Vista Previa (PDF)
+      </button>
+      <button style={btnSuccess} onClick={guardar}>
+        Guardar
+      </button>
+      <button style={btnPrimary} onClick={enviar}>
+        Enviar
+      </button>
+      <button style={btnSecondary} onClick={limpiar}>
+        Limpiar
+      </button>
+
+      {onGo && (
+        <button style={btnSecondary} onClick={volver}>
+          Volver
+        </button>
+      )}
     </div>
   );
 };
