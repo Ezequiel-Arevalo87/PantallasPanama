@@ -26,6 +26,7 @@ import PantallaControNotificacion from "../components/PantallaControNotificacion
 
 // HOMES
 import Home from "./Home";
+import HomeJefeSeccionFiscalizacion from "./HomeJefeSeccionFiscalizacion"; // ✅ NUEVO
 import { NuevosCasos } from "./NuevosCasos";
 import { readAprobados } from "../lib/workflowStorage";
 
@@ -40,13 +41,14 @@ import { Tramite } from "./Tramite";
 import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
 import AutoArchivo from "../components/AutoArchivo";
 import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
+
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
 const SUP_PATH = "PROCESOS DE AUDITORIAS/SUPERVISOR";
 const DIR_PATH = "PROCESOS DE AUDITORIAS/DIRECTOR";
 
 export const Layout: React.FC = () => {
-  const [selectedPath, setSelectedPath] = useState<string>("HOME");
+  const [selectedPath, setSelectedPath] = useState<string>("HOME/GENERAL");
   const [readOnly, setReadOnly] = useState<boolean>(false);
   const [routeState, setRouteState] = useState<any>(null);
 
@@ -85,7 +87,7 @@ export const Layout: React.FC = () => {
       ruta === SUP_PATH ||
         ruta.endsWith("/SUPERVISOR") ||
         ruta === DIR_PATH ||
-        ruta.endsWith("/DIRECTOR"),
+        ruta.endsWith("/DIRECTOR")
     );
   };
 
@@ -97,8 +99,11 @@ export const Layout: React.FC = () => {
   const renderContent = () => {
     switch (leaf) {
       // ================= HOMES =================
-      case "HOME":
+      case "GENERAL":
         return <Home onGo={handleSelect} contexto={selectedPath} />;
+
+      case "JEFE DE SECCIÓN":
+        return <HomeJefeSeccionFiscalizacion />;
 
       // ================= COMUNICACIONES =================
       case "COMUNICACIONES":
@@ -157,8 +162,8 @@ export const Layout: React.FC = () => {
       case "AUTO ARCHIVO":
         return <AutoArchivo tramite={routeState?.tramite} />;
 
-     case "REQUERIMIENTO":
-  return <RequerimientoRegularizacion tramite={routeState?.tramite} />;
+      case "REQUERIMIENTO":
+        return <RequerimientoRegularizacion tramite={routeState?.tramite} />;
 
       // ================= OTROS =================
       case "ACTA DE INICIO":
@@ -203,12 +208,7 @@ export const Layout: React.FC = () => {
 
   /** ===================== LAYOUT ===================== */
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      height="100vh"
-      sx={{ overflow: "hidden" }}
-    >
+    <Box display="flex" flexDirection="column" height="100vh" sx={{ overflow: "hidden" }}>
       {/* ENCABEZADO */}
       <Box sx={{ width: "100%" }}>
         <img
