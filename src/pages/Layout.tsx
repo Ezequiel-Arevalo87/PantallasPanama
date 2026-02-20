@@ -42,6 +42,9 @@ import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
 import AutoArchivo from "../components/AutoArchivo";
 import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
 
+/** ✅ NUEVO: PARAMETRIZACIÓN ALERTAS */
+import ParametrizacionAlertas from "./ParametrizacionAlertas";
+
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
 const SUP_PATH = "PROCESOS DE AUDITORIAS/SUPERVISOR";
@@ -104,6 +107,11 @@ export const Layout: React.FC = () => {
 
       case "JEFE DE SECCIÓN":
         return <HomeJefeSeccionFiscalizacion />;
+
+      // ================= PARAMETRIZACIÓN =================
+      // Sidebar envía: "PARAMETRIZACIÓN/ALERTAS" => leaf = "ALERTAS"
+      case "ALERTAS":
+        return <ParametrizacionAlertas />;
 
       // ================= COMUNICACIONES =================
       case "COMUNICACIONES":
@@ -208,7 +216,12 @@ export const Layout: React.FC = () => {
 
   /** ===================== LAYOUT ===================== */
   return (
-    <Box display="flex" flexDirection="column" height="100vh" sx={{ overflow: "hidden" }}>
+    <Box
+      display="flex"
+      flexDirection="column"
+      height="100vh"
+      sx={{ overflow: "hidden" }}
+    >
       {/* ENCABEZADO */}
       <Box sx={{ width: "100%" }}>
         <img

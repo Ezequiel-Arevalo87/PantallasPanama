@@ -24,6 +24,8 @@ import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 
+import { loadParamAlertas, type AlertaParam } from "../services/mockParamAlertas";
+
 type Semaforo = "ROJO" | "AMARILLO" | "VERDE" | "GRIS";
 
 type EstadoActividad =
@@ -35,7 +37,7 @@ type EstadoActividad =
   | "CERRADA"
   | "ANULADA";
 
-type Actividad = {
+type ActividadBase = {
   id: string;
   tramite: string;
   ruc: string;
@@ -43,17 +45,99 @@ type Actividad = {
   actividad: string;
   tipo: "Auditoría" | "Verificación" | "Omiso" | "Rectificativa" | "Cierre";
   estado: EstadoActividad;
-  semaforo: Semaforo;
   fechaAsignacion: string; // YYYY-MM-DD
-  fechaVencimiento: string; // YYYY-MM-DD
-  diasRestantes: number; // puede ser negativo
   analista: string;
   prioridad: "Alta" | "Media" | "Baja";
+};
+
+type ActividadView = ActividadBase & {
+  semaforo: Semaforo;
+  diasTranscurridos: number;
+  totalDiasPermitidos: number | null;
+  fechaVencimiento: string | null;
+  diasRestantes: number | null;
+  paramMatched: boolean;
 };
 
 function fmtDate(ymd: string) {
   const d = new Date(ymd + "T00:00:00");
   return d.toLocaleDateString("es-CO", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function todayYmd() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysBetween(startYmd: string, endYmd: string) {
+  const a = new Date(startYmd + "T00:00:00").getTime();
+  const b = new Date(endYmd + "T00:00:00").getTime();
+  return Math.floor((b - a) / (1000 * 60 * 60 * 24));
+}
+
+function addDaysYmd(startYmd: string, n: number) {
+  const d = new Date(startYmd + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** ✅ Normaliza textos para hacer match flexible */
+function normalize(s: string) {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quita acentos
+    .replace(/\([^)]*\)/g, " ") // quita (706), (799), etc.
+    .replace(/[^a-z0-9\s]/g, " ") // quita signos raros
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** ✅ Match flexible: exacto -> incluye -> por tokens */
+function findParamByActividad(params: AlertaParam[], actividad: string) {
+  const a = normalize(actividad);
+  if (!a) return undefined;
+
+  // 1) exacto
+  let found = params.find((p) => normalize(p.actividad) === a);
+  if (found) return found;
+
+  // 2) includes (ambos sentidos)
+  found = params.find((p) => {
+    const pa = normalize(p.actividad);
+    return pa && (a.includes(pa) || pa.includes(a));
+  });
+  if (found) return found;
+
+  // 3) tokens (si comparte suficientes palabras)
+  const tokens = new Set(a.split(" ").filter(Boolean));
+  found = params.find((p) => {
+    const pa = normalize(p.actividad);
+    if (!pa) return false;
+    const pt = pa.split(" ").filter(Boolean);
+    const hits = pt.filter((t) => tokens.has(t)).length;
+    return hits >= Math.min(3, Math.max(1, pt.length - 1));
+  });
+
+  return found;
+}
+
+function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridos: number): Semaforo {
+  if (!param) return "GRIS";
+  const d = diasTranscurridos;
+
+  if (d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
+  if (d >= param.amarilloDesde && d <= param.amarilloHasta) return "AMARILLO";
+  if (d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
+  if (d > param.totalDiasPermitidos) return "ROJO";
+  if (d < param.verdeDesde) return "VERDE";
+  return "GRIS";
 }
 
 function chipSemaforo(s: Semaforo) {
@@ -69,17 +153,9 @@ function chipSemaforo(s: Semaforo) {
   }
 }
 
-function chipEstado(
-  e: EstadoActividad
-): { label: string; icon?: React.ReactElement; sx?: any } {
-  const map: Record<
-    EstadoActividad,
-    { label: string; icon?: React.ReactElement; sx?: any }
-  > = {
-    PENDIENTE_REVISION: {
-      label: "Pendiente revisión",
-      icon: <PendingActionsIcon fontSize="small" />,
-    },
+function chipEstado(e: EstadoActividad): { label: string; icon?: React.ReactElement } {
+  const map: Record<EstadoActividad, { label: string; icon?: React.ReactElement }> = {
+    PENDIENTE_REVISION: { label: "Pendiente revisión", icon: <PendingActionsIcon fontSize="small" /> },
     EN_EJECUCION: { label: "En ejecución" },
     EN_ESPERA_CONTRIBUYENTE: { label: "Espera contribuyente" },
     POR_VENCER: { label: "Por vencer", icon: <WarningAmberIcon fontSize="small" /> },
@@ -87,13 +163,11 @@ function chipEstado(
     CERRADA: { label: "Cerrada", icon: <AssignmentTurnedInIcon fontSize="small" /> },
     ANULADA: { label: "Anulada" },
   };
-
   return map[e];
 }
 
-
-/** ✅ Mock para mostrar varios estados y semáforos */
-const MOCK: Actividad[] = [
+/** ✅ Mock mínimo */
+const MOCK: ActividadBase[] = [
   {
     id: "A-1001",
     tramite: "TR-2026-000145",
@@ -102,10 +176,7 @@ const MOCK: Actividad[] = [
     actividad: "Informe de Auditoría (706)",
     tipo: "Auditoría",
     estado: "POR_VENCER",
-    semaforo: "AMARILLO",
     fechaAsignacion: "2026-02-01",
-    fechaVencimiento: "2026-02-20",
-    diasRestantes: 2,
     analista: "Analista: J. Pérez",
     prioridad: "Alta",
   },
@@ -117,10 +188,7 @@ const MOCK: Actividad[] = [
     actividad: "Verificación de Inconsistencias",
     tipo: "Verificación",
     estado: "EN_EJECUCION",
-    semaforo: "VERDE",
     fechaAsignacion: "2026-02-10",
-    fechaVencimiento: "2026-03-05",
-    diasRestantes: 15,
     analista: "Analista: M. Ríos",
     prioridad: "Media",
   },
@@ -132,10 +200,7 @@ const MOCK: Actividad[] = [
     actividad: "Requerimiento (documentación)",
     tipo: "Auditoría",
     estado: "EN_ESPERA_CONTRIBUYENTE",
-    semaforo: "GRIS",
     fechaAsignacion: "2026-01-25",
-    fechaVencimiento: "2026-03-01",
-    diasRestantes: 11,
     analista: "Analista: L. Gómez",
     prioridad: "Media",
   },
@@ -147,42 +212,9 @@ const MOCK: Actividad[] = [
     actividad: "Caso Omiso (apertura)",
     tipo: "Omiso",
     estado: "VENCIDA",
-    semaforo: "ROJO",
     fechaAsignacion: "2026-01-05",
-    fechaVencimiento: "2026-02-12",
-    diasRestantes: -6,
     analista: "Analista: D. Torres",
     prioridad: "Alta",
-  },
-  {
-    id: "A-1005",
-    tramite: "TR-2026-000220",
-    ruc: "4455667-1-2026",
-    contribuyente: "Global Market, S.A.",
-    actividad: "Acta de Cierre (799)",
-    tipo: "Cierre",
-    estado: "CERRADA",
-    semaforo: "VERDE",
-    fechaAsignacion: "2026-01-15",
-    fechaVencimiento: "2026-02-10",
-    diasRestantes: 0,
-    analista: "Analista: C. Méndez",
-    prioridad: "Baja",
-  },
-  {
-    id: "A-1006",
-    tramite: "TR-2026-000173",
-    ruc: "7771112-4-2025",
-    contribuyente: "Constructora Norte, S.A.",
-    actividad: "Rectificativa (análisis preliminar)",
-    tipo: "Rectificativa",
-    estado: "PENDIENTE_REVISION",
-    semaforo: "AMARILLO",
-    fechaAsignacion: "2026-02-14",
-    fechaVencimiento: "2026-02-28",
-    diasRestantes: 10,
-    analista: "Analista: A. Ruiz",
-    prioridad: "Media",
   },
 ];
 
@@ -191,8 +223,34 @@ export default function HomeJefeSeccionFiscalizacion() {
   const [estado, setEstado] = useState<"TODOS" | EstadoActividad>("TODOS");
   const [soloCriticos, setSoloCriticos] = useState(false);
 
-  const data = useMemo(() => {
-    let rows = [...MOCK];
+  // ✅ si cambias parametrización y quieres refrescar: usa estado "tick"
+  const [tick, setTick] = useState(0);
+
+  const params = useMemo(() => loadParamAlertas(), [tick]);
+
+  const data = useMemo<ActividadView[]>(() => {
+    const hoy = todayYmd();
+
+    let rows: ActividadView[] = MOCK.map((r) => {
+      const param = findParamByActividad(params, r.actividad);
+      const diasTranscurridos = Math.max(0, daysBetween(r.fechaAsignacion, hoy));
+      const totalDias = param?.totalDiasPermitidos ?? null;
+
+      const fechaVencimiento = totalDias ? addDaysYmd(r.fechaAsignacion, totalDias) : null;
+      const diasRestantes = totalDias ? totalDias - diasTranscurridos : null;
+
+      const sem = semaforoFromParam(param, diasTranscurridos);
+
+      return {
+        ...r,
+        semaforo: sem,
+        diasTranscurridos,
+        totalDiasPermitidos: totalDias,
+        fechaVencimiento,
+        diasRestantes,
+        paramMatched: !!param,
+      };
+    });
 
     const q = search.trim().toLowerCase();
     if (q) {
@@ -203,52 +261,50 @@ export default function HomeJefeSeccionFiscalizacion() {
     }
 
     if (estado !== "TODOS") rows = rows.filter((r) => r.estado === estado);
-
     if (soloCriticos) rows = rows.filter((r) => r.semaforo === "ROJO" || r.semaforo === "AMARILLO");
 
-    // orden: primero ROJO, luego AMARILLO, luego VERDE, luego GRIS; y por días restantes asc
     const rank: Record<Semaforo, number> = { ROJO: 0, AMARILLO: 1, VERDE: 2, GRIS: 3 };
     rows.sort((a, b) => {
       const ra = rank[a.semaforo] - rank[b.semaforo];
       if (ra !== 0) return ra;
-      return a.diasRestantes - b.diasRestantes;
+
+      const da = a.diasRestantes ?? 999999;
+      const db = b.diasRestantes ?? 999999;
+      return da - db;
     });
 
     return rows;
-  }, [search, estado, soloCriticos]);
+  }, [params, search, estado, soloCriticos]);
 
   const kpis = useMemo(() => {
-    const total = MOCK.length;
-    const rojas = MOCK.filter((x) => x.semaforo === "ROJO").length;
-    const amarillas = MOCK.filter((x) => x.semaforo === "AMARILLO").length;
-    const pendientes = MOCK.filter((x) => x.estado === "PENDIENTE_REVISION").length;
-    const espera = MOCK.filter((x) => x.estado === "EN_ESPERA_CONTRIBUYENTE").length;
-    return { total, rojas, amarillas, pendientes, espera };
-  }, []);
+    const total = data.length;
+    const rojas = data.filter((x) => x.semaforo === "ROJO").length;
+    const amarillas = data.filter((x) => x.semaforo === "AMARILLO").length;
+    const pendientes = data.filter((x) => x.estado === "PENDIENTE_REVISION").length;
+    const espera = data.filter((x) => x.estado === "EN_ESPERA_CONTRIBUYENTE").length;
+    const sinSla = data.filter((x) => x.semaforo === "GRIS").length;
+    return { total, rojas, amarillas, pendientes, espera, sinSla };
+  }, [data]);
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* Header */}
       <Stack direction="row" alignItems="flex-end" justifyContent="space-between" spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={800}>
             Home – Jefe de Sección (Fiscalización)
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Bandeja de control: actividades asignadas, alertas por vencimiento y seguimiento de ejecución.
+            Bandeja con SLA calculado por Parametrización → Alertas.
           </Typography>
         </Box>
 
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Refrescar (mock)">
-            <IconButton onClick={() => { /* aquí iría refetch */ }}>
+          <Tooltip title="Refrescar parametrización (localStorage)">
+            <IconButton onClick={() => setTick((x) => x + 1)}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button
-            variant={soloCriticos ? "contained" : "outlined"}
-            onClick={() => setSoloCriticos((v) => !v)}
-          >
+          <Button variant={soloCriticos ? "contained" : "outlined"} onClick={() => setSoloCriticos((v) => !v)}>
             {soloCriticos ? "Mostrando críticos" : "Solo críticos"}
           </Button>
         </Stack>
@@ -256,60 +312,39 @@ export default function HomeJefeSeccionFiscalizacion() {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* KPI Cards */}
       <Grid container spacing={2}>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Total actividades
-            </Typography>
-            <Typography variant="h4" fontWeight={800}>
-              {kpis.total}
-            </Typography>
+            <Typography variant="caption" color="text.secondary">Total</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.total}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Críticas (Rojo)
-            </Typography>
-            <Typography variant="h4" fontWeight={800}>
-              {kpis.rojas}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Requiere atención inmediata
-            </Typography>
+            <Typography variant="caption" color="text.secondary">Rojo</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.rojas}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Alertas (Amarillo)
-            </Typography>
-            <Typography variant="h4" fontWeight={800}>
-              {kpis.amarillas}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Próximas a vencer
-            </Typography>
+            <Typography variant="caption" color="text.secondary">Amarillo</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.amarillas}</Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Pendiente revisión / Espera
-            </Typography>
-            <Typography variant="h4" fontWeight={800}>
-              {kpis.pendientes} / {kpis.espera}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Flujo de gestión
-            </Typography>
+            <Typography variant="caption" color="text.secondary">Pendiente / Espera</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.pendientes} / {kpis.espera}</Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={2.4}>
+          <Paper sx={{ p: 2, borderRadius: 3 }}>
+            <Typography variant="caption" color="text.secondary">Sin SLA</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.sinSla}</Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* Filtros */}
       <Paper sx={{ p: 2, mt: 2, borderRadius: 3 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} md={6}>
@@ -323,13 +358,7 @@ export default function HomeJefeSeccionFiscalizacion() {
           </Grid>
 
           <Grid item xs={12} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Estado"
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as any)}
-            >
+            <TextField select fullWidth label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as any)}>
               <MenuItem value="TODOS">Todos</MenuItem>
               <MenuItem value="PENDIENTE_REVISION">Pendiente revisión</MenuItem>
               <MenuItem value="EN_EJECUCION">En ejecución</MenuItem>
@@ -361,7 +390,6 @@ export default function HomeJefeSeccionFiscalizacion() {
         </Grid>
       </Paper>
 
-      {/* Tabla */}
       <Paper sx={{ p: 2, mt: 2, borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6" fontWeight={800}>
@@ -369,7 +397,7 @@ export default function HomeJefeSeccionFiscalizacion() {
           </Typography>
 
           <Typography variant="body2" color="text.secondary">
-            Ordenado por semáforo y días restantes
+            Ordenado por criticidad y días restantes
           </Typography>
         </Stack>
 
@@ -377,15 +405,19 @@ export default function HomeJefeSeccionFiscalizacion() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell><b>Semáforo</b></TableCell>
+                <TableCell><b>SLA</b></TableCell>
                 <TableCell><b>Estado</b></TableCell>
                 <TableCell><b>Trámite</b></TableCell>
+                <TableCell><b>RUC</b></TableCell>
                 <TableCell><b>Contribuyente</b></TableCell>
                 <TableCell><b>Actividad</b></TableCell>
                 <TableCell><b>Tipo</b></TableCell>
-                <TableCell><b>Analista</b></TableCell>
+                <TableCell><b>Asignado</b></TableCell>
+                <TableCell align="right"><b>Total</b></TableCell>
+                <TableCell align="right"><b>Transc.</b></TableCell>
+                <TableCell align="right"><b>Restan</b></TableCell>
                 <TableCell><b>Vence</b></TableCell>
-                <TableCell align="right"><b>Días</b></TableCell>
+                <TableCell><b>Analista</b></TableCell>
                 <TableCell><b>Prioridad</b></TableCell>
                 <TableCell align="center"><b>Acciones</b></TableCell>
               </TableRow>
@@ -395,31 +427,35 @@ export default function HomeJefeSeccionFiscalizacion() {
               {data.map((r) => {
                 const s = chipSemaforo(r.semaforo);
                 const e = chipEstado(r.estado);
+
                 return (
                   <TableRow key={r.id} hover>
                     <TableCell>
-                      <Chip
-                        variant="outlined"
-                        label={s.label}
-                        sx={{ ...s.sx, borderWidth: 1 }}
-                        size="small"
-                      />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          variant="outlined"
+                          label={s.label}
+                          sx={{ ...s.sx, borderWidth: 1 }}
+                          size="small"
+                        />
+                        {!r.paramMatched && (
+                          <Tooltip title="No se encontró parametrización para esta actividad">
+                            <Chip size="small" variant="outlined" label="Sin matriz" />
+                          </Tooltip>
+                        )}
+                      </Stack>
                     </TableCell>
 
                     <TableCell>
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        icon={e.icon}
-                        label={e.label}
-                      />
+                      <Chip size="small" variant="outlined" icon={e.icon} label={e.label} />
                     </TableCell>
 
                     <TableCell>
                       <Typography fontWeight={700}>{r.tramite}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {r.ruc}
-                      </Typography>
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography variant="body2">{r.ruc}</Typography>
                     </TableCell>
 
                     <TableCell>
@@ -435,18 +471,32 @@ export default function HomeJefeSeccionFiscalizacion() {
                     </TableCell>
 
                     <TableCell>
-                      <Typography>{r.analista}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Asignado: {fmtDate(r.fechaAsignacion)}
+                      {fmtDate(r.fechaAsignacion)}
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography fontWeight={800}>{r.totalDiasPermitidos ?? "—"}</Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography fontWeight={800}>{r.diasTranscurridos}</Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography
+                        fontWeight={800}
+                        color={typeof r.diasRestantes === "number" && r.diasRestantes < 0 ? "error.main" : "text.primary"}
+                      >
+                        {r.diasRestantes ?? "—"}
                       </Typography>
                     </TableCell>
 
-                    <TableCell>{fmtDate(r.fechaVencimiento)}</TableCell>
+                    <TableCell>
+                      {r.fechaVencimiento ? fmtDate(r.fechaVencimiento) : "—"}
+                    </TableCell>
 
-                    <TableCell align="right">
-                      <Typography fontWeight={800} color={r.diasRestantes < 0 ? "error.main" : "text.primary"}>
-                        {r.diasRestantes}
-                      </Typography>
+                    <TableCell>
+                      <Typography>{r.analista}</Typography>
                     </TableCell>
 
                     <TableCell>
@@ -477,7 +527,7 @@ export default function HomeJefeSeccionFiscalizacion() {
 
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11}>
+                  <TableCell colSpan={15}>
                     <Typography color="text.secondary">No hay resultados con los filtros actuales.</Typography>
                   </TableCell>
                 </TableRow>

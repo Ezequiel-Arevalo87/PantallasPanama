@@ -57,7 +57,7 @@ const buildPath = (parent: string, label: string) =>
   parent ? `${parent}/${label}` : label;
 
 const useMenuData = () => {
-  /** ✅ MEJOR OPCIÓN: HOME como árbol */
+  /** ✅ HOME como árbol */
   const home: MenuNode[] = [
     {
       label: "HOME",
@@ -105,6 +105,16 @@ const useMenuData = () => {
     { label: "MÓDULO ALERTAS" },
   ];
 
+  /** ✅ NUEVO: PARAMETRIZACIÓN (para matriz por Actividad) */
+  const parametrizacion: MenuNode[] = [
+    {
+      label: "PARAMETRIZACIÓN",
+      children: [
+        { label: "ALERTAS" }, // => path: "PARAMETRIZACIÓN/ALERTAS"
+      ],
+    },
+  ];
+
   return {
     home,
     trazabilidad,
@@ -115,6 +125,7 @@ const useMenuData = () => {
     priorizacion,
     aprobacion,
     asignacion,
+    parametrizacion,
   };
 };
 
@@ -130,10 +141,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
     priorizacion,
     aprobacion,
     asignacion,
+    parametrizacion,
   } = useMenuData();
 
   const ROOTS = useMemo(
-    () => ["SELECTOR DE CASOS Y PRIORIZACIÓN", "PROCESOS DE AUDITORIAS", "HOME"] as const,
+    () =>
+      [
+        "SELECTOR DE CASOS Y PRIORIZACIÓN",
+        "PROCESOS DE AUDITORIAS",
+        "HOME",
+        "PARAMETRIZACIÓN",
+      ] as const,
     []
   );
 
@@ -161,10 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
           return (
             <React.Fragment key={thisPath}>
               <ListItem disablePadding>
-                <ListItemButton
-                  onClick={() => togglePath(thisPath)}
-                  sx={ITEM_STYLE}
-                >
+                <ListItemButton onClick={() => togglePath(thisPath)} sx={ITEM_STYLE}>
                   <ListItemIcon sx={{ minWidth: 28 }}>
                     {isOpen ? <ExpandLess /> : <ExpandMore />}
                   </ListItemIcon>
@@ -222,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
           </ListSubheader>
         }
       >
-        {/* ✅ HOME (como árbol) */}
+        {/* ✅ HOME */}
         <ListItemButton
           onClick={() => toggleRoot("HOME")}
           sx={SECTION_STYLE}
@@ -321,6 +336,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelect, selected }) => {
             <Typography variant="subtitle2">{a.label}</Typography>
           </ListItemButton>
         ))}
+
+        <Divider sx={{ my: 1.5 }} />
+
+        {/* ✅ PARAMETRIZACIÓN (NUEVO ROOT) */}
+        <ListItemButton
+          onClick={() => toggleRoot("PARAMETRIZACIÓN")}
+          sx={SECTION_STYLE}
+          selected={!!openMap["PARAMETRIZACIÓN"]}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            PARAMETRIZACIÓN
+          </Typography>
+          {openMap["PARAMETRIZACIÓN"] ? <ExpandLess /> : <ExpandMore />}
+        </ListItemButton>
+
+        <Collapse in={!!openMap["PARAMETRIZACIÓN"]} timeout="auto" unmountOnExit>
+          {renderNodes(parametrizacion[0].children ?? [], "PARAMETRIZACIÓN")}
+        </Collapse>
 
         <Divider sx={{ my: 1.5 }} />
 
