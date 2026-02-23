@@ -25,6 +25,8 @@ import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 
+import * as XLSX from "xlsx";
+
 import { loadParamAlertas, type AlertaParam } from "../services/mockParamAlertas";
 
 type Semaforo = "ROJO" | "AMARILLO" | "VERDE" | "GRIS";
@@ -46,8 +48,8 @@ type ActividadBase = {
   actividad: string;
   estado: EstadoActividad;
   fechaAsignacion: string; // YYYY-MM-DD
-  auditor: string; // antes: analista
-  supervisor: string; // nuevo
+  auditor: string;
+  supervisor: string;
 };
 
 type ActividadView = ActividadBase & {
@@ -87,35 +89,30 @@ function addDaysYmd(startYmd: string, n: number) {
   return `${y}-${m}-${day}`;
 }
 
-/** ✅ Normaliza textos para hacer match flexible */
 function normalize(s: string) {
   return (s ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quita acentos
-    .replace(/\([^)]*\)/g, " ") // quita (706), (799), etc.
-    .replace(/[^a-z0-9\s]/g, " ") // quita signos raros
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** ✅ Match flexible: exacto -> incluye -> por tokens */
 function findParamByActividad(params: AlertaParam[], actividad: string) {
   const a = normalize(actividad);
   if (!a) return undefined;
 
-  // 1) exacto
   let found = params.find((p) => normalize(p.actividad) === a);
   if (found) return found;
 
-  // 2) includes (ambos sentidos)
   found = params.find((p) => {
     const pa = normalize(p.actividad);
     return pa && (a.includes(pa) || pa.includes(a));
   });
   if (found) return found;
 
-  // 3) tokens (si comparte suficientes palabras)
   const tokens = new Set(a.split(" ").filter(Boolean));
   found = params.find((p) => {
     const pa = normalize(p.actividad);
@@ -130,13 +127,15 @@ function findParamByActividad(params: AlertaParam[], actividad: string) {
 
 function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridos: number): Semaforo {
   if (!param) return "GRIS";
+
   const d = diasTranscurridos;
 
-  if (d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
-  if (d >= param.amarilloDesde && d <= param.amarilloHasta) return "AMARILLO";
-  if (d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
-  if (d > param.totalDiasPermitidos) return "ROJO";
-  if (d < param.verdeDesde) return "VERDE";
+  if (param.rojoDesde >= 0 && param.rojoHasta >= 0 && d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
+  if (param.amarilloDesde >= 0 && param.amarilloHasta >= 0 && d >= param.amarilloDesde && d <= param.amarilloHasta)
+    return "AMARILLO";
+  if (param.verdeDesde >= 0 && param.verdeHasta >= 0 && d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
+
+  if (d >= param.totalDiasPermitidos) return "ROJO";
   return "GRIS";
 }
 
@@ -166,70 +165,69 @@ function chipEstado(e: EstadoActividad): { label: string; icon?: React.ReactElem
   return map[e];
 }
 
-/** ✅ Mock mínimo (YA SIN tipo/prioridad, y con auditor/supervisor) */
-const MOCK: ActividadBase[] = [
-  {
-    id: "A-1001",
-    tramite: "TR-2026-000145",
-    ruc: "1555666-1-2026",
-    contribuyente: "Comercial El Sol, S.A.",
-    actividad: "Informe de Auditoría (706)",
-    estado: "POR_VENCER",
-    fechaAsignacion: "2026-02-01",
-    auditor: "J. Pérez",
-    supervisor: "S. Martínez",
-  },
-  {
-    id: "A-1002",
-    tramite: "TR-2026-000188",
-    ruc: "1888777-2-2025",
-    contribuyente: "Inversiones Delta, Inc.",
-    actividad: "Verificación de Inconsistencias",
-    estado: "EN_EJECUCION",
-    fechaAsignacion: "2026-02-10",
-    auditor: "M. Ríos",
-    supervisor: "S. Martínez",
-  },
-  {
-    id: "A-1003",
-    tramite: "TR-2026-000201",
-    ruc: "1020304-3-2024",
-    contribuyente: "Servicios Pacífico, S.A.",
-    actividad: "Requerimiento (documentación)",
-    estado: "EN_ESPERA_CONTRIBUYENTE",
-    fechaAsignacion: "2026-01-25",
-    auditor: "L. Gómez",
-    supervisor: "C. Valdés",
-  },
-  {
-    id: "A-1004",
-    tramite: "TR-2026-000099",
-    ruc: "9090909-9-2023",
-    contribuyente: "Transportes Andina, S.A.",
-    actividad: "Caso Omiso (apertura)",
-    estado: "VENCIDA",
-    fechaAsignacion: "2026-01-05",
-    auditor: "D. Torres",
-    supervisor: "C. Valdés",
-  },
-];
+/** ✅ Home arma el mock desde params (actividades reales del cuadro) */
+function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
+  const auditores = ["J. Pérez", "M. Ríos", "L. Gómez", "D. Torres", "A. Moreno", "K. Salazar"];
+  const supervisores = ["S. Martínez", "C. Valdés", "R. Herrera", "M. Pineda"];
+  const estados: EstadoActividad[] = ["PENDIENTE_REVISION", "EN_EJECUCION", "EN_ESPERA_CONTRIBUYENTE", "POR_VENCER", "VENCIDA", "CERRADA"];
+
+  const contribuyentes = [
+    "Comercial El Sol, S.A.",
+    "Inversiones Delta, Inc.",
+    "Servicios Pacífico, S.A.",
+    "Transportes Andina, S.A.",
+    "Grupo Marítimo Azul, S.A.",
+    "Constructora Horizonte, S.A.",
+  ];
+
+  const baseDate = "2026-02-01";
+
+  return params.map((p, idx) => {
+    const n = idx + 1;
+    const yyyy = 2026;
+
+    const tramite = `TR-${yyyy}-${String(100000 + n).slice(-6)}`;
+    const ruc = `${String(1000000 + n).slice(-7)}-${(n % 9) + 1}-${yyyy}`;
+    const contribuyente = contribuyentes[idx % contribuyentes.length];
+
+    // Para simular rojos/amarillos/verdes
+    const offsetDays = idx % 3 === 0 ? 40 : idx % 3 === 1 ? 15 : 3;
+    const fechaAsignacion = addDaysYmd(baseDate, -offsetDays);
+
+    return {
+      id: `A-${1000 + n}`,
+      tramite,
+      ruc,
+      contribuyente,
+      actividad: p.actividad,
+      estado: estados[idx % estados.length],
+      fechaAsignacion,
+      auditor: auditores[idx % auditores.length],
+      supervisor: supervisores[idx % supervisores.length],
+    };
+  });
+}
+
+function ymd(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
 
 export default function HomeJefeSeccionFiscalizacion() {
   const [search, setSearch] = useState("");
   const [estado, setEstado] = useState<"TODOS" | EstadoActividad>("TODOS");
-
-  // ✅ filtro por semaforización (colores)
   const [semaforoFiltro, setSemaforoFiltro] = useState<"TODOS" | "VERDE" | "AMARILLO" | "ROJO">("TODOS");
-
-  // ✅ si cambias parametrización y quieres refrescar: usa estado "tick"
   const [tick, setTick] = useState(0);
 
   const params = useMemo(() => loadParamAlertas(), [tick]);
+  const baseRows = useMemo(() => buildMockFromParams(params), [params]);
 
   const data = useMemo<ActividadView[]>(() => {
     const hoy = todayYmd();
 
-    let rows: ActividadView[] = MOCK.map((r) => {
+    let rows: ActividadView[] = baseRows.map((r) => {
       const param = findParamByActividad(params, r.actividad);
       const diasTranscurridos = Math.max(0, daysBetween(r.fechaAsignacion, hoy));
       const totalDias = param?.totalDiasPermitidos ?? null;
@@ -259,24 +257,19 @@ export default function HomeJefeSeccionFiscalizacion() {
     }
 
     if (estado !== "TODOS") rows = rows.filter((r) => r.estado === estado);
+    if (semaforoFiltro !== "TODOS") rows = rows.filter((r) => r.semaforo === semaforoFiltro);
 
-    if (semaforoFiltro !== "TODOS") {
-      rows = rows.filter((r) => r.semaforo === semaforoFiltro);
-    }
-
-    // Orden: rojo -> amarillo -> verde -> gris, luego por días restantes
     const rank: Record<Semaforo, number> = { ROJO: 0, AMARILLO: 1, VERDE: 2, GRIS: 3 };
     rows.sort((a, b) => {
       const ra = rank[a.semaforo] - rank[b.semaforo];
       if (ra !== 0) return ra;
-
       const da = a.diasRestantes ?? 999999;
       const db = b.diasRestantes ?? 999999;
       return da - db;
     });
 
     return rows;
-  }, [params, search, estado, semaforoFiltro]);
+  }, [params, baseRows, search, estado, semaforoFiltro]);
 
   const kpis = useMemo(() => {
     const total = data.length;
@@ -289,6 +282,50 @@ export default function HomeJefeSeccionFiscalizacion() {
     return { total, rojas, amarillas, verdes, pendientes, espera, sinSla };
   }, [data]);
 
+  /** ✅ EXPORT EXCEL (lo visto + parametrización) */
+  function exportExcel() {
+    const wb = XLSX.utils.book_new();
+
+    // Hoja 1: Bandeja (filtrada)
+    const sheetRows = data.map((r) => ({
+      Semaforo: r.semaforo,
+      Estado: r.estado,
+      Tramite: r.tramite,
+      RUC: r.ruc,
+      Contribuyente: r.contribuyente,
+      Actividad: r.actividad,
+      FechaAsignacion: r.fechaAsignacion,
+      TotalDiasPermitidos: r.totalDiasPermitidos ?? "",
+      DiasTranscurridos: r.diasTranscurridos,
+      DiasRestantes: r.diasRestantes ?? "",
+      FechaVencimiento: r.fechaVencimiento ?? "",
+      Auditor: r.auditor,
+      Supervisor: r.supervisor,
+      Parametrizada: r.paramMatched ? "SI" : "NO",
+    }));
+
+    const ws1 = XLSX.utils.json_to_sheet(sheetRows);
+    XLSX.utils.book_append_sheet(wb, ws1, "Bandeja Home");
+
+    // Hoja 2: Parametrización (la matriz actual)
+    const paramRows = params.map((p) => ({
+      Actividad: p.actividad,
+      TotalDiasPermitidos: p.totalDiasPermitidos,
+      VerdeDesde: p.verdeDesde,
+      VerdeHasta: p.verdeHasta,
+      AmarilloDesde: p.amarilloDesde,
+      AmarilloHasta: p.amarilloHasta,
+      RojoDesde: p.rojoDesde,
+      RojoHasta: p.rojoHasta,
+    }));
+
+    const ws2 = XLSX.utils.json_to_sheet(paramRows);
+    XLSX.utils.book_append_sheet(wb, ws2, "Parametrizacion Alertas");
+
+    const fileName = `Home_Jefe_Seccion_${ymd(new Date())}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }
+
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" alignItems="flex-end" justifyContent="space-between" spacing={2}>
@@ -297,7 +334,7 @@ export default function HomeJefeSeccionFiscalizacion() {
             Home – Jefe de Sección (Fiscalización)
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Bandeja con semaforización (Verde/Amarillo/Rojo) calculada desde Parametrización → Alertas.
+            Actividades tomadas del cuadro de alertas (Parametrización → Alertas).
           </Typography>
         </Box>
 
@@ -307,6 +344,10 @@ export default function HomeJefeSeccionFiscalizacion() {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
+
+          <Button variant="outlined" onClick={exportExcel}>
+            Generar Excel
+          </Button>
         </Stack>
       </Stack>
 
@@ -447,12 +488,7 @@ export default function HomeJefeSeccionFiscalizacion() {
                   <TableRow key={r.id} hover>
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip
-                          variant="outlined"
-                          label={s.label}
-                          sx={{ ...s.sx, borderWidth: 1 }}
-                          size="small"
-                        />
+                        <Chip variant="outlined" label={s.label} sx={{ ...s.sx, borderWidth: 1 }} size="small" />
                         {!r.paramMatched && (
                           <Tooltip title="No se encontró parametrización para esta actividad">
                             <Chip size="small" variant="outlined" label="Sin matriz" />

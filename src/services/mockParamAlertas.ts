@@ -1,233 +1,189 @@
 // src/services/mockParamAlertas.ts
-
-export type FrecuenciaCorreo = "Unica" | "Diaria" | "Semanal";
-
 export type AlertaParam = {
-  id: string;
-
   actividad: string;
-  producto: string;
-  rolResponsable: string;
 
+  // SLA total permitido (en días)
   totalDiasPermitidos: number;
 
+  // Rangos por color (0-based: 0 = mismo día de asignación)
   verdeDesde: number;
   verdeHasta: number;
-
   amarilloDesde: number;
   amarilloHasta: number;
-
   rojoDesde: number;
   rojoHasta: number;
-
-  escalamientoAmarilloRol1: string;
-  escalamientoRojoRol1: string;
-  escalamientoRojoRol2: string;
-  escalamientoRojoRol3?: string;
-
-  canalEnvioHome: boolean;
-  canalEnvioCorreo: boolean;
-  frecuenciaCorreo: FrecuenciaCorreo;
-
-  generaIndicadorConsolidado: boolean;
-  observaciones?: string;
 };
 
+const LS_KEY = "paramAlertas:v1";
+
 /**
- * ✅ Catálogo base para el botón "Nueva regla"
- * (así ParametrizacionAlertas.tsx NO falla)
+ * ✅ Defaults tomados del cuadro "INVENTARIO DE ALERTAS TIEMPOS Y ESCALAMIENTOS"
+ * Nota: se convirtieron a rangos 0-based:
+ * - En el cuadro suelen estar como días 1..N (1-based)
+ * - Aquí usamos diasTranscurridos 0..N-1
  */
-export const ACTIVIDADES_BASE: Array<{
-  actividad: string;
-  producto: string;
-  rol: string;
-}> = [
-  { actividad: "Informe de Auditoría (706)", producto: "Informe Auditoría", rol: "Auditor" },
-  { actividad: "Verificación de Inconsistencias", producto: "Verificación", rol: "Analista" },
-  { actividad: "Requerimiento (documentación)", producto: "Requerimientos", rol: "Auditor" },
-  { actividad: "Caso Omiso (apertura)", producto: "Omiso", rol: "Jefe de Seccion" },
-  { actividad: "Acta de Cierre (799)", producto: "Cierre", rol: "Auditor" },
+export const DEFAULT_ALERTAS: AlertaParam[] = [
+  {
+    actividad: "CREACION  ACTA DE INICIO",
+    totalDiasPermitidos: 1,
+    verdeDesde: 0,
+    verdeHasta: -1,
+    amarilloDesde: -1,
+    amarilloHasta: -1,
+    rojoDesde: 0,
+    rojoHasta: 0,
+  },
+  {
+    actividad: "NOTIFICACION ACTA DE INICIO",
+    totalDiasPermitidos: 1,
+    verdeDesde: 0,
+    verdeHasta: -1,
+    amarilloDesde: -1,
+    amarilloHasta: -1,
+    rojoDesde: 0,
+    rojoHasta: 0,
+  },
+  {
+    actividad:
+      "CREACION  INFORME DE AUDITORIA, ACTA DE CIERRE, PROPUESTA DE REGULARIZACION, RESOLUCION(ES)",
+    totalDiasPermitidos: 45,
+    verdeDesde: 0,
+    verdeHasta: 29,
+    amarilloDesde: 30,
+    amarilloHasta: 39,
+    rojoDesde: 40,
+    rojoHasta: 44,
+  },
+  {
+    actividad:
+      "APROBACION INFORME  AUDITORIA,  ACTA DE CIERRE, PROPUESTA DE REGULARIZACION, RESOLUCION(ES)",
+    totalDiasPermitidos: 3,
+    verdeDesde: 0,
+    verdeHasta: 0,
+    amarilloDesde: 1,
+    amarilloHasta: 1,
+    rojoDesde: 2,
+    rojoHasta: 2,
+  },
+  {
+    actividad: "DILIGENCIA ACTA DE CIERRE",
+    totalDiasPermitidos: 2,
+    verdeDesde: 0,
+    verdeHasta: -1,
+    amarilloDesde: 0,
+    amarilloHasta: 0,
+    rojoDesde: 1,
+    rojoHasta: 1,
+  },
+  {
+    actividad: "AUTO DE ARCHIVO(IMPRODUCTIVO O PRESENTACION VOLUNTARIA",
+    totalDiasPermitidos: 3,
+    verdeDesde: 0,
+    verdeHasta: 0,
+    amarilloDesde: 1,
+    amarilloHasta: 1,
+    rojoDesde: 2,
+    rojoHasta: 2,
+  },
+  {
+    actividad: "APROBACION AUTO DE ARCHIVO",
+    totalDiasPermitidos: 2,
+    verdeDesde: 0,
+    verdeHasta: -1,
+    amarilloDesde: 0,
+    amarilloHasta: 0,
+    rojoDesde: 1,
+    rojoHasta: 1,
+  },
+  {
+    actividad: "RESPUESTA PROPUESTA REGULARIZACION",
+    totalDiasPermitidos: 10,
+    verdeDesde: 0,
+    verdeHasta: 4,
+    amarilloDesde: 5,
+    amarilloHasta: 7,
+    rojoDesde: 8,
+    rojoHasta: 9,
+  },
+  {
+    actividad: "ELABORACION RESOLUCION(ES) O ACTO ADMINISTRATIVO",
+    totalDiasPermitidos: 10,
+    verdeDesde: 0,
+    verdeHasta: 4,
+    amarilloDesde: 5,
+    amarilloHasta: 7,
+    rojoDesde: 8,
+    rojoHasta: 9,
+  },
+  {
+    actividad: "NOTIFICACION RESOLUCION(ES)",
+    totalDiasPermitidos: 5,
+    verdeDesde: 0,
+    verdeHasta: 2,
+    amarilloDesde: 3,
+    amarilloHasta: 3,
+    rojoDesde: 4,
+    rojoHasta: 4,
+  },
+  {
+    actividad: "RESPUESTA APELACION",
+    totalDiasPermitidos: 30,
+    verdeDesde: 0,
+    verdeHasta: 19,
+    amarilloDesde: 20,
+    amarilloHasta: 24,
+    rojoDesde: 25,
+    rojoHasta: 29,
+  },
 ];
 
-const LS_KEY = "DGI_PARAM_ALERTAS_V1";
-
-function uid(prefix = "ALERTA") {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-}
-
-/**
- * ✅ Semilla: incluye las actividades del HOME (para que NO salga "Sin SLA")
- */
-export function buildSeedParamAlertas(): AlertaParam[] {
-  return [
-    {
-      id: uid(),
-      actividad: "Informe de Auditoría (706)",
-      producto: "Informe Auditoría",
-      rolResponsable: "Auditor",
-      totalDiasPermitidos: 20,
-      verdeDesde: 1,
-      verdeHasta: 14,
-      amarilloDesde: 15,
-      amarilloHasta: 18,
-      rojoDesde: 19,
-      rojoHasta: 20,
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Supervisor",
-      escalamientoRojoRol2: "Jefe de Seccion",
-      escalamientoRojoRol3: "Direccion",
-      canalEnvioHome: true,
-      canalEnvioCorreo: true,
-      frecuenciaCorreo: "Diaria",
-      generaIndicadorConsolidado: true,
-      observaciones: "Semilla para HOME (auditoría)",
-    },
-    {
-      id: uid(),
-      actividad: "Verificación de Inconsistencias",
-      producto: "Verificación",
-      rolResponsable: "Analista",
-      totalDiasPermitidos: 15,
-      verdeDesde: 1,
-      verdeHasta: 10,
-      amarilloDesde: 11,
-      amarilloHasta: 13,
-      rojoDesde: 14,
-      rojoHasta: 15,
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Supervisor",
-      escalamientoRojoRol2: "Jefe de Seccion",
-      escalamientoRojoRol3: "Direccion",
-      canalEnvioHome: true,
-      canalEnvioCorreo: false,
-      frecuenciaCorreo: "Diaria",
-      generaIndicadorConsolidado: true,
-      observaciones: "Semilla para HOME (verificación)",
-    },
-    {
-      id: uid(),
-      actividad: "Requerimiento (documentación)",
-      producto: "Requerimientos",
-      rolResponsable: "Auditor",
-      totalDiasPermitidos: 30,
-      verdeDesde: 1,
-      verdeHasta: 20,
-      amarilloDesde: 21,
-      amarilloHasta: 27,
-      rojoDesde: 28,
-      rojoHasta: 30,
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Supervisor",
-      escalamientoRojoRol2: "Jefe de Seccion",
-      escalamientoRojoRol3: "Direccion",
-      canalEnvioHome: true,
-      canalEnvioCorreo: true,
-      frecuenciaCorreo: "Semanal",
-      generaIndicadorConsolidado: true,
-      observaciones: "Semilla para HOME (espera contribuyente)",
-    },
-    {
-      id: uid(),
-      actividad: "Caso Omiso (apertura)",
-      producto: "Omiso",
-      rolResponsable: "Jefe de Seccion",
-      totalDiasPermitidos: 10,
-      verdeDesde: 1,
-      verdeHasta: 6,
-      amarilloDesde: 7,
-      amarilloHasta: 8,
-      rojoDesde: 9,
-      rojoHasta: 10,
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Jefe de Seccion",
-      escalamientoRojoRol2: "Direccion",
-      escalamientoRojoRol3: "",
-      canalEnvioHome: true,
-      canalEnvioCorreo: true,
-      frecuenciaCorreo: "Diaria",
-      generaIndicadorConsolidado: true,
-      observaciones: "Semilla para HOME (omisos)",
-    },
-    {
-      id: uid(),
-      actividad: "Acta de Cierre (799)",
-      producto: "Cierre",
-      rolResponsable: "Auditor",
-      totalDiasPermitidos: 10,
-      verdeDesde: 1,
-      verdeHasta: 7,
-      amarilloDesde: 8,
-      amarilloHasta: 9,
-      rojoDesde: 10,
-      rojoHasta: 10,
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Jefe de Seccion",
-      escalamientoRojoRol2: "Direccion",
-      escalamientoRojoRol3: "",
-      canalEnvioHome: true,
-      canalEnvioCorreo: true,
-      frecuenciaCorreo: "Diaria",
-      generaIndicadorConsolidado: true,
-      observaciones: "Semilla extra",
-    },
-  ];
-}
-
-export function loadParamAlertas(): AlertaParam[] {
-  const seed = buildSeedParamAlertas();
-
+function safeParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) {
-      localStorage.setItem(LS_KEY, JSON.stringify(seed));
-      return seed;
-    }
-
-    const parsed = JSON.parse(raw);
-    const current: AlertaParam[] = Array.isArray(parsed) ? (parsed as AlertaParam[]) : [];
-
-    // ✅ MERGE: si faltan actividades del seed, las agrega sin borrar lo existente
-    const norm = (s: string) =>
-      (s ?? "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\([^)]*\)/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    const byKey = new Map<string, AlertaParam>();
-    current.forEach((r) => byKey.set(norm(r.actividad), r));
-
-    let changed = false;
-
-    for (const s of seed) {
-      const k = norm(s.actividad);
-      if (!byKey.has(k)) {
-        current.push(s);
-        byKey.set(k, s);
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      localStorage.setItem(LS_KEY, JSON.stringify(current));
-    }
-
-    return current.length ? current : seed;
+    return JSON.parse(raw) as T;
   } catch {
-    localStorage.setItem(LS_KEY, JSON.stringify(seed));
-    return seed;
+    return null;
   }
 }
 
-
-export function saveParamAlertas(rows: AlertaParam[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(rows));
+function normalizeActividad(s: string) {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-export function resetParamAlertas(): AlertaParam[] {
-  const seed = buildSeedParamAlertas();
-  localStorage.setItem(LS_KEY, JSON.stringify(seed));
-  return seed;
+/**
+ * ✅ Carga parametrización desde localStorage.
+ * Si no existe, devuelve DEFAULT_ALERTAS (las actividades reales del cuadro).
+ */
+export function loadParamAlertas(): AlertaParam[] {
+  const ls = safeParse<AlertaParam[]>(localStorage.getItem(LS_KEY));
+  const data = Array.isArray(ls) ? ls : DEFAULT_ALERTAS;
+
+  // Limpieza mínima: quitar duplicados por actividad normalizada
+  const seen = new Set<string>();
+  const out: AlertaParam[] = [];
+  for (const p of data) {
+    const k = normalizeActividad(p.actividad);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(p);
+  }
+
+  return out;
+}
+
+/** ✅ Guarda parametrización (si tienes UI de editar alertas) */
+export function saveParamAlertas(list: AlertaParam[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(list ?? []));
+}
+
+/** ✅ Reset rápido a defaults del cuadro */
+export function resetParamAlertas() {
+  localStorage.removeItem(LS_KEY);
 }
