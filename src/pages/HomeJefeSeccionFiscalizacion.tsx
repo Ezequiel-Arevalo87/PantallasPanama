@@ -54,10 +54,17 @@ type ActividadBase = {
 
 type ActividadView = ActividadBase & {
   semaforo: Semaforo;
-  diasTranscurridos: number;
+
+  /** ✅ Patricia: (Transc + Restan = Total) */
+  diasTranscurridos: number; // capado a total
+  diasRestantes: number | null; // nunca negativo
+
   totalDiasPermitidos: number | null;
   fechaVencimiento: string | null;
-  diasRestantes: number | null;
+
+  /** ✅ recomendado: atraso real (no rompe la regla) */
+  diasAtraso: number | null;
+
   paramMatched: boolean;
 };
 
@@ -125,13 +132,19 @@ function findParamByActividad(params: AlertaParam[], actividad: string) {
   return found;
 }
 
-function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridos: number): Semaforo {
+/** ✅ Semaforo calculado con días reales */
+function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridosReal: number): Semaforo {
   if (!param) return "GRIS";
 
-  const d = diasTranscurridos;
+  const d = diasTranscurridosReal;
 
   if (param.rojoDesde >= 0 && param.rojoHasta >= 0 && d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
-  if (param.amarilloDesde >= 0 && param.amarilloHasta >= 0 && d >= param.amarilloDesde && d <= param.amarilloHasta)
+  if (
+    param.amarilloDesde >= 0 &&
+    param.amarilloHasta >= 0 &&
+    d >= param.amarilloDesde &&
+    d <= param.amarilloHasta
+  )
     return "AMARILLO";
   if (param.verdeDesde >= 0 && param.verdeHasta >= 0 && d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
 
@@ -169,7 +182,14 @@ function chipEstado(e: EstadoActividad): { label: string; icon?: React.ReactElem
 function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
   const auditores = ["J. Pérez", "M. Ríos", "L. Gómez", "D. Torres", "A. Moreno", "K. Salazar"];
   const supervisores = ["S. Martínez", "C. Valdés", "R. Herrera", "M. Pineda"];
-  const estados: EstadoActividad[] = ["PENDIENTE_REVISION", "EN_EJECUCION", "EN_ESPERA_CONTRIBUYENTE", "POR_VENCER", "VENCIDA", "CERRADA"];
+  const estados: EstadoActividad[] = [
+    "PENDIENTE_REVISION",
+    "EN_EJECUCION",
+    "EN_ESPERA_CONTRIBUYENTE",
+    "POR_VENCER",
+    "VENCIDA",
+    "CERRADA",
+  ];
 
   const contribuyentes = [
     "Comercial El Sol, S.A.",
@@ -180,7 +200,7 @@ function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
     "Constructora Horizonte, S.A.",
   ];
 
-  const baseDate = "2026-02-01";
+  const hoy = todayYmd();
 
   return params.map((p, idx) => {
     const n = idx + 1;
@@ -190,9 +210,22 @@ function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
     const ruc = `${String(1000000 + n).slice(-7)}-${(n % 9) + 1}-${yyyy}`;
     const contribuyente = contribuyentes[idx % contribuyentes.length];
 
-    // Para simular rojos/amarillos/verdes
-    const offsetDays = idx % 3 === 0 ? 40 : idx % 3 === 1 ? 15 : 3;
-    const fechaAsignacion = addDaysYmd(baseDate, -offsetDays);
+    // ✅ Genera ejemplos SIEMPRE (Verde/Amarillo/Rojo) usando el total real de la actividad
+    const total = Number(p.totalDiasPermitidos ?? 10) || 10;
+
+    let diasSimulados = 1;
+    if (idx % 3 === 0) {
+      // VERDE ~ 30%
+      diasSimulados = Math.max(1, Math.floor(total * 0.3));
+    } else if (idx % 3 === 1) {
+      // AMARILLO ~ 70%
+      diasSimulados = Math.max(1, Math.floor(total * 0.7));
+    } else {
+      // ROJO ~ 95%
+      diasSimulados = Math.max(1, Math.floor(total * 0.95));
+    }
+
+    const fechaAsignacion = addDaysYmd(hoy, -diasSimulados);
 
     return {
       id: `A-${1000 + n}`,
@@ -229,21 +262,33 @@ export default function HomeJefeSeccionFiscalizacion() {
 
     let rows: ActividadView[] = baseRows.map((r) => {
       const param = findParamByActividad(params, r.actividad);
-      const diasTranscurridos = Math.max(0, daysBetween(r.fechaAsignacion, hoy));
+
+      // ✅ días reales desde asignación hasta hoy
+      const diasTranscurridosReal = Math.max(0, daysBetween(r.fechaAsignacion, hoy));
+
+      // ✅ SLA total por actividad (matriz)
       const totalDias = param?.totalDiasPermitidos ?? null;
 
-      const fechaVencimiento = totalDias ? addDaysYmd(r.fechaAsignacion, totalDias) : null;
-      const diasRestantes = totalDias ? totalDias - diasTranscurridos : null;
+      // ✅ Patricia: (Transc + Restan = Total)
+      const diasTranscurridosSla =
+        typeof totalDias === "number" ? Math.min(diasTranscurridosReal, totalDias) : diasTranscurridosReal;
+      const diasRestantes = typeof totalDias === "number" ? Math.max(0, totalDias - diasTranscurridosReal) : null;
 
-      const sem = semaforoFromParam(param, diasTranscurridos);
+      // ✅ atraso real (sin romper regla)
+      const diasAtraso = typeof totalDias === "number" ? Math.max(0, diasTranscurridosReal - totalDias) : null;
+
+      const fechaVencimiento = typeof totalDias === "number" ? addDaysYmd(r.fechaAsignacion, totalDias) : null;
+
+      const sem = semaforoFromParam(param, diasTranscurridosReal);
 
       return {
         ...r,
         semaforo: sem,
-        diasTranscurridos,
+        diasTranscurridos: diasTranscurridosSla,
         totalDiasPermitidos: totalDias,
         fechaVencimiento,
         diasRestantes,
+        diasAtraso,
         paramMatched: !!param,
       };
     });
@@ -263,9 +308,14 @@ export default function HomeJefeSeccionFiscalizacion() {
     rows.sort((a, b) => {
       const ra = rank[a.semaforo] - rank[b.semaforo];
       if (ra !== 0) return ra;
+
       const da = a.diasRestantes ?? 999999;
       const db = b.diasRestantes ?? 999999;
-      return da - db;
+      if (da !== db) return da - db;
+
+      const aa = a.diasAtraso ?? 0;
+      const ab = b.diasAtraso ?? 0;
+      return ab - aa;
     });
 
     return rows;
@@ -282,11 +332,9 @@ export default function HomeJefeSeccionFiscalizacion() {
     return { total, rojas, amarillas, verdes, pendientes, espera, sinSla };
   }, [data]);
 
-  /** ✅ EXPORT EXCEL (lo visto + parametrización) */
   function exportExcel() {
     const wb = XLSX.utils.book_new();
 
-    // Hoja 1: Bandeja (filtrada)
     const sheetRows = data.map((r) => ({
       Semaforo: r.semaforo,
       Estado: r.estado,
@@ -298,6 +346,7 @@ export default function HomeJefeSeccionFiscalizacion() {
       TotalDiasPermitidos: r.totalDiasPermitidos ?? "",
       DiasTranscurridos: r.diasTranscurridos,
       DiasRestantes: r.diasRestantes ?? "",
+      DiasAtraso: r.diasAtraso ?? "",
       FechaVencimiento: r.fechaVencimiento ?? "",
       Auditor: r.auditor,
       Supervisor: r.supervisor,
@@ -307,7 +356,6 @@ export default function HomeJefeSeccionFiscalizacion() {
     const ws1 = XLSX.utils.json_to_sheet(sheetRows);
     XLSX.utils.book_append_sheet(wb, ws1, "Bandeja Home");
 
-    // Hoja 2: Parametrización (la matriz actual)
     const paramRows = params.map((p) => ({
       Actividad: p.actividad,
       TotalDiasPermitidos: p.totalDiasPermitidos,
@@ -356,33 +404,55 @@ export default function HomeJefeSeccionFiscalizacion() {
       <Grid container spacing={2}>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Total</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.total}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Total
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              {kpis.total}
+            </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Rojo</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.rojas}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Rojo
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              {kpis.rojas}
+            </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Amarillo</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.amarillas}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Amarillo
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              {kpis.amarillas}
+            </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Verde</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.verdes}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Verde
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              {kpis.verdes}
+            </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Pendiente / Espera</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.pendientes} / {kpis.espera}</Typography>
-            <Typography variant="caption" color="text.secondary">Sin SLA: {kpis.sinSla}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Pendiente / Espera
+            </Typography>
+            <Typography variant="h4" fontWeight={800}>
+              {kpis.pendientes} / {kpis.espera}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Sin SLA: {kpis.sinSla}
+            </Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -459,23 +529,54 @@ export default function HomeJefeSeccionFiscalizacion() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell><b>Semáforo</b></TableCell>
-                <TableCell><b>Estado</b></TableCell>
-                <TableCell><b>Trámite</b></TableCell>
-                <TableCell><b>RUC</b></TableCell>
-                <TableCell><b>Contribuyente</b></TableCell>
-                <TableCell><b>Actividad</b></TableCell>
+                <TableCell>
+                  <b>Semáforo</b>
+                </TableCell>
+                <TableCell>
+                  <b>Estado</b>
+                </TableCell>
+                <TableCell>
+                  <b>Trámite</b>
+                </TableCell>
+                <TableCell>
+                  <b>RUC</b>
+                </TableCell>
+                <TableCell>
+                  <b>Contribuyente</b>
+                </TableCell>
+                <TableCell>
+                  <b>Actividad</b>
+                </TableCell>
 
-                <TableCell><b>Asignado</b></TableCell>
-                <TableCell align="right"><b>Total</b></TableCell>
-                <TableCell align="right"><b>Transc.</b></TableCell>
-                <TableCell align="right"><b>Restan</b></TableCell>
-                <TableCell><b>Vence</b></TableCell>
+                <TableCell>
+                  <b>Asignado</b>
+                </TableCell>
+                <TableCell align="right">
+                  <b>Total</b>
+                </TableCell>
+                <TableCell align="right">
+                  <b>Transc.</b>
+                </TableCell>
+                <TableCell align="right">
+                  <b>Restan</b>
+                </TableCell>
+                <TableCell align="right">
+                  <b>Atraso</b>
+                </TableCell>
+                <TableCell>
+                  <b>Vence</b>
+                </TableCell>
 
-                <TableCell><b>Auditor</b></TableCell>
-                <TableCell><b>Supervisor</b></TableCell>
+                <TableCell>
+                  <b>Auditor</b>
+                </TableCell>
+                <TableCell>
+                  <b>Supervisor</b>
+                </TableCell>
 
-                <TableCell align="center"><b>Acciones</b></TableCell>
+                <TableCell align="center">
+                  <b>Acciones</b>
+                </TableCell>
               </TableRow>
             </TableHead>
 
@@ -528,11 +629,12 @@ export default function HomeJefeSeccionFiscalizacion() {
                     </TableCell>
 
                     <TableCell align="right">
-                      <Typography
-                        fontWeight={800}
-                        color={typeof r.diasRestantes === "number" && r.diasRestantes < 0 ? "error.main" : "text.primary"}
-                      >
-                        {r.diasRestantes ?? "—"}
+                      <Typography fontWeight={800}>{r.diasRestantes ?? "—"}</Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography fontWeight={800} color={(r.diasAtraso ?? 0) > 0 ? "error.main" : "text.primary"}>
+                        {r.diasAtraso ?? "—"}
                       </Typography>
                     </TableCell>
 
@@ -566,7 +668,7 @@ export default function HomeJefeSeccionFiscalizacion() {
 
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={14}>
+                  <TableCell colSpan={15}>
                     <Typography color="text.secondary">No hay resultados con los filtros actuales.</Typography>
                   </TableCell>
                 </TableRow>

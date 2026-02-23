@@ -41,9 +41,10 @@ import { Tramite } from "./Tramite";
 import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
 import AutoArchivo from "../components/AutoArchivo";
 import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
+import ParametrizacionAlertas from "./ParametrizacionAlertas";
 
 /** ✅ NUEVO: PARAMETRIZACIÓN ALERTAS */
-import ParametrizacionAlertas from "./ParametrizacionAlertas";
+
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
