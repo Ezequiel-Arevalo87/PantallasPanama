@@ -1,3 +1,4 @@
+// src/pages/HomeJefeSeccionFiscalizacion.tsx
 import React, { useMemo, useState } from "react";
 import {
   Box,
@@ -43,11 +44,10 @@ type ActividadBase = {
   ruc: string;
   contribuyente: string;
   actividad: string;
-  tipo: "Auditoría" | "Verificación" | "Omiso" | "Rectificativa" | "Cierre";
   estado: EstadoActividad;
   fechaAsignacion: string; // YYYY-MM-DD
-  analista: string;
-  prioridad: "Alta" | "Media" | "Baja";
+  auditor: string; // antes: analista
+  supervisor: string; // nuevo
 };
 
 type ActividadView = ActividadBase & {
@@ -143,11 +143,11 @@ function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridos: nu
 function chipSemaforo(s: Semaforo) {
   switch (s) {
     case "ROJO":
-      return { label: "Crítico", sx: { bgcolor: "#fde7e9", color: "#b42318", borderColor: "#fecdca" } };
+      return { label: "Rojo", sx: { bgcolor: "#fde7e9", color: "#b42318", borderColor: "#fecdca" } };
     case "AMARILLO":
-      return { label: "Alerta", sx: { bgcolor: "#fff6d6", color: "#8a5a00", borderColor: "#ffe59a" } };
+      return { label: "Amarillo", sx: { bgcolor: "#fff6d6", color: "#8a5a00", borderColor: "#ffe59a" } };
     case "VERDE":
-      return { label: "En tiempo", sx: { bgcolor: "#e7f8ed", color: "#027a48", borderColor: "#abefc6" } };
+      return { label: "Verde", sx: { bgcolor: "#e7f8ed", color: "#027a48", borderColor: "#abefc6" } };
     default:
       return { label: "Sin SLA", sx: { bgcolor: "#f4f4f5", color: "#52525b", borderColor: "#e4e4e7" } };
   }
@@ -166,7 +166,7 @@ function chipEstado(e: EstadoActividad): { label: string; icon?: React.ReactElem
   return map[e];
 }
 
-/** ✅ Mock mínimo */
+/** ✅ Mock mínimo (YA SIN tipo/prioridad, y con auditor/supervisor) */
 const MOCK: ActividadBase[] = [
   {
     id: "A-1001",
@@ -174,11 +174,10 @@ const MOCK: ActividadBase[] = [
     ruc: "1555666-1-2026",
     contribuyente: "Comercial El Sol, S.A.",
     actividad: "Informe de Auditoría (706)",
-    tipo: "Auditoría",
     estado: "POR_VENCER",
     fechaAsignacion: "2026-02-01",
-    analista: "Analista: J. Pérez",
-    prioridad: "Alta",
+    auditor: "J. Pérez",
+    supervisor: "S. Martínez",
   },
   {
     id: "A-1002",
@@ -186,11 +185,10 @@ const MOCK: ActividadBase[] = [
     ruc: "1888777-2-2025",
     contribuyente: "Inversiones Delta, Inc.",
     actividad: "Verificación de Inconsistencias",
-    tipo: "Verificación",
     estado: "EN_EJECUCION",
     fechaAsignacion: "2026-02-10",
-    analista: "Analista: M. Ríos",
-    prioridad: "Media",
+    auditor: "M. Ríos",
+    supervisor: "S. Martínez",
   },
   {
     id: "A-1003",
@@ -198,11 +196,10 @@ const MOCK: ActividadBase[] = [
     ruc: "1020304-3-2024",
     contribuyente: "Servicios Pacífico, S.A.",
     actividad: "Requerimiento (documentación)",
-    tipo: "Auditoría",
     estado: "EN_ESPERA_CONTRIBUYENTE",
     fechaAsignacion: "2026-01-25",
-    analista: "Analista: L. Gómez",
-    prioridad: "Media",
+    auditor: "L. Gómez",
+    supervisor: "C. Valdés",
   },
   {
     id: "A-1004",
@@ -210,18 +207,19 @@ const MOCK: ActividadBase[] = [
     ruc: "9090909-9-2023",
     contribuyente: "Transportes Andina, S.A.",
     actividad: "Caso Omiso (apertura)",
-    tipo: "Omiso",
     estado: "VENCIDA",
     fechaAsignacion: "2026-01-05",
-    analista: "Analista: D. Torres",
-    prioridad: "Alta",
+    auditor: "D. Torres",
+    supervisor: "C. Valdés",
   },
 ];
 
 export default function HomeJefeSeccionFiscalizacion() {
   const [search, setSearch] = useState("");
   const [estado, setEstado] = useState<"TODOS" | EstadoActividad>("TODOS");
-  const [soloCriticos, setSoloCriticos] = useState(false);
+
+  // ✅ filtro por semaforización (colores)
+  const [semaforoFiltro, setSemaforoFiltro] = useState<"TODOS" | "VERDE" | "AMARILLO" | "ROJO">("TODOS");
 
   // ✅ si cambias parametrización y quieres refrescar: usa estado "tick"
   const [tick, setTick] = useState(0);
@@ -255,14 +253,18 @@ export default function HomeJefeSeccionFiscalizacion() {
     const q = search.trim().toLowerCase();
     if (q) {
       rows = rows.filter((r) => {
-        const blob = `${r.tramite} ${r.ruc} ${r.contribuyente} ${r.actividad} ${r.analista}`.toLowerCase();
+        const blob = `${r.tramite} ${r.ruc} ${r.contribuyente} ${r.actividad} ${r.auditor} ${r.supervisor}`.toLowerCase();
         return blob.includes(q);
       });
     }
 
     if (estado !== "TODOS") rows = rows.filter((r) => r.estado === estado);
-    if (soloCriticos) rows = rows.filter((r) => r.semaforo === "ROJO" || r.semaforo === "AMARILLO");
 
+    if (semaforoFiltro !== "TODOS") {
+      rows = rows.filter((r) => r.semaforo === semaforoFiltro);
+    }
+
+    // Orden: rojo -> amarillo -> verde -> gris, luego por días restantes
     const rank: Record<Semaforo, number> = { ROJO: 0, AMARILLO: 1, VERDE: 2, GRIS: 3 };
     rows.sort((a, b) => {
       const ra = rank[a.semaforo] - rank[b.semaforo];
@@ -274,16 +276,17 @@ export default function HomeJefeSeccionFiscalizacion() {
     });
 
     return rows;
-  }, [params, search, estado, soloCriticos]);
+  }, [params, search, estado, semaforoFiltro]);
 
   const kpis = useMemo(() => {
     const total = data.length;
     const rojas = data.filter((x) => x.semaforo === "ROJO").length;
     const amarillas = data.filter((x) => x.semaforo === "AMARILLO").length;
+    const verdes = data.filter((x) => x.semaforo === "VERDE").length;
     const pendientes = data.filter((x) => x.estado === "PENDIENTE_REVISION").length;
     const espera = data.filter((x) => x.estado === "EN_ESPERA_CONTRIBUYENTE").length;
     const sinSla = data.filter((x) => x.semaforo === "GRIS").length;
-    return { total, rojas, amarillas, pendientes, espera, sinSla };
+    return { total, rojas, amarillas, verdes, pendientes, espera, sinSla };
   }, [data]);
 
   return (
@@ -294,7 +297,7 @@ export default function HomeJefeSeccionFiscalizacion() {
             Home – Jefe de Sección (Fiscalización)
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Bandeja con SLA calculado por Parametrización → Alertas.
+            Bandeja con semaforización (Verde/Amarillo/Rojo) calculada desde Parametrización → Alertas.
           </Typography>
         </Box>
 
@@ -304,9 +307,6 @@ export default function HomeJefeSeccionFiscalizacion() {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button variant={soloCriticos ? "contained" : "outlined"} onClick={() => setSoloCriticos((v) => !v)}>
-            {soloCriticos ? "Mostrando críticos" : "Solo críticos"}
-          </Button>
         </Stack>
       </Stack>
 
@@ -333,25 +333,26 @@ export default function HomeJefeSeccionFiscalizacion() {
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Pendiente / Espera</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.pendientes} / {kpis.espera}</Typography>
+            <Typography variant="caption" color="text.secondary">Verde</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.verdes}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={2.4}>
           <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">Sin SLA</Typography>
-            <Typography variant="h4" fontWeight={800}>{kpis.sinSla}</Typography>
+            <Typography variant="caption" color="text.secondary">Pendiente / Espera</Typography>
+            <Typography variant="h4" fontWeight={800}>{kpis.pendientes} / {kpis.espera}</Typography>
+            <Typography variant="caption" color="text.secondary">Sin SLA: {kpis.sinSla}</Typography>
           </Paper>
         </Grid>
       </Grid>
 
       <Paper sx={{ p: 2, mt: 2, borderRadius: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={5}>
             <TextField
               fullWidth
               label="Buscar"
-              placeholder="Trámite, RUC, contribuyente, actividad, analista…"
+              placeholder="Trámite, RUC, contribuyente, actividad, auditor, supervisor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -370,20 +371,32 @@ export default function HomeJefeSeccionFiscalizacion() {
             </TextField>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={2}>
+            <TextField
+              select
+              fullWidth
+              label="Semaforización"
+              value={semaforoFiltro}
+              onChange={(e) => setSemaforoFiltro(e.target.value as any)}
+            >
+              <MenuItem value="TODOS">Todos</MenuItem>
+              <MenuItem value="VERDE">Verde</MenuItem>
+              <MenuItem value="AMARILLO">Amarillo</MenuItem>
+              <MenuItem value="ROJO">Rojo</MenuItem>
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12} md={2}>
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
               <Button
                 variant="outlined"
                 onClick={() => {
                   setSearch("");
                   setEstado("TODOS");
-                  setSoloCriticos(false);
+                  setSemaforoFiltro("TODOS");
                 }}
               >
                 Limpiar
-              </Button>
-              <Button variant="contained" startIcon={<VisibilityIcon />}>
-                Ver tablero
               </Button>
             </Stack>
           </Grid>
@@ -405,20 +418,22 @@ export default function HomeJefeSeccionFiscalizacion() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell><b>SLA</b></TableCell>
+                <TableCell><b>Semáforo</b></TableCell>
                 <TableCell><b>Estado</b></TableCell>
                 <TableCell><b>Trámite</b></TableCell>
                 <TableCell><b>RUC</b></TableCell>
                 <TableCell><b>Contribuyente</b></TableCell>
                 <TableCell><b>Actividad</b></TableCell>
-                <TableCell><b>Tipo</b></TableCell>
+
                 <TableCell><b>Asignado</b></TableCell>
                 <TableCell align="right"><b>Total</b></TableCell>
                 <TableCell align="right"><b>Transc.</b></TableCell>
                 <TableCell align="right"><b>Restan</b></TableCell>
                 <TableCell><b>Vence</b></TableCell>
-                <TableCell><b>Analista</b></TableCell>
-                <TableCell><b>Prioridad</b></TableCell>
+
+                <TableCell><b>Auditor</b></TableCell>
+                <TableCell><b>Supervisor</b></TableCell>
+
                 <TableCell align="center"><b>Acciones</b></TableCell>
               </TableRow>
             </TableHead>
@@ -466,13 +481,7 @@ export default function HomeJefeSeccionFiscalizacion() {
                       <Typography>{r.actividad}</Typography>
                     </TableCell>
 
-                    <TableCell>
-                      <Chip size="small" label={r.tipo} variant="outlined" />
-                    </TableCell>
-
-                    <TableCell>
-                      {fmtDate(r.fechaAsignacion)}
-                    </TableCell>
+                    <TableCell>{fmtDate(r.fechaAsignacion)}</TableCell>
 
                     <TableCell align="right">
                       <Typography fontWeight={800}>{r.totalDiasPermitidos ?? "—"}</Typography>
@@ -491,20 +500,14 @@ export default function HomeJefeSeccionFiscalizacion() {
                       </Typography>
                     </TableCell>
 
+                    <TableCell>{r.fechaVencimiento ? fmtDate(r.fechaVencimiento) : "—"}</TableCell>
+
                     <TableCell>
-                      {r.fechaVencimiento ? fmtDate(r.fechaVencimiento) : "—"}
+                      <Typography>{r.auditor}</Typography>
                     </TableCell>
 
                     <TableCell>
-                      <Typography>{r.analista}</Typography>
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={r.prioridad}
-                        variant={r.prioridad === "Alta" ? "filled" : "outlined"}
-                      />
+                      <Typography>{r.supervisor}</Typography>
                     </TableCell>
 
                     <TableCell align="center">
@@ -527,7 +530,7 @@ export default function HomeJefeSeccionFiscalizacion() {
 
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={15}>
+                  <TableCell colSpan={14}>
                     <Typography color="text.secondary">No hay resultados con los filtros actuales.</Typography>
                   </TableCell>
                 </TableRow>

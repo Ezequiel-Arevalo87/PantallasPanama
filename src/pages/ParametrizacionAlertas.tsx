@@ -1,4 +1,3 @@
-// src/pages/ParametrizacionAlertas.tsx
 import React, { useMemo, useState } from "react";
 import {
   Box,
@@ -12,15 +11,12 @@ import {
   Tooltip,
   Divider,
 } from "@mui/material";
-import {
-  DataGrid,
-  GridColDef,
-  GridRowModel,
-  GridToolbar,
-} from "@mui/x-data-grid";
+import { DataGrid, type GridColDef, GridToolbar } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import SaveIcon from "@mui/icons-material/Save";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import IconButton from "@mui/material/IconButton";
 
 import {
   ACTIVIDADES_BASE,
@@ -30,8 +26,15 @@ import {
   resetParamAlertas,
 } from "../services/mockParamAlertas";
 
+import AlertRuleDialog from "../components/AlertRuleDialog";
+import ConfirmDialog from "../components/ConfirmDialog";
+
 type FrecuenciaCorreo = "Unica" | "Diaria" | "Semanal";
 const TODAS = "TODAS";
+
+function uid(prefix = "ALERTA") {
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
 
 function validateRow(r: AlertaParam): string | null {
   const t = r.totalDiasPermitidos;
@@ -50,7 +53,6 @@ function validateRow(r: AlertaParam): string | null {
 
   if (!ok) return "Rangos inválidos vs Total Días Permitidos.";
 
-  // recomendado: no solapar
   if (!(r.verdeHasta < r.amarilloDesde && r.amarilloHasta < r.rojoDesde)) {
     return "Recomendado: Verde < Amarillo < Rojo (sin solaparse).";
   }
@@ -60,110 +62,112 @@ function validateRow(r: AlertaParam): string | null {
 
 export default function ParametrizacionAlertas() {
   const [rows, setRows] = useState<AlertaParam[]>(() => loadParamAlertas());
+
+  // filtros: Actividad + Rol
   const [fActividad, setFActividad] = useState<string>(TODAS);
-  const [fProducto, setFProducto] = useState<string>(TODAS);
+  const [fRol, setFRol] = useState<string>(TODAS);
+
+  // modal crear/editar
+  const [openRule, setOpenRule] = useState(false);
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [draft, setDraft] = useState<AlertaParam | null>(null);
+
+  // eliminar confirm
+  const [openConfirmDelete, setOpenConfirmDelete] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const actividades = useMemo(() => {
     const set = new Set(rows.map((r) => r.actividad));
     return [TODAS, ...Array.from(set)];
   }, [rows]);
 
-  const productos = useMemo(() => {
-    const set = new Set(rows.map((r) => r.producto));
+  const roles = useMemo(() => {
+    const set = new Set(rows.map((r) => r.rolResponsable));
     return [TODAS, ...Array.from(set)];
   }, [rows]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const okA = fActividad === TODAS ? true : r.actividad === fActividad;
-      const okP = fProducto === TODAS ? true : r.producto === fProducto;
-      return okA && okP;
+      const okR = fRol === TODAS ? true : r.rolResponsable === fRol;
+      return okA && okR;
     });
-  }, [rows, fActividad, fProducto]);
+  }, [rows, fActividad, fRol]);
 
   const columns: GridColDef[] = [
-    // ==== Identidad (pinned mentalmente: más anchas) ====
     {
-      field: "actividad",
-      headerName: "Actividad",
-      width: 260,
-      editable: true,
-    },
-    {
-      field: "producto",
-      headerName: "Producto",
-      width: 180,
-      editable: true,
-    },
-    {
-      field: "rolResponsable",
-      headerName: "Rol Responsable",
-      width: 180,
-      editable: true,
-    },
-
-    // ==== Plazos ====
-    {
-      field: "totalDiasPermitidos",
-      headerName: "Total días",
-      type: "number",
-      width: 110,
-      editable: true,
-    },
-
-    // ==== Verde ====
-    { field: "verdeDesde", headerName: "Verde desde", type: "number", width: 120, editable: true },
-    { field: "verdeHasta", headerName: "Verde hasta", type: "number", width: 120, editable: true },
-
-    // ==== Amarillo ====
-    { field: "amarilloDesde", headerName: "Amarillo desde", type: "number", width: 130, editable: true },
-    { field: "amarilloHasta", headerName: "Amarillo hasta", type: "number", width: 130, editable: true },
-
-    // ==== Rojo ====
-    { field: "rojoDesde", headerName: "Rojo desde", type: "number", width: 120, editable: true },
-    { field: "rojoHasta", headerName: "Rojo hasta", type: "number", width: 120, editable: true },
-
-    // ==== Escalamientos ====
-    { field: "escalamientoAmarilloRol1", headerName: "Esc. Amarillo (Rol 1)", width: 200, editable: true },
-    { field: "escalamientoRojoRol1", headerName: "Esc. Rojo (Rol 1)", width: 180, editable: true },
-    { field: "escalamientoRojoRol2", headerName: "Esc. Rojo (Rol 2)", width: 180, editable: true },
-    { field: "escalamientoRojoRol3", headerName: "Esc. Rojo (Rol 3)", width: 180, editable: true },
-
-    // ==== Canales y frecuencia (con select) ====
-    {
-      field: "canalEnvioHome",
-      headerName: "Canal Home",
-      type: "boolean",
+      field: "_actions",
+      headerName: "Acciones",
       width: 120,
-      editable: true,
+      sortable: false,
+      filterable: false,
+      renderCell: (p) => {
+        const r = p.row as AlertaParam;
+
+        return (
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Editar">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setMode("edit");
+                  setDraft({ ...r });
+                  setOpenRule(true);
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Eliminar">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setDeleteId(r.id);
+                  setOpenConfirmDelete(true);
+                }}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        );
+      },
     },
-    {
-      field: "canalEnvioCorreo",
-      headerName: "Canal Correo",
-      type: "boolean",
-      width: 130,
-      editable: true,
-    },
+
+    { field: "actividad", headerName: "Actividad", width: 260 },
+    { field: "producto", headerName: "Producto", width: 180 },
+    { field: "rolResponsable", headerName: "Rol Responsable", width: 180 },
+
+    { field: "totalDiasPermitidos", headerName: "Total días", type: "number", width: 110 },
+
+    { field: "verdeDesde", headerName: "Verde desde", type: "number", width: 120 },
+    { field: "verdeHasta", headerName: "Verde hasta", type: "number", width: 120 },
+
+    { field: "amarilloDesde", headerName: "Amarillo desde", type: "number", width: 130 },
+    { field: "amarilloHasta", headerName: "Amarillo hasta", type: "number", width: 130 },
+
+    { field: "rojoDesde", headerName: "Rojo desde", type: "number", width: 120 },
+    { field: "rojoHasta", headerName: "Rojo hasta", type: "number", width: 120 },
+
+    { field: "escalamientoAmarilloRol1", headerName: "Esc. Amarillo (Rol 1)", width: 200 },
+    { field: "escalamientoRojoRol1", headerName: "Esc. Rojo (Rol 1)", width: 180 },
+    { field: "escalamientoRojoRol2", headerName: "Esc. Rojo (Rol 2)", width: 180 },
+    { field: "escalamientoRojoRol3", headerName: "Esc. Rojo (Rol 3)", width: 180 },
+
+    { field: "canalEnvioHome", headerName: "Canal Home", type: "boolean", width: 120 },
+    { field: "canalEnvioCorreo", headerName: "Canal Correo", type: "boolean", width: 130 },
     {
       field: "frecuenciaCorreo",
       headerName: "Frecuencia",
       width: 130,
-      editable: true,
       type: "singleSelect",
       valueOptions: ["Unica", "Diaria", "Semanal"] as FrecuenciaCorreo[],
     },
-    {
-      field: "generaIndicadorConsolidado",
-      headerName: "Indicador",
-      type: "boolean",
-      width: 110,
-      editable: true,
-    },
+    { field: "generaIndicadorConsolidado", headerName: "Indicador", type: "boolean", width: 110 },
 
-    // ==== Observaciones ====
-    { field: "observaciones", headerName: "Observaciones", width: 260, editable: true },
+    { field: "observaciones", headerName: "Observaciones", width: 260 },
 
-    // ==== Semáforo visual (no editable) ====
     {
       field: "_semaforo",
       headerName: "Rangos",
@@ -190,30 +194,15 @@ export default function ParametrizacionAlertas() {
     },
   ];
 
-  const handleSave = () => {
-    saveParamAlertas(rows);
-    alert("Parametrización guardada.");
-  };
-
-  const handleReset = () => {
-    const seed = resetParamAlertas();
-    setRows(seed);
-    setFActividad(TODAS);
-    setFProducto(TODAS);
-  };
-
-  const handleAdd = () => {
+  const openCreate = () => {
     const base = ACTIVIDADES_BASE[0];
-
     const newRow: AlertaParam = {
-      id: `ALERTA_${Math.random().toString(16).slice(2)}_${Date.now()}`,
-
+      id: uid(),
       actividad: base?.actividad ?? "Nueva Actividad",
       producto: base?.producto ?? "Producto",
       rolResponsable: base?.rol ?? "Auditor",
 
       totalDiasPermitidos: 10,
-
       verdeDesde: 1,
       verdeHasta: 6,
       amarilloDesde: 7,
@@ -234,23 +223,56 @@ export default function ParametrizacionAlertas() {
       observaciones: "Nueva regla",
     };
 
-    setRows((prev) => [newRow, ...prev]);
+    setMode("create");
+    setDraft(newRow);
+    setOpenRule(true);
   };
 
-  // ✅ Edición real: DataGrid aplica el update y tú lo guardas en state
-  const processRowUpdate = (newRow: GridRowModel, oldRow: GridRowModel) => {
-    const updated = newRow as AlertaParam;
+  const handleUpsert = (next: AlertaParam) => {
+    // aplica cambios
+    setRows((prev) => {
+      const exists = prev.some((r) => r.id === next.id);
+      if (exists) return prev.map((r) => (r.id === next.id ? next : r));
+      return [next, ...prev];
+    });
 
-    // Validación suave: no bloquea, solo advierte en chip, pero puedes bloquear si quieres
-    // si (validateRow(updated) && validateRow(updated) !== "Recomendado...") throw new Error("Rangos inválidos");
+    // ✅ persiste al instante (ya no hay botón Guardar)
+    setTimeout(() => {
+      // usamos callback de setRows para estado actual, pero aquí basta con leer del updater:
+      // (para evitar líos, guardamos en un segundo useEffect sería lo ideal, pero así es simple)
+      saveParamAlertas(
+        (() => {
+          const current = loadParamAlertas(); // fallback
+          // mejor: guardamos con la última versión desde el estado real:
+          // como no tenemos ese estado aquí sincronizado, guardamos directo con el "next" aplicado:
+          // -> hacemos un guardado correcto abajo con un setRows que ya calculó la lista.
+          return current;
+        })()
+      );
+    }, 0);
 
-    setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-    return updated;
+    setOpenRule(false);
+    setDraft(null);
   };
 
-  const onProcessRowUpdateError = (err: any) => {
-    console.error(err);
-    alert(err?.message ?? "No se pudo actualizar la fila.");
+  const handleReset = () => {
+    const seed = resetParamAlertas();
+    setRows(seed);
+    setFActividad(TODAS);
+    setFRol(TODAS);
+  };
+
+  const doDelete = () => {
+    if (!deleteId) return;
+
+    setRows((prev) => {
+      const next = prev.filter((r) => r.id !== deleteId);
+      saveParamAlertas(next); // ✅ persistimos al instante
+      return next;
+    });
+
+    setOpenConfirmDelete(false);
+    setDeleteId(null);
   };
 
   return (
@@ -259,22 +281,18 @@ export default function ParametrizacionAlertas() {
         Parametrización • Alertas por Actividad
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-        Edita rangos, plazos, escalamiento y canales. Esto se usa luego para calcular el semáforo y las alertas por actividad.
+        Crear/Editar/Eliminar se hace por modales con confirmación. No hay guardado manual.
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          alignItems={{ md: "center" }}
-        >
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }}>
           <TextField
             select
             label="Actividad"
             value={fActividad}
             onChange={(e) => setFActividad(e.target.value)}
             size="small"
-            sx={{ minWidth: 260 }}
+            sx={{ minWidth: 280 }}
           >
             {actividades.map((a) => (
               <MenuItem key={a} value={a}>
@@ -285,15 +303,15 @@ export default function ParametrizacionAlertas() {
 
           <TextField
             select
-            label="Producto"
-            value={fProducto}
-            onChange={(e) => setFProducto(e.target.value)}
+            label="Rol Responsable"
+            value={fRol}
+            onChange={(e) => setFRol(e.target.value)}
             size="small"
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 240 }}
           >
-            {productos.map((p) => (
-              <MenuItem key={p} value={p}>
-                {p}
+            {roles.map((r) => (
+              <MenuItem key={r} value={r}>
+                {r}
               </MenuItem>
             ))}
           </TextField>
@@ -301,16 +319,8 @@ export default function ParametrizacionAlertas() {
           <Box flex={1} />
 
           <Stack direction="row" spacing={1}>
-            <Button startIcon={<AddIcon />} variant="contained" onClick={handleAdd}>
+            <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
               Nueva regla
-            </Button>
-            <Button
-              startIcon={<SaveIcon />}
-              variant="outlined"
-              color="success"
-              onClick={handleSave}
-            >
-              Guardar
             </Button>
             <Button
               startIcon={<RestartAltIcon />}
@@ -326,7 +336,7 @@ export default function ParametrizacionAlertas() {
         <Divider sx={{ my: 2 }} />
 
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Tip: puedes usar el buscador y filtros del toolbar de la tabla.
+          Tip: usa el buscador del toolbar. Acciones → Editar / Eliminar.
         </Typography>
       </Paper>
 
@@ -336,8 +346,6 @@ export default function ParametrizacionAlertas() {
           columns={columns}
           getRowId={(r) => r.id}
           disableRowSelectionOnClick
-          processRowUpdate={processRowUpdate}
-          onProcessRowUpdateError={onProcessRowUpdateError}
           slots={{ toolbar: GridToolbar }}
           slotProps={{
             toolbar: {
@@ -346,15 +354,50 @@ export default function ParametrizacionAlertas() {
             },
           }}
           pageSizeOptions={[10, 20, 50]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10, page: 0 } },
-          }}
-          sx={{
-            // ✅ Esto asegura que NO intente encajar columnas; permite scroll horizontal
-            "& .MuiDataGrid-virtualScroller": { overflowX: "auto" },
-          }}
+          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+          sx={{ "& .MuiDataGrid-virtualScroller": { overflowX: "auto" } }}
         />
       </Paper>
+
+      {/* Modal Crear/Editar */}
+      {draft ? (
+        <AlertRuleDialog
+          open={openRule}
+          mode={mode}
+          value={draft}
+          onClose={() => {
+            setOpenRule(false);
+            setDraft(null);
+          }}
+          onSubmit={(next) => {
+            // ✅ guardado inmediato y correcto (sin el setTimeout raro)
+            setRows((prev) => {
+              const exists = prev.some((r) => r.id === next.id);
+              const merged = exists ? prev.map((r) => (r.id === next.id ? next : r)) : [next, ...prev];
+              saveParamAlertas(merged);
+              return merged;
+            });
+
+            setOpenRule(false);
+            setDraft(null);
+          }}
+          validateRow={validateRow}
+        />
+      ) : null}
+
+      {/* Confirmación Eliminar */}
+      <ConfirmDialog
+        open={openConfirmDelete}
+        title="Eliminar regla"
+        message="¿Seguro que deseas eliminar esta regla? Esta acción no se puede deshacer."
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+        onClose={() => {
+          setOpenConfirmDelete(false);
+          setDeleteId(null);
+        }}
+        onConfirm={doDelete}
+      />
     </Box>
   );
 }
