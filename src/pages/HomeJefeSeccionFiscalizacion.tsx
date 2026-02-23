@@ -379,7 +379,7 @@ export default function HomeJefeSeccionFiscalizacion() {
       <Stack direction="row" alignItems="flex-end" justifyContent="space-between" spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={800}>
-            Home – Jefe de Sección (Fiscalización)
+            Home – Jefe de Sección Auditoría
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Actividades tomadas del cuadro de alertas (Parametrización → Alertas).
