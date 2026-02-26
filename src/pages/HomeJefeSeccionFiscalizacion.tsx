@@ -685,11 +685,11 @@ export default function HomeJefeSeccionFiscalizacion() {
                     {/* ✅ Acciones: 1) Detalle 2) Ir */}
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
-                        <Tooltip title="Detalle">
+                        {/* <Tooltip title="Detalle">
                           <IconButton size="small" onClick={() => goDetalle(r)}>
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
+                        </Tooltip> */}
 
                         <Tooltip title="Ir">
                           <IconButton size="small" onClick={() => goIr(r)}>
