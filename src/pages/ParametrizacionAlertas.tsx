@@ -126,41 +126,41 @@ export default function ParametrizacionAlertas() {
 
     { field: "canalEnvioHome", headerName: "Activada Home", type: "boolean", width: 120 },
     { field: "canalEnvioCorreo", headerName: "Activada Correo", type: "boolean", width: 130 },
-    {
-      field: "frecuenciaCorreo",
-      headerName: "Frecuencia",
-      width: 130,
-      type: "singleSelect",
-      valueOptions: ["Unica", "Diaria", "Semanal"] as FrecuenciaCorreo[],
-    },
-    { field: "generaIndicadorConsolidado", headerName: "Indicador", type: "boolean", width: 110 },
+    // {
+    //   field: "frecuenciaCorreo",
+    //   headerName: "Frecuencia",
+    //   width: 130,
+    //   type: "singleSelect",
+    //   valueOptions: ["Unica", "Diaria", "Semanal"] as FrecuenciaCorreo[],
+    // },
+    // { field: "generaIndicadorConsolidado", headerName: "Indicador", type: "boolean", width: 110 },
 
-    { field: "observaciones", headerName: "Observaciones", width: 260 },
+    // { field: "observaciones", headerName: "Observaciones", width: 260 },
 
-    {
-      field: "_semaforo",
-      headerName: "Rangos",
-      width: 260,
-      sortable: false,
-      filterable: false,
-      renderCell: (p) => {
-        const r = p.row as AlertaParam;
-        const warn = validateRow(r);
+    // {
+    //   field: "_semaforo",
+    //   headerName: "Rangos",
+    //   width: 260,
+    //   sortable: false,
+    //   filterable: false,
+    //   renderCell: (p) => {
+    //     const r = p.row as AlertaParam;
+    //     const warn = validateRow(r);
 
-        return (
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip size="small" label={`V ${r.verdeDesde}-${r.verdeHasta}`} />
-            <Chip size="small" label={`A ${r.amarilloDesde}-${r.amarilloHasta}`} />
-            <Chip size="small" label={`R ${r.rojoDesde}-${r.rojoHasta}`} />
-            {warn ? (
-              <Tooltip title={warn}>
-                <Chip size="small" color="warning" label="!" />
-              </Tooltip>
-            ) : null}
-          </Stack>
-        );
-      },
-    },
+    //     return (
+    //       <Stack direction="row" spacing={1} alignItems="center">
+    //         <Chip size="small" label={`V ${r.verdeDesde}-${r.verdeHasta}`} />
+    //         <Chip size="small" label={`A ${r.amarilloDesde}-${r.amarilloHasta}`} />
+    //         <Chip size="small" label={`R ${r.rojoDesde}-${r.rojoHasta}`} />
+    //         {warn ? (
+    //           <Tooltip title={warn}>
+    //             <Chip size="small" color="warning" label="!" />
+    //           </Tooltip>
+    //         ) : null}
+    //       </Stack>
+    //     );
+    //   },
+    // },
 
     {
       field: "_actions",
@@ -313,9 +313,6 @@ export default function ParametrizacionAlertas() {
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Tip: usa el buscador del toolbar. Acciones → Editar / Eliminar.
-        </Typography>
       </Paper>
 
       <Paper sx={{ height: 640, width: "100%" }}>
