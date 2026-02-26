@@ -57,7 +57,7 @@ export default function AlertRuleDialog({
     setDraft((p) => ({ ...p, [k]: v }));
   };
 
-  const title = mode === "create" ? "Nueva regla" : "Editar regla";
+  const title = mode === "create" ? "Adicionar Parámetro de Alerta" : "Editar Parámetro de Alerta";
   const submitLabel = mode === "create" ? "Crear" : "Guardar cambios";
 
   const handleAskConfirm = () => {

@@ -2,22 +2,16 @@
 export type FrecuenciaCorreo = "Unica" | "Diaria" | "Semanal";
 
 export type AlertaParam = {
-  /** ✅ necesario para DataGrid + ParametrizacionAlertas */
   id: string;
 
-  /** ✅ lo que Patricia pide: actividades del cuadro */
   actividad: string;
-
-  /** opcional (pero tu pantalla lo usa) */
+  /** ✅ puede ser "" (vacío) */
   producto: string;
 
-  /** ✅ tu pantalla lo usa como filtro/columna */
   rolResponsable: string;
 
-  /** SLA */
   totalDiasPermitidos: number;
 
-  /** rangos */
   verdeDesde: number;
   verdeHasta: number;
   amarilloDesde: number;
@@ -25,81 +19,362 @@ export type AlertaParam = {
   rojoDesde: number;
   rojoHasta: number;
 
-  /** escalamiento */
   escalamientoAmarilloRol1: string;
   escalamientoRojoRol1: string;
   escalamientoRojoRol2: string;
   escalamientoRojoRol3: string;
 
-  /** canales */
   canalEnvioHome: boolean;
   canalEnvioCorreo: boolean;
   frecuenciaCorreo: FrecuenciaCorreo;
 
-  /** reportes */
   generaIndicadorConsolidado: boolean;
-
-  /** texto libre */
   observaciones: string;
 };
 
-/**
- * ✅ Catálogo base de actividades (para el botón “Nueva regla”)
- * Nota: lo dejamos simple: actividad + producto + rol (para precargar)
- */
-export type ActividadBase = {
-  actividad: string;
-  producto: string;
-  rol: string;
-};
+type MatrizRow = Omit<AlertaParam, "id">;
 
-export const ACTIVIDADES_BASE: ActividadBase[] = [
-  { actividad: "Informe de Auditoría (706)", producto: "Fiscalización", rol: "Auditor" },
-  { actividad: "Verificación de Inconsistencias", producto: "Fiscalización", rol: "Auditor" },
-  { actividad: "Requerimiento (documentación)", producto: "Fiscalización", rol: "Auditor" },
-  { actividad: "Caso Omiso (apertura)", producto: "Fiscalización", rol: "Auditor" },
-  // agrega aquí las del cuadro oficial si quieres “quemarlas” todas desde ya
+/**
+ * ✅ MATRIZ según tu Excel (productos solo donde aplica)
+ * IMPORTANTE: "borradores" se queda SOLO en ACTIVIDAD, NO en PRODUCTO.
+ */
+const MATRIZ_EXCEL: MatrizRow[] = [
+  // ACTA DE INICIO (producto = ACTA DE INICIO)
+  {
+    actividad: "CREACION  ACTA DE INICIO",
+    producto: "ACTA DE INICIO",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "Director DGI",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "APROBACION ACTA DE INICIO",
+    producto: "ACTA DE INICIO",
+    rolResponsable: "Supervisor",
+    totalDiasPermitidos: 3,
+    verdeDesde: 1,
+    verdeHasta: 2,
+    amarilloDesde: 3,
+    amarilloHasta: 3,
+    rojoDesde: 3,
+    rojoHasta: 3,
+    escalamientoAmarilloRol1: "Jefe de Seccion",
+    escalamientoRojoRol1: "Director DGI",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "NOTIFICACION ACTA DE INICIO",
+    producto: "ACTA DE INICIO",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "Director DGI",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+
+  // PRODUCTO LARGO (Informe/Acta Cierre/Propuesta/Resolución) -> NO lleva "borradores"
+  {
+    actividad:
+      "CREACION  INFORME DE AUDITORIA, ACTA DE CIERRE, PROPUESTA DE REGULARIZACION, RESOLUCION(ES) borradores",
+    producto:
+      "INFORME DE AUDITORIA,\nACTA DE CIERRE,\nPROPUESTA DE REGULARIZACION,\nRESOLUCION(ES)",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 20,
+    verdeDesde: 1,
+    verdeHasta: 12,
+    amarilloDesde: 13,
+    amarilloHasta: 16,
+    rojoDesde: 17,
+    rojoHasta: 20,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "Director DGI",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Semanal",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad:
+      "APROBACION INFORME  AUDITORIA,  ACTA DE CIERRE, PROPUESTA DE REGULARIZACION, RESOLUCION(ES) borradores",
+    producto:
+      "INFORME DE AUDITORIA,\nACTA DE CIERRE,\nPROPUESTA DE REGULARIZACION,\nRESOLUCION(ES)",
+    rolResponsable: "Jefe de Seccion",
+    totalDiasPermitidos: 7,
+    verdeDesde: 1,
+    verdeHasta: 4,
+    amarilloDesde: 5,
+    amarilloHasta: 6,
+    rojoDesde: 7,
+    rojoHasta: 7,
+    escalamientoAmarilloRol1: "Director DGI",
+    escalamientoRojoRol1: "Director DGI",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+
+  // Sin producto (vacío)
+  {
+    actividad: "DILIGENCIA ACTA DE CIERRE",
+    producto: "",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 10,
+    verdeDesde: 1,
+    verdeHasta: 6,
+    amarilloDesde: 7,
+    amarilloHasta: 8,
+    rojoDesde: 9,
+    rojoHasta: 10,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "Director DGI",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+
+  // AUTO DE ARCHIVO (producto = AUTO DE ARCHIVO)
+  {
+    actividad: "AUTO DE ARCHIVO(IMPRODUCTIVO O PRESENTACION VOLUNTARIA",
+    producto: "AUTO DE ARCHIVO",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 8,
+    verdeDesde: 1,
+    verdeHasta: 5,
+    amarilloDesde: 6,
+    amarilloHasta: 7,
+    rojoDesde: 8,
+    rojoHasta: 8,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: false,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "APROBACION AUTO DE ARCHIVO",
+    producto: "AUTO DE ARCHIVO",
+    rolResponsable: "Supervisor",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "Jefe de Seccion",
+    escalamientoRojoRol1: "Director DGI",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+
+  // Resto sin producto (vacío) como en tu Excel
+  {
+    actividad: "RESPUESTA PROPUESTA REGULARIZACION",
+    producto: "",
+    rolResponsable: "Contribuyente",
+    totalDiasPermitidos: 15,
+    verdeDesde: 1,
+    verdeHasta: 10,
+    amarilloDesde: 11,
+    amarilloHasta: 13,
+    rojoDesde: 14,
+    rojoHasta: 15,
+    escalamientoAmarilloRol1: "Auditor",
+    escalamientoRojoRol1: "Supervisor",
+    escalamientoRojoRol2: "Jefe de Seccion",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Semanal",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "ENVIO CUENTA CORRIENTE",
+    producto: "",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "FIRMA RESOLUCION",
+    producto: "",
+    rolResponsable: "Director DGI",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "",
+    escalamientoRojoRol1: "",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Unica",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "NOTIFICACION RESOLUCION",
+    producto: "",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 5,
+    verdeDesde: 1,
+    verdeHasta: 3,
+    amarilloDesde: 4,
+    amarilloHasta: 4,
+    rojoDesde: 5,
+    rojoHasta: 5,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "Director DGI",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Diaria",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "CIERRE Y ARCHIVO",
+    producto: "",
+    rolResponsable: "Auditor",
+    totalDiasPermitidos: 7,
+    verdeDesde: 1,
+    verdeHasta: 4,
+    amarilloDesde: 5,
+    amarilloHasta: 6,
+    rojoDesde: 7,
+    rojoHasta: 7,
+    escalamientoAmarilloRol1: "Supervisor",
+    escalamientoRojoRol1: "Jefe de Seccion",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: false,
+    frecuenciaCorreo: "Semanal",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
+  {
+    actividad: "RECURSO APELACION",
+    producto: "",
+    rolResponsable: "Auditor Apartamento Jurídico Tributario",
+    totalDiasPermitidos: 15,
+    verdeDesde: 1,
+    verdeHasta: 10,
+    amarilloDesde: 11,
+    amarilloHasta: 13,
+    rojoDesde: 14,
+    rojoHasta: 15,
+    escalamientoAmarilloRol1: "Jefe Depto Control",
+    escalamientoRojoRol1: "Director DGI",
+    escalamientoRojoRol2: "",
+    escalamientoRojoRol3: "",
+    canalEnvioHome: true,
+    canalEnvioCorreo: true,
+    frecuenciaCorreo: "Semanal",
+    generaIndicadorConsolidado: true,
+    observaciones: "",
+  },
 ];
 
-const LS_KEY = "dgi:paramAlertas:v1";
+export type ActividadBase = { actividad: string; producto: string; rol: string };
+export const ACTIVIDADES_BASE: ActividadBase[] = MATRIZ_EXCEL.map((r) => ({
+  actividad: r.actividad,
+  producto: r.producto,
+  rol: r.rolResponsable,
+}));
+
+function uniqNonEmpty(arr: string[]) {
+  return Array.from(new Set(arr.map((x) => String(x ?? "").trim()).filter((x) => x.length > 0)));
+}
+
+export const CATALOGO_PRODUCTOS = uniqNonEmpty(MATRIZ_EXCEL.map((r) => r.producto)) as readonly string[];
+export const CATALOGO_ROLES = uniqNonEmpty(MATRIZ_EXCEL.map((r) => r.rolResponsable)) as readonly string[];
+export const CATALOGO_ACTIVIDADES = uniqNonEmpty(MATRIZ_EXCEL.map((r) => r.actividad)) as readonly string[];
+
+const LS_KEY = "dgi:paramAlertas:v2";
 
 function uid(prefix = "ALERTA") {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 }
 
-/** ✅ Seed inicial (si no hay nada en localStorage) */
+function asFrecuencia(v: any): FrecuenciaCorreo {
+  return v === "Unica" || v === "Diaria" || v === "Semanal" ? v : "Diaria";
+}
+
 export function seedParamAlertas(): AlertaParam[] {
-  // Creamos una regla por cada actividad base (puedes ajustar rangos)
-  return ACTIVIDADES_BASE.map((b, idx) => {
-    const t = idx % 3 === 0 ? 10 : idx % 3 === 1 ? 15 : 20;
-
-    return {
-      id: uid(),
-      actividad: b.actividad,
-      producto: b.producto,
-      rolResponsable: b.rol,
-
-      totalDiasPermitidos: t,
-      verdeDesde: 1,
-      verdeHasta: Math.max(1, Math.floor(t * 0.6)),
-      amarilloDesde: Math.max(2, Math.floor(t * 0.6) + 1),
-      amarilloHasta: Math.max(2, Math.floor(t * 0.8)),
-      rojoDesde: Math.max(3, Math.floor(t * 0.8) + 1),
-      rojoHasta: t,
-
-      escalamientoAmarilloRol1: "Supervisor",
-      escalamientoRojoRol1: "Jefe de Seccion",
-      escalamientoRojoRol2: "Direccion",
-      escalamientoRojoRol3: "",
-
-      canalEnvioHome: true,
-      canalEnvioCorreo: true,
-      frecuenciaCorreo: "Diaria",
-
-      generaIndicadorConsolidado: true,
-      observaciones: "Regla inicial",
-    };
-  });
+  return MATRIZ_EXCEL.map((r) => ({ id: uid(), ...r }));
 }
 
 export function loadParamAlertas(): AlertaParam[] {
@@ -113,13 +388,26 @@ export function loadParamAlertas(): AlertaParam[] {
 
     const parsed = JSON.parse(raw) as Partial<AlertaParam>[];
 
-    // ✅ normaliza por si viene data vieja sin campos nuevos
+    // auto-migración si trae actividades que ya no existen en la matriz
+    const actividadesExcel = new Set(MATRIZ_EXCEL.map((r) => r.actividad.trim()));
+    const parsedTieneViejas = (parsed ?? []).some((p) => {
+      const a = String(p.actividad ?? "").trim();
+      return a && actividadesExcel.size > 0 && !actividadesExcel.has(a);
+    });
+
+    if (parsedTieneViejas) {
+      const seed = seedParamAlertas();
+      saveParamAlertas(seed);
+      return seed;
+    }
+
+    // normaliza SIN forzar producto (puede ser "")
     const normalized: AlertaParam[] = (parsed ?? [])
       .filter(Boolean)
       .map((p, idx) => {
         const actividad = String(p.actividad ?? "").trim() || `Actividad ${idx + 1}`;
-        const producto = String(p.producto ?? "Fiscalización");
-        const rolResponsable = String((p as any).rolResponsable ?? (p as any).rol ?? "Auditor");
+        const producto = String(p.producto ?? "").trim(); // ✅ respeta vacío
+        const rolResponsable = String((p as any).rolResponsable ?? (p as any).rol ?? "Auditor").trim();
 
         const totalDiasPermitidos = Number(p.totalDiasPermitidos ?? 10) || 10;
 
@@ -127,7 +415,9 @@ export function loadParamAlertas(): AlertaParam[] {
         const verdeHasta = Number(p.verdeHasta ?? Math.max(1, Math.floor(totalDiasPermitidos * 0.6)));
 
         const amarilloDesde = Number(p.amarilloDesde ?? verdeHasta + 1);
-        const amarilloHasta = Number(p.amarilloHasta ?? Math.max(amarilloDesde, Math.floor(totalDiasPermitidos * 0.8)));
+        const amarilloHasta = Number(
+          p.amarilloHasta ?? Math.max(amarilloDesde, Math.floor(totalDiasPermitidos * 0.8))
+        );
 
         const rojoDesde = Number(p.rojoDesde ?? amarilloHasta + 1);
         const rojoHasta = Number(p.rojoHasta ?? totalDiasPermitidos);
@@ -148,19 +438,18 @@ export function loadParamAlertas(): AlertaParam[] {
 
           escalamientoAmarilloRol1: String(p.escalamientoAmarilloRol1 ?? "Supervisor"),
           escalamientoRojoRol1: String(p.escalamientoRojoRol1 ?? "Jefe de Seccion"),
-          escalamientoRojoRol2: String(p.escalamientoRojoRol2 ?? "Direccion"),
+          escalamientoRojoRol2: String(p.escalamientoRojoRol2 ?? "Director DGI"),
           escalamientoRojoRol3: String(p.escalamientoRojoRol3 ?? ""),
 
           canalEnvioHome: Boolean(p.canalEnvioHome ?? true),
           canalEnvioCorreo: Boolean(p.canalEnvioCorreo ?? true),
-          frecuenciaCorreo: (p.frecuenciaCorreo as any) ?? "Diaria",
+          frecuenciaCorreo: asFrecuencia((p as any).frecuenciaCorreo),
 
           generaIndicadorConsolidado: Boolean(p.generaIndicadorConsolidado ?? true),
           observaciones: String(p.observaciones ?? ""),
         };
       });
 
-    // si quedó vacío, seed
     if (!normalized.length) {
       const seed = seedParamAlertas();
       saveParamAlertas(seed);
@@ -179,12 +468,6 @@ export function saveParamAlertas(rows: AlertaParam[]) {
   localStorage.setItem(LS_KEY, JSON.stringify(rows ?? []));
 }
 
-/**
- * ✅ IMPORTANTE: tu ParametrizacionAlertas.tsx espera que reset retorne AlertaParam[]
- * para poder hacer:
- *   const seed = resetParamAlertas();
- *   setRows(seed);
- */
 export function resetParamAlertas(): AlertaParam[] {
   localStorage.removeItem(LS_KEY);
   const seed = seedParamAlertas();

@@ -21,12 +21,12 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 
 import * as XLSX from "xlsx";
-
 import { loadParamAlertas, type AlertaParam } from "../services/mockParamAlertas";
 
 type Semaforo = "ROJO" | "AMARILLO" | "VERDE" | "GRIS";
@@ -55,18 +55,18 @@ type ActividadBase = {
 type ActividadView = ActividadBase & {
   semaforo: Semaforo;
 
-  /** ✅ Patricia: (Transc + Restan = Total) */
   diasTranscurridos: number; // capado a total
   diasRestantes: number | null; // nunca negativo
 
   totalDiasPermitidos: number | null;
   fechaVencimiento: string | null;
 
-  /** ✅ recomendado: atraso real (no rompe la regla) */
   diasAtraso: number | null;
 
   paramMatched: boolean;
 };
+
+const TODOS = "TODOS";
 
 function fmtDate(ymd: string) {
   const d = new Date(ymd + "T00:00:00");
@@ -132,21 +132,14 @@ function findParamByActividad(params: AlertaParam[], actividad: string) {
   return found;
 }
 
-/** ✅ Semaforo calculado con días reales */
 function semaforoFromParam(param: AlertaParam | undefined, diasTranscurridosReal: number): Semaforo {
   if (!param) return "GRIS";
 
   const d = diasTranscurridosReal;
 
-  if (param.rojoDesde >= 0 && param.rojoHasta >= 0 && d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
-  if (
-    param.amarilloDesde >= 0 &&
-    param.amarilloHasta >= 0 &&
-    d >= param.amarilloDesde &&
-    d <= param.amarilloHasta
-  )
-    return "AMARILLO";
-  if (param.verdeDesde >= 0 && param.verdeHasta >= 0 && d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
+  if (d >= param.rojoDesde && d <= param.rojoHasta) return "ROJO";
+  if (d >= param.amarilloDesde && d <= param.amarilloHasta) return "AMARILLO";
+  if (d >= param.verdeDesde && d <= param.verdeHasta) return "VERDE";
 
   if (d >= param.totalDiasPermitidos) return "ROJO";
   return "GRIS";
@@ -178,7 +171,6 @@ function chipEstado(e: EstadoActividad): { label: string; icon?: React.ReactElem
   return map[e];
 }
 
-/** ✅ Home arma el mock desde params (actividades reales del cuadro) */
 function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
   const auditores = ["J. Pérez", "M. Ríos", "L. Gómez", "D. Torres", "A. Moreno", "K. Salazar"];
   const supervisores = ["S. Martínez", "C. Valdés", "R. Herrera", "M. Pineda"];
@@ -210,20 +202,12 @@ function buildMockFromParams(params: AlertaParam[]): ActividadBase[] {
     const ruc = `${String(1000000 + n).slice(-7)}-${(n % 9) + 1}-${yyyy}`;
     const contribuyente = contribuyentes[idx % contribuyentes.length];
 
-    // ✅ Genera ejemplos SIEMPRE (Verde/Amarillo/Rojo) usando el total real de la actividad
     const total = Number(p.totalDiasPermitidos ?? 10) || 10;
 
     let diasSimulados = 1;
-    if (idx % 3 === 0) {
-      // VERDE ~ 30%
-      diasSimulados = Math.max(1, Math.floor(total * 0.3));
-    } else if (idx % 3 === 1) {
-      // AMARILLO ~ 70%
-      diasSimulados = Math.max(1, Math.floor(total * 0.7));
-    } else {
-      // ROJO ~ 95%
-      diasSimulados = Math.max(1, Math.floor(total * 0.95));
-    }
+    if (idx % 3 === 0) diasSimulados = Math.max(1, Math.floor(total * 0.3)); // VERDE
+    else if (idx % 3 === 1) diasSimulados = Math.max(1, Math.floor(total * 0.7)); // AMARILLO
+    else diasSimulados = Math.max(1, Math.floor(total * 0.95)); // ROJO
 
     const fechaAsignacion = addDaysYmd(hoy, -diasSimulados);
 
@@ -248,14 +232,29 @@ function ymd(d: Date) {
   return `${y}${m}${day}`;
 }
 
+function uniqNonEmpty(values: string[]) {
+  return Array.from(new Set(values.map((v) => String(v ?? "").trim()).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b, "es")
+  );
+}
+
 export default function HomeJefeSeccionFiscalizacion() {
   const [search, setSearch] = useState("");
-  const [estado, setEstado] = useState<"TODOS" | EstadoActividad>("TODOS");
-  const [semaforoFiltro, setSemaforoFiltro] = useState<"TODOS" | "VERDE" | "AMARILLO" | "ROJO">("TODOS");
+  const [estado, setEstado] = useState<typeof TODOS | EstadoActividad>(TODOS);
+  const [semaforoFiltro, setSemaforoFiltro] = useState<typeof TODOS | "VERDE" | "AMARILLO" | "ROJO">(TODOS);
+
+  // ✅ nuevos filtros
+  const [fAuditor, setFAuditor] = useState<string>(TODOS);
+  const [fSupervisor, setFSupervisor] = useState<string>(TODOS);
+
   const [tick, setTick] = useState(0);
 
   const params = useMemo(() => loadParamAlertas(), [tick]);
   const baseRows = useMemo(() => buildMockFromParams(params), [params]);
+
+  // ✅ listas sacadas de la data (no hardcode)
+  const auditorOptions = useMemo(() => [TODOS, ...uniqNonEmpty(baseRows.map((r) => r.auditor))], [baseRows]);
+  const supervisorOptions = useMemo(() => [TODOS, ...uniqNonEmpty(baseRows.map((r) => r.supervisor))], [baseRows]);
 
   const data = useMemo<ActividadView[]>(() => {
     const hoy = todayYmd();
@@ -263,20 +262,14 @@ export default function HomeJefeSeccionFiscalizacion() {
     let rows: ActividadView[] = baseRows.map((r) => {
       const param = findParamByActividad(params, r.actividad);
 
-      // ✅ días reales desde asignación hasta hoy
       const diasTranscurridosReal = Math.max(0, daysBetween(r.fechaAsignacion, hoy));
-
-      // ✅ SLA total por actividad (matriz)
       const totalDias = param?.totalDiasPermitidos ?? null;
 
-      // ✅ Patricia: (Transc + Restan = Total)
       const diasTranscurridosSla =
         typeof totalDias === "number" ? Math.min(diasTranscurridosReal, totalDias) : diasTranscurridosReal;
       const diasRestantes = typeof totalDias === "number" ? Math.max(0, totalDias - diasTranscurridosReal) : null;
 
-      // ✅ atraso real (sin romper regla)
       const diasAtraso = typeof totalDias === "number" ? Math.max(0, diasTranscurridosReal - totalDias) : null;
-
       const fechaVencimiento = typeof totalDias === "number" ? addDaysYmd(r.fechaAsignacion, totalDias) : null;
 
       const sem = semaforoFromParam(param, diasTranscurridosReal);
@@ -301,9 +294,14 @@ export default function HomeJefeSeccionFiscalizacion() {
       });
     }
 
-    if (estado !== "TODOS") rows = rows.filter((r) => r.estado === estado);
-    if (semaforoFiltro !== "TODOS") rows = rows.filter((r) => r.semaforo === semaforoFiltro);
+    if (estado !== TODOS) rows = rows.filter((r) => r.estado === estado);
+    if (semaforoFiltro !== TODOS) rows = rows.filter((r) => r.semaforo === semaforoFiltro);
 
+    // ✅ filtros auditor / supervisor
+    if (fAuditor !== TODOS) rows = rows.filter((r) => r.auditor === fAuditor);
+    if (fSupervisor !== TODOS) rows = rows.filter((r) => r.supervisor === fSupervisor);
+
+    // orden
     const rank: Record<Semaforo, number> = { ROJO: 0, AMARILLO: 1, VERDE: 2, GRIS: 3 };
     rows.sort((a, b) => {
       const ra = rank[a.semaforo] - rank[b.semaforo];
@@ -319,7 +317,7 @@ export default function HomeJefeSeccionFiscalizacion() {
     });
 
     return rows;
-  }, [params, baseRows, search, estado, semaforoFiltro]);
+  }, [params, baseRows, search, estado, semaforoFiltro, fAuditor, fSupervisor]);
 
   const kpis = useMemo(() => {
     const total = data.length;
@@ -338,7 +336,7 @@ export default function HomeJefeSeccionFiscalizacion() {
     const sheetRows = data.map((r) => ({
       Semaforo: r.semaforo,
       Estado: r.estado,
-      Tramite: r.tramite,
+      NoTramite: r.tramite,
       RUC: r.ruc,
       Contribuyente: r.contribuyente,
       Actividad: r.actividad,
@@ -372,6 +370,16 @@ export default function HomeJefeSeccionFiscalizacion() {
 
     const fileName = `Home_Jefe_Seccion_${ymd(new Date())}.xlsx`;
     XLSX.writeFile(wb, fileName);
+  }
+
+  function goDetalle(r: ActividadView) {
+    // TODO: aquí puedes navegar a /tramites/:id o abrir modal
+    alert(`Detalle: ${r.tramite}\nActividad: ${r.actividad}`);
+  }
+
+  function goIr(r: ActividadView) {
+    // TODO: aquí puedes navegar al módulo real
+    alert(`Ir a gestión del trámite: ${r.tramite}`);
   }
 
   return (
@@ -442,36 +450,25 @@ export default function HomeJefeSeccionFiscalizacion() {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={2.4}>
-          <Paper sx={{ p: 2, borderRadius: 3 }}>
-            <Typography variant="caption" color="text.secondary">
-              Pendiente / Espera
-            </Typography>
-            <Typography variant="h4" fontWeight={800}>
-              {kpis.pendientes} / {kpis.espera}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Sin SLA: {kpis.sinSla}
-            </Typography>
-          </Paper>
-        </Grid>
+    
       </Grid>
 
+      {/* Filtros */}
       <Paper sx={{ p: 2, mt: 2, borderRadius: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               label="Buscar"
-              placeholder="Trámite, RUC, contribuyente, actividad, auditor, supervisor…"
+              placeholder="No trámite, RUC, contribuyente, actividad, auditor, supervisor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={2}>
             <TextField select fullWidth label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as any)}>
-              <MenuItem value="TODOS">Todos</MenuItem>
+              <MenuItem value={TODOS}>Todos</MenuItem>
               <MenuItem value="PENDIENTE_REVISION">Pendiente revisión</MenuItem>
               <MenuItem value="EN_EJECUCION">En ejecución</MenuItem>
               <MenuItem value="EN_ESPERA_CONTRIBUYENTE">Espera contribuyente</MenuItem>
@@ -490,21 +487,57 @@ export default function HomeJefeSeccionFiscalizacion() {
               value={semaforoFiltro}
               onChange={(e) => setSemaforoFiltro(e.target.value as any)}
             >
-              <MenuItem value="TODOS">Todos</MenuItem>
+              <MenuItem value={TODOS}>Todos</MenuItem>
               <MenuItem value="VERDE">Verde</MenuItem>
               <MenuItem value="AMARILLO">Amarillo</MenuItem>
               <MenuItem value="ROJO">Rojo</MenuItem>
             </TextField>
           </Grid>
 
+          {/* ✅ Auditor */}
           <Grid item xs={12} md={2}>
+            <TextField
+              select
+              fullWidth
+              label="Auditor"
+              value={fAuditor}
+              onChange={(e) => setFAuditor(e.target.value)}
+            >
+              {auditorOptions.map((a) => (
+                <MenuItem key={a} value={a}>
+                  {a === TODOS ? "Todos" : a}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          {/* ✅ Supervisor */}
+          <Grid item xs={12} md={2}>
+            <TextField
+              select
+              fullWidth
+              label="Supervisor"
+              value={fSupervisor}
+              onChange={(e) => setFSupervisor(e.target.value)}
+            >
+              {supervisorOptions.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s === TODOS ? "Todos" : s}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          <Grid item xs={12}>
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
               <Button
                 variant="outlined"
                 onClick={() => {
                   setSearch("");
-                  setEstado("TODOS");
-                  setSemaforoFiltro("TODOS");
+                  setEstado(TODOS);
+                  setSemaforoFiltro(TODOS);
+                  setFAuditor(TODOS);
+                  setFSupervisor(TODOS);
                 }}
               >
                 Limpiar
@@ -514,6 +547,7 @@ export default function HomeJefeSeccionFiscalizacion() {
         </Grid>
       </Paper>
 
+      {/* Tabla */}
       <Paper sx={{ p: 2, mt: 2, borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6" fontWeight={800}>
@@ -536,7 +570,7 @@ export default function HomeJefeSeccionFiscalizacion() {
                   <b>Estado</b>
                 </TableCell>
                 <TableCell>
-                  <b>Trámite</b>
+                  <b>No Trámite</b>
                 </TableCell>
                 <TableCell>
                   <b>RUC</b>
@@ -549,7 +583,7 @@ export default function HomeJefeSeccionFiscalizacion() {
                 </TableCell>
 
                 <TableCell>
-                  <b>Asignado</b>
+                  <b>Fecha Asignación</b>
                 </TableCell>
                 <TableCell align="right">
                   <b>Total</b>
@@ -564,7 +598,7 @@ export default function HomeJefeSeccionFiscalizacion() {
                   <b>Atraso</b>
                 </TableCell>
                 <TableCell>
-                  <b>Vence</b>
+                  <b>Fecha Vencimiento</b>
                 </TableCell>
 
                 <TableCell>
@@ -648,16 +682,18 @@ export default function HomeJefeSeccionFiscalizacion() {
                       <Typography>{r.supervisor}</Typography>
                     </TableCell>
 
+                    {/* ✅ Acciones: 1) Detalle 2) Ir */}
                     <TableCell align="center">
-                      <Stack direction="row" spacing={1} justifyContent="center">
-                        <Tooltip title="Ver detalle">
-                          <IconButton size="small" onClick={() => alert(`Abrir detalle ${r.id}`)}>
+                      <Stack direction="row" spacing={0.5} justifyContent="center">
+                        <Tooltip title="Detalle">
+                          <IconButton size="small" onClick={() => goDetalle(r)}>
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Tomar acción">
-                          <IconButton size="small" onClick={() => alert(`Acción sobre ${r.id}`)}>
-                            <AssignmentTurnedInIcon fontSize="small" />
+
+                        <Tooltip title="Ir">
+                          <IconButton size="small" onClick={() => goIr(r)}>
+                            <OpenInNewIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Stack>

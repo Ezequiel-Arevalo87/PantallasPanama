@@ -1,3 +1,4 @@
+// src/pages/ParametrizacionAlertas.tsx
 import React, { useMemo, useState } from "react";
 import {
   Box,
@@ -95,6 +96,72 @@ export default function ParametrizacionAlertas() {
   }, [rows, fActividad, fRol]);
 
   const columns: GridColDef[] = [
+    { field: "actividad", headerName: "Actividad", width: 260 },
+   {
+  field: "producto",
+  headerName: "Producto",
+  width: 260,
+  renderCell: (params:any) => {
+    const value = params.row.producto;
+    return value && value.trim() !== "" ? value : "—";
+  },
+},
+    { field: "rolResponsable", headerName: "Rol Responsable", width: 180 },
+
+    { field: "totalDiasPermitidos", headerName: "Total días", type: "number", width: 110 },
+
+    { field: "verdeDesde", headerName: "Verde desde", type: "number", width: 120 },
+    { field: "verdeHasta", headerName: "Verde hasta", type: "number", width: 120 },
+
+    { field: "amarilloDesde", headerName: "Amarillo desde", type: "number", width: 130 },
+    { field: "amarilloHasta", headerName: "Amarillo hasta", type: "number", width: 130 },
+
+    { field: "rojoDesde", headerName: "Rojo desde", type: "number", width: 120 },
+    { field: "rojoHasta", headerName: "Rojo hasta", type: "number", width: 120 },
+
+    { field: "escalamientoAmarilloRol1", headerName: "Esc. Amarillo (Rol 1)", width: 200 },
+    { field: "escalamientoRojoRol1", headerName: "Esc. Rojo (Rol 1)", width: 180 },
+    { field: "escalamientoRojoRol2", headerName: "Esc. Rojo (Rol 2)", width: 180 },
+    { field: "escalamientoRojoRol3", headerName: "Esc. Rojo (Rol 3)", width: 180 },
+
+    { field: "canalEnvioHome", headerName: "Activada Home", type: "boolean", width: 120 },
+    { field: "canalEnvioCorreo", headerName: "Activada Correo", type: "boolean", width: 130 },
+    {
+      field: "frecuenciaCorreo",
+      headerName: "Frecuencia",
+      width: 130,
+      type: "singleSelect",
+      valueOptions: ["Unica", "Diaria", "Semanal"] as FrecuenciaCorreo[],
+    },
+    { field: "generaIndicadorConsolidado", headerName: "Indicador", type: "boolean", width: 110 },
+
+    { field: "observaciones", headerName: "Observaciones", width: 260 },
+
+    {
+      field: "_semaforo",
+      headerName: "Rangos",
+      width: 260,
+      sortable: false,
+      filterable: false,
+      renderCell: (p) => {
+        const r = p.row as AlertaParam;
+        const warn = validateRow(r);
+
+        return (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip size="small" label={`V ${r.verdeDesde}-${r.verdeHasta}`} />
+            <Chip size="small" label={`A ${r.amarilloDesde}-${r.amarilloHasta}`} />
+            <Chip size="small" label={`R ${r.rojoDesde}-${r.rojoHasta}`} />
+            {warn ? (
+              <Tooltip title={warn}>
+                <Chip size="small" color="warning" label="!" />
+              </Tooltip>
+            ) : null}
+          </Stack>
+        );
+      },
+    },
+
     {
       field: "_actions",
       headerName: "Acciones",
@@ -134,68 +201,11 @@ export default function ParametrizacionAlertas() {
         );
       },
     },
-
-    { field: "actividad", headerName: "Actividad", width: 260 },
-    { field: "producto", headerName: "Producto", width: 180 },
-    { field: "rolResponsable", headerName: "Rol Responsable", width: 180 },
-
-    { field: "totalDiasPermitidos", headerName: "Total días", type: "number", width: 110 },
-
-    { field: "verdeDesde", headerName: "Verde desde", type: "number", width: 120 },
-    { field: "verdeHasta", headerName: "Verde hasta", type: "number", width: 120 },
-
-    { field: "amarilloDesde", headerName: "Amarillo desde", type: "number", width: 130 },
-    { field: "amarilloHasta", headerName: "Amarillo hasta", type: "number", width: 130 },
-
-    { field: "rojoDesde", headerName: "Rojo desde", type: "number", width: 120 },
-    { field: "rojoHasta", headerName: "Rojo hasta", type: "number", width: 120 },
-
-    { field: "escalamientoAmarilloRol1", headerName: "Esc. Amarillo (Rol 1)", width: 200 },
-    { field: "escalamientoRojoRol1", headerName: "Esc. Rojo (Rol 1)", width: 180 },
-    { field: "escalamientoRojoRol2", headerName: "Esc. Rojo (Rol 2)", width: 180 },
-    { field: "escalamientoRojoRol3", headerName: "Esc. Rojo (Rol 3)", width: 180 },
-
-    { field: "canalEnvioHome", headerName: "Canal Home", type: "boolean", width: 120 },
-    { field: "canalEnvioCorreo", headerName: "Canal Correo", type: "boolean", width: 130 },
-    {
-      field: "frecuenciaCorreo",
-      headerName: "Frecuencia",
-      width: 130,
-      type: "singleSelect",
-      valueOptions: ["Unica", "Diaria", "Semanal"] as FrecuenciaCorreo[],
-    },
-    { field: "generaIndicadorConsolidado", headerName: "Indicador", type: "boolean", width: 110 },
-
-    { field: "observaciones", headerName: "Observaciones", width: 260 },
-
-    {
-      field: "_semaforo",
-      headerName: "Rangos",
-      width: 260,
-      sortable: false,
-      filterable: false,
-      renderCell: (p) => {
-        const r = p.row as AlertaParam;
-        const warn = validateRow(r);
-
-        return (
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip size="small" label={`V ${r.verdeDesde}-${r.verdeHasta}`} />
-            <Chip size="small" label={`A ${r.amarilloDesde}-${r.amarilloHasta}`} />
-            <Chip size="small" label={`R ${r.rojoDesde}-${r.rojoHasta}`} />
-            {warn ? (
-              <Tooltip title={warn}>
-                <Chip size="small" color="warning" label="!" />
-              </Tooltip>
-            ) : null}
-          </Stack>
-        );
-      },
-    },
   ];
 
   const openCreate = () => {
-    const base = ACTIVIDADES_BASE[0];
+    const base = ACTIVIDADES_BASE?.[0];
+
     const newRow: AlertaParam = {
       id: uid(),
       actividad: base?.actividad ?? "Nueva Actividad",
@@ -220,39 +230,12 @@ export default function ParametrizacionAlertas() {
       frecuenciaCorreo: "Diaria",
 
       generaIndicadorConsolidado: true,
-      observaciones: "Nueva regla",
+      observaciones: "Adicionar Parámetro de Alerta",
     };
 
     setMode("create");
     setDraft(newRow);
     setOpenRule(true);
-  };
-
-  const handleUpsert = (next: AlertaParam) => {
-    // aplica cambios
-    setRows((prev) => {
-      const exists = prev.some((r) => r.id === next.id);
-      if (exists) return prev.map((r) => (r.id === next.id ? next : r));
-      return [next, ...prev];
-    });
-
-    // ✅ persiste al instante (ya no hay botón Guardar)
-    setTimeout(() => {
-      // usamos callback de setRows para estado actual, pero aquí basta con leer del updater:
-      // (para evitar líos, guardamos en un segundo useEffect sería lo ideal, pero así es simple)
-      saveParamAlertas(
-        (() => {
-          const current = loadParamAlertas(); // fallback
-          // mejor: guardamos con la última versión desde el estado real:
-          // como no tenemos ese estado aquí sincronizado, guardamos directo con el "next" aplicado:
-          // -> hacemos un guardado correcto abajo con un setRows que ya calculó la lista.
-          return current;
-        })()
-      );
-    }, 0);
-
-    setOpenRule(false);
-    setDraft(null);
   };
 
   const handleReset = () => {
@@ -267,7 +250,7 @@ export default function ParametrizacionAlertas() {
 
     setRows((prev) => {
       const next = prev.filter((r) => r.id !== deleteId);
-      saveParamAlertas(next); // ✅ persistimos al instante
+      saveParamAlertas(next);
       return next;
     });
 
@@ -320,14 +303,9 @@ export default function ParametrizacionAlertas() {
 
           <Stack direction="row" spacing={1}>
             <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
-              Nueva regla
+              Adicionar Parámetro de Alerta
             </Button>
-            <Button
-              startIcon={<RestartAltIcon />}
-              variant="outlined"
-              color="warning"
-              onClick={handleReset}
-            >
+            <Button startIcon={<RestartAltIcon />} variant="outlined" color="warning" onClick={handleReset}>
               Limpiar
             </Button>
           </Stack>
@@ -370,7 +348,6 @@ export default function ParametrizacionAlertas() {
             setDraft(null);
           }}
           onSubmit={(next) => {
-            // ✅ guardado inmediato y correcto (sin el setTimeout raro)
             setRows((prev) => {
               const exists = prev.some((r) => r.id === next.id);
               const merged = exists ? prev.map((r) => (r.id === next.id ? next : r)) : [next, ...prev];
