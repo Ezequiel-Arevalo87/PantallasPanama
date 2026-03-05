@@ -31,7 +31,7 @@ import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import Swal from "sweetalert2";
 
 import { CASOS_KEY, nextNumeroAuto } from "../lib/aprobacionesStorage";
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 
 /* ===================== Tipos ===================== */
 type Caso = {
@@ -48,7 +48,7 @@ type Caso = {
   bloquear?: boolean;
   red?: string;
   asignado?: boolean;
-  trazas?: TrazaItem[];
+  trazas?: any[];
   [k: string]: any;
 };
 
@@ -165,7 +165,7 @@ function distribuirPorIguales(rows: Caso[], targetAuditores: string[]): Caso[] {
 }
 
 /* Mock trazas */
-const mockTrazas = (ruc: string): TrazaItem[] => [
+const mockTrazas = (ruc: string): any[] => [
   {
     id: `${ruc}-1`,
     fechaISO: new Date(Date.now() - 86400000 * 3).toISOString(),

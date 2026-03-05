@@ -1,23 +1,23 @@
 // src/services/trazasStore.ts
-import type { TrazaItem } from "../components/Trazabilidad";
+
 
 const STORAGE_KEY = "DGI_TRAZAS_EXTRA_V1";
 
 /** Lee todo el mapa de trazas extra guardadas */
-function readAll(): Record<string, TrazaItem[]> {
+function readAll(): Record<string, any[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return {};
-    return parsed as Record<string, TrazaItem[]>;
+    return parsed as Record<string, any[]>;
   } catch {
     return {};
   }
 }
 
 /** Guarda todo el mapa */
-function writeAll(map: Record<string, TrazaItem[]>) {
+function writeAll(map: Record<string, any[]>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
 
@@ -27,13 +27,13 @@ export function makeTrazaKey(ruc: string, tramite: string) {
 }
 
 /** Obtiene trazas extra (las creadas desde comunicaciones) para una llave */
-export function getExtraTrazas(key: string): TrazaItem[] {
+export function getExtraTrazas(key: string): any[] {
   const all = readAll();
   return Array.isArray(all[key]) ? all[key] : [];
 }
 
 /** Agrega una traza extra al inicio */
-export function addExtraTraza(key: string, item: TrazaItem) {
+export function addExtraTraza(key: string, item: any) {
   const all = readAll();
   const prev = Array.isArray(all[key]) ? all[key] : [];
   all[key] = [item, ...prev];
@@ -41,7 +41,7 @@ export function addExtraTraza(key: string, item: TrazaItem) {
 }
 
 /** Reemplaza todas las extra (si lo necesitas en el futuro) */
-export function setExtraTrazas(key: string, items: TrazaItem[]) {
+export function setExtraTrazas(key: string, items: any[]) {
   const all = readAll();
   all[key] = items;
   writeAll(all);

@@ -23,7 +23,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CloseIcon from "@mui/icons-material/Close";
 
-import Trazabilidad, { type TrazaItem, type EstadoAprobacion } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
 import { addExtraTraza, getExtraTrazas, makeTrazaKey } from "../services/trazasStore";
 import type { CasoInfo } from "./TablaResultadosComunicacion";
@@ -62,7 +62,7 @@ const EnviosComunicacion: React.FC<Props> = ({ caso, onClose }) => {
   const key = React.useMemo(() => makeTrazaKey(caso.ruc, caso.noTramite), [caso.ruc, caso.noTramite]);
 
   // trazas
-  const [trazas, setTrazas] = React.useState<TrazaItem[]>([]);
+  const [trazas, setTrazas] = React.useState<any[]>([]);
 
   // ✅ inicia CERRADO
   const [expanded, setExpanded] = React.useState(false);
@@ -129,13 +129,13 @@ const EnviosComunicacion: React.FC<Props> = ({ caso, onClose }) => {
       modalidad === "CORREO" || modalidad === "TODAS" ? requiereAdjunto : false
     );
 
-    const nuevo: TrazaItem = {
+    const nuevo: any = {
       id: `ENV-${Date.now()}`,
       actividad,
       usuarioGestion: "Auditor",
       fechaInicialISO: nowISO,
       fechaFinalISO: "",
-      estado: "PENDIENTE" as EstadoAprobacion,
+      estado: "PENDIENTE" as any,
       observacion: obs,
     };
 

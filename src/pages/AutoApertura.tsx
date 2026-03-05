@@ -21,7 +21,7 @@ import {
 import jsPDF from 'jspdf';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { CASOS_KEY } from '../lib/aprobacionesStorage';
-import Trazabilidad, { type TrazaItem } from '../components/Trazabilidad';
+import Trazabilidad from '../components/Trazabilidad';
 
 type RowAprobaciones = {
   id: number | string;
@@ -40,7 +40,7 @@ type RowAprobaciones = {
   metaActividadEconomica?: string[];
   metaPeriodoInicial?: string | null;
   metaPeriodoFinal?: string | null;
-  trazas?: TrazaItem[];
+  trazas?: any[];
 };
 
 type RowDisplay = {
@@ -48,7 +48,7 @@ type RowDisplay = {
   nombre: string;
   ruc: string;
   fecha: string;
-  trazas: TrazaItem[];
+  trazas: any[];
 };
 
 interface Props {
@@ -57,7 +57,7 @@ interface Props {
 }
 
 /* Mock de trazas por si no vienen desde storage/props */
-const mockTrazas = (ruc: string): TrazaItem[] => [
+const mockTrazas = (ruc: string): any[] => [
   { id: `${ruc}-1`, fechaISO: new Date(Date.now() - 86400000 * 5).toISOString(), actor: 'Supervisor', accion: 'Revisión', estado: 'PENDIENTE' },
   { id: `${ruc}-2`, fechaISO: new Date(Date.now() - 86400000 * 2).toISOString(), actor: 'Auditor', accion: 'Asignación', estado: 'ASIGNADO' },
   { id: `${ruc}-3`, fechaISO: new Date().toISOString(), actor: 'Sistema', accion: 'Aprobación', estado: 'APROBADO' },

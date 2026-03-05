@@ -1,6 +1,6 @@
 // src/services/mockTrazas.ts
 import dayjs from "dayjs";
-import type { TrazaItem, EstadoAprobacion } from "../components/Trazabilidad";
+
 
 const ACTIVIDADES_TRAZA = [
   "Asignación",
@@ -50,7 +50,7 @@ function randInt(seed: number, idx: number, max: number) {
   return Math.abs(x) % max;
 }
 
-function estadoPorIndice(i: number, total: number): EstadoAprobacion {
+function estadoPorIndice(i: number, total: number): any {
   // regla simple: las primeras suelen ir APROBADO, la última puede variar
   if (i < total - 1) return "APROBADO";
   const last = i % 3;
@@ -63,7 +63,7 @@ function estadoPorIndice(i: number, total: number): EstadoAprobacion {
  * ✅ Devuelve trazas ya con:
  * actividad | estado | fechaInicialISO | fechaFinalISO | usuarioGestion
  */
-export function buildMockTrazas(key: string, cantidad?: number): TrazaItem[] {
+export function buildMockTrazas(key: string, cantidad?: number): any[] {
   const seed = hashSeed(key || "default");
 
   // 3 a 8 filas por defecto (o cantidad forzada)
@@ -76,7 +76,7 @@ export function buildMockTrazas(key: string, cantidad?: number): TrazaItem[] {
   const startDaysAgo = 20 + (seed % 40);
   let cursor = dayjs().subtract(startDaysAgo, "day").hour(9).minute(0).second(0);
 
-  const rows: TrazaItem[] = [];
+  const rows: any[] = [];
 
   for (let i = 0; i < total; i++) {
     const actIdx = randInt(seed, i, ACTIVIDADES_TRAZA.length);

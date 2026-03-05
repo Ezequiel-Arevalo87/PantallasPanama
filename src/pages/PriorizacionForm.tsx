@@ -39,7 +39,7 @@ import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
 
 import { CASOS_KEY, notifyAprobaciones } from "../lib/aprobacionesStorage";
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 import type { Actividad } from "../services/actividadesLoader";
 
 /* ====================== TYPES ====================== */
@@ -82,7 +82,7 @@ type Row = {
   valor: number;
   valorInt: number;
   provincia: string;
-  trazas?: TrazaItem[];
+  trazas?: any[];
 };
 
 export type RowAprobacion = Row & {

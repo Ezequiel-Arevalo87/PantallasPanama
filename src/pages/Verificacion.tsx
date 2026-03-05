@@ -42,7 +42,7 @@ import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
 
 import { CASOS_KEY } from "../lib/aprobacionesStorage";
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 import { getRolSimulado, type RolSimulado } from "../lib/rolSimulado";
 
 /* =============================================================================================
@@ -81,7 +81,7 @@ type EstadoVerificacion =
 type Row = RowBase &
   RowMeta & {
     valorNum: number;
-    trazas?: TrazaItem[];
+    trazas?: any[];
     detalleVisto?: boolean;
     fechaAsignacionISO?: string;
     esDoble?: boolean;
@@ -162,7 +162,7 @@ function CustomToolbar() {
  * MOCK TRAZABILIDAD
  * ============================================================================================= */
 
-const mockTrazas = (ruc: string): TrazaItem[] => [
+const mockTrazas = (ruc: string): any[] => [
   {
     id: `${ruc}-1`,
     fechaISO: new Date().toISOString(),

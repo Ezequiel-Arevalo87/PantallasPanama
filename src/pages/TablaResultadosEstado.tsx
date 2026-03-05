@@ -26,7 +26,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import * as XLSX from "xlsx";
 import { calcularSemaforo, diasRestantes, toDDMMYYYY, type FilaEstado } from "../services/mockEstados";
 
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
 
 type Props = { rows: FilaEstado[] };
@@ -159,7 +159,7 @@ const getRelacionImpuestos = (fila: any): RelacionImpuestoRow[] => {
 
 const TablaResultadosEstado: React.FC<Props> = ({ rows }) => {
   const [openTraza, setOpenTraza] = useState(false);
-  const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<TrazaItem[]>([]);
+  const [trazasSeleccionadas, setTrazasSeleccionadas] = useState<any[]>([]);
   const [tramiteActual, setTramiteActual] = useState<string | number | null>(null);
 
   const [detalleHeader, setDetalleHeader] = useState<{

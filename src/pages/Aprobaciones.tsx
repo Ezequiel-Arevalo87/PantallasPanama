@@ -41,7 +41,7 @@ import {
 import { esES } from "@mui/x-data-grid/locales";
 import Swal from "sweetalert2";
 import { CASOS_KEY, nextNumeroAuto } from "../lib/aprobacionesStorage";
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 
 // ICONOS
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -84,7 +84,7 @@ type RowMeta = {
 type Row = RowBase &
   RowMeta & {
     valorNum: number;
-    trazas?: TrazaItem[];
+    trazas?: any[];
   };
 
 // ===================== Utils =====================
@@ -164,7 +164,7 @@ const inconsLabels = (inc?: string | null) => {
   }
 };
 
-const mockTrazas = (ruc: string): TrazaItem[] => [
+const mockTrazas = (ruc: string): any[] => [
   {
     id: `${ruc}-1`,
     fechaISO: new Date(Date.now() - 86400000 * 7).toISOString(),
