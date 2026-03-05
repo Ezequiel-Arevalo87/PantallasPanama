@@ -11,7 +11,7 @@ import {
   Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import Trazabilidad, { type TrazaItem } from "./Trazabilidad";
+import Trazabilidad from "./Trazabilidad";
 
 type Props = {
   open: boolean;
@@ -21,7 +21,7 @@ type Props = {
   detalle: React.ReactNode;
 
   /** Filas de trazabilidad */
-  trazas: TrazaItem[];
+  trazas: any[];
 
   /** Título del diálogo */
   titulo?: string;
