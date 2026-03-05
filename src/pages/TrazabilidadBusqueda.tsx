@@ -13,14 +13,14 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 import { buildMockTrazas } from "../services/mockTrazas";
 import { getExtraTrazas, makeTrazaKey } from "../services/trazasStore";
 
 const TrazabilidadBusqueda: React.FC = () => {
   const [ruc, setRuc] = React.useState("");
   const [tramite, setTramite] = React.useState("");
-  const [rows, setRows] = React.useState<TrazaItem[]>([]);
+  const [rows, setRows] = React.useState<any[]>([]);
   const [expanded, setExpanded] = React.useState(true);
 
   const handleBuscar = () => {
@@ -65,7 +65,11 @@ const TrazabilidadBusqueda: React.FC = () => {
           mb: 2,
           alignItems: "stretch",
           "& .MuiTextField-root": { flex: 1 },
-          "& .MuiButton-root": { minWidth: 120, fontWeight: "bold", height: "56px" },
+          "& .MuiButton-root": {
+            minWidth: 120,
+            fontWeight: "bold",
+            height: "56px",
+          },
         }}
       >
         <TextField
@@ -91,9 +95,15 @@ const TrazabilidadBusqueda: React.FC = () => {
       </Stack>
 
       {rows.length > 0 ? (
-        <Accordion expanded={expanded} onChange={(_, v) => setExpanded(v)} disableGutters>
+        <Accordion
+          expanded={expanded}
+          onChange={(_, v) => setExpanded(v)}
+          disableGutters
+        >
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography sx={{ fontWeight: 800 }}>Trazabilidad del Caso</Typography>
+            <Typography sx={{ fontWeight: 800 }}>
+              Trazabilidad del Caso
+            </Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Trazabilidad rows={rows} height={420} />
@@ -101,7 +111,8 @@ const TrazabilidadBusqueda: React.FC = () => {
         </Accordion>
       ) : (
         <Box sx={{ py: 6, textAlign: "center", color: "text.secondary" }}>
-          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona <b>Buscar</b>.
+          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona{" "}
+          <b>Buscar</b>.
         </Box>
       )}
     </Box>
