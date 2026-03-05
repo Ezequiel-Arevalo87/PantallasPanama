@@ -18,7 +18,7 @@ import {
   Tab,
 } from "@mui/material";
 
-import Trazabilidad, { type TrazaItem } from "../components/Trazabilidad";
+import Trazabilidad from "../components/Trazabilidad";
 
 const fmtMoneyUS = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
