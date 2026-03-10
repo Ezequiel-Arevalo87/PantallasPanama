@@ -1,4 +1,3 @@
-// src/pages/ComunicacionesEnviosPage.tsx
 import * as React from "react";
 import {
   Box,
@@ -12,10 +11,13 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Chip,
 } from "@mui/material";
 import dayjs from "dayjs";
 
-import TablaResultadosComunicacion, { type CasoInfo } from "./TablaResultadosComunicacion";
+import TablaResultadosComunicacion, {
+  type CasoInfo,
+} from "./TablaResultadosComunicacion";
 import EnviosComunicacion from "./EnviosComunicacion";
 
 /** ===================== MOCK HELPERS ===================== */
@@ -33,18 +35,50 @@ const buildMockCaso = (ruc: string, noTramite: string): CasoInfo => {
     "Distribuidora Pacífico, S.A.",
     "Constructora Bahía Azul, S.A.",
   ];
-  const reps = ["Luis Gómez", "María Pérez", "Carlos Díaz", "Ana Sánchez", "Pedro Rodríguez"];
+
+  const reps = [
+    "Luis Gómez",
+    "María Pérez",
+    "Carlos Díaz",
+    "Ana Sánchez",
+    "Pedro Rodríguez",
+  ];
+
+  const correosBase = [
+    "contacto@empresa.com",
+    "legal@empresa.com",
+    "administracion@empresa.com",
+    "tributario@empresa.com",
+    "gerencia@empresa.com",
+  ];
 
   const seed = `${ruc}|${noTramite}`;
   const razonSocial = randomFrom(seed + "|rs", empresas);
   const representanteLegal = randomFrom(seed + "|rep", reps);
 
-  const correo = `${razonSocial
+  const correoPrincipal = `${razonSocial
     .split(" ")[0]
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")}@correo.com`;
 
-  const actaInicio = `AI-${dayjs().format("YYYY")}-${String((noTramite.match(/\d+/)?.[0] ?? "1")).slice(-4)}`;
+  const otrosCorreos = [
+    correoPrincipal,
+    ...correosBase.map((_, idx) => {
+      const pref = razonSocial
+        .split(" ")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+      return `${pref}${idx + 1}@correo.com`;
+    }),
+  ].slice(0, 3);
+
+  const actaInicio = `AI-${dayjs().format("YYYY")}-${String(
+    noTramite.match(/\d+/)?.[0] ?? "1"
+  ).slice(-4)}`;
+
+  const fechaApertura = dayjs()
+    .subtract(Number(noTramite.replace(/\D/g, "").slice(-2) || 5), "day")
+    .format("DD/MM/YYYY");
 
   return {
     noTramite,
@@ -52,7 +86,15 @@ const buildMockCaso = (ruc: string, noTramite: string): CasoInfo => {
     razonSocial,
     actaInicio,
     representanteLegal,
-    correo,
+    correo: correoPrincipal,
+    correos: otrosCorreos,
+    fechaApertura,
+    estadoCaso: randomFrom(seed + "|estado", [
+      "EN PROCESO",
+      "PENDIENTE DOCUMENTACIÓN",
+      "EN ANÁLISIS",
+      "ACTIVO",
+    ]),
   };
 };
 
@@ -62,13 +104,11 @@ const buildMockResultados = (ruc?: string, tramite?: string): CasoInfo[] => {
 
   if (!r && !t) return [];
 
-  // Si viene trámite, retornamos 1
   if (t) {
     const rucFinal = r || "8-000-000";
     return [buildMockCaso(rucFinal, t)];
   }
 
-  // Si viene solo RUC, retornamos varios trámites (simulación)
   const rucFinal = r || "8-000-000";
   const y = dayjs().format("YYYY");
   const base = rucFinal.replace(/[^0-9]/g, "").slice(-3) || "001";
@@ -81,24 +121,40 @@ const buildMockResultados = (ruc?: string, tramite?: string): CasoInfo[] => {
   return tramites.map((noTramite) => buildMockCaso(rucFinal, noTramite));
 };
 
+const isRucValido = (value: string) => {
+  if (!value.trim()) return true;
+  return /^[0-9A-Za-z-]+$/.test(value.trim());
+};
+
+type Props = {
+  handleSelect: (ruta: string) => void;
+};
+
 /** ===================== PAGE ===================== */
-const ComunicacionesEnviosPage: React.FC = () => {
+const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
   const [ruc, setRuc] = React.useState("");
   const [tramite, setTramite] = React.useState("");
 
   const [error, setError] = React.useState("");
   const [rows, setRows] = React.useState<CasoInfo[]>([]);
-
   const [selectedCaso, setSelectedCaso] = React.useState<CasoInfo | null>(null);
 
   const handleBuscar = () => {
     setError("");
+
     const r = ruc.trim();
     const t = tramite.trim();
 
     if (!r && !t) {
       setRows([]);
       setSelectedCaso(null);
+      return;
+    }
+
+    if (r && !isRucValido(r)) {
+      setRows([]);
+      setSelectedCaso(null);
+      setError("RUC errado.");
       return;
     }
 
@@ -128,12 +184,24 @@ const ComunicacionesEnviosPage: React.FC = () => {
   };
 
   return (
-    <Box component={Paper} sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Comunicaciones → Envíos
+    <Box component={Paper} sx={{ p: 2.5, borderRadius: 3 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={1}
+        sx={{ mb: 2, alignItems: { xs: "flex-start", md: "center" } }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Comunicaciones → Envíos
+        </Typography>
+
+      
+      </Stack>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Simulación visual del flujo de búsqueda, selección de caso y gestión de
+        envío al contribuyente.
       </Typography>
 
-      {/* Búsqueda */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={1.5}
@@ -141,7 +209,7 @@ const ComunicacionesEnviosPage: React.FC = () => {
           mb: 2,
           alignItems: "stretch",
           "& .MuiTextField-root": { flex: 1 },
-          "& .MuiButton-root": { minWidth: 120, fontWeight: "bold", height: "56px" },
+          "& .MuiButton-root": { minWidth: 120, fontWeight: "bold", height: 56 },
         }}
       >
         <TextField
@@ -151,6 +219,7 @@ const ComunicacionesEnviosPage: React.FC = () => {
           onKeyDown={onKeyDown}
           placeholder="Ej.: 8-123-456"
         />
+
         <TextField
           label="Número de trámite"
           value={tramite}
@@ -158,9 +227,11 @@ const ComunicacionesEnviosPage: React.FC = () => {
           onKeyDown={onKeyDown}
           placeholder="Ej.: 2026-000123"
         />
+
         <Button variant="contained" onClick={handleBuscar}>
           Buscar
         </Button>
+
         <Button variant="outlined" color="inherit" onClick={handleLimpiar}>
           Limpiar
         </Button>
@@ -173,17 +244,30 @@ const ComunicacionesEnviosPage: React.FC = () => {
       ) : null}
 
       {!rows.length ? (
-        <Box sx={{ py: 6, textAlign: "center", color: "text.secondary" }}>
-          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona <b>Buscar</b>.
+        <Box
+          sx={{
+            py: 7,
+            textAlign: "center",
+            color: "text.secondary",
+            border: "1px dashed",
+            borderColor: "divider",
+            borderRadius: 2,
+            bgcolor: "grey.50",
+          }}
+        >
+          Ingresa <b>RUC</b>, <b>Número de trámite</b> o ambos y presiona{" "}
+          <b>Buscar</b>.
         </Box>
       ) : (
         <>
           <Divider sx={{ my: 2 }} />
-          <TablaResultadosComunicacion rows={rows} onSelect={(row) => setSelectedCaso(row)} />
+          <TablaResultadosComunicacion
+            rows={rows}
+            onSelect={(row) => setSelectedCaso(row)}
+          />
         </>
       )}
 
-      {/* Detalle en Dialog */}
       <Dialog
         open={!!selectedCaso}
         onClose={() => setSelectedCaso(null)}
@@ -191,11 +275,19 @@ const ComunicacionesEnviosPage: React.FC = () => {
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: 900 }}>
-          Gestión de Envíos / Comunicación Formal
+          Gestión de Envíos / Comunicación
         </DialogTitle>
+
         <DialogContent sx={{ pt: 1 }}>
           {selectedCaso ? (
-            <EnviosComunicacion caso={selectedCaso} onClose={() => setSelectedCaso(null)} />
+            <EnviosComunicacion
+              caso={selectedCaso}
+              onClose={() => setSelectedCaso(null)}
+              onGoTrazabilidad={() => {
+                setSelectedCaso(null);
+                handleSelect("TRAZABILIDAD DE COMUNICACIONES");
+              }}
+            />
           ) : null}
         </DialogContent>
       </Dialog>

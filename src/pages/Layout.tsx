@@ -22,11 +22,12 @@ import Aprobaciones from "./Aprobaciones";
 import VerificacionPage from "./VerificacionPage";
 import TrazabilidadBusqueda from "./TrazabilidadBusqueda";
 import ConsultasDeEstado from "./ConsultasDeEstado";
+import TrazabilidadComunicaciones from "./TrazabilidadComunicaciones";
 import PantallaControNotificacion from "../components/PantallaControNotificacion";
 
 // HOMES
 import Home from "./Home";
-import HomeJefeSeccionFiscalizacion from "./HomeJefeSeccionFiscalizacion"; // ✅ NUEVO
+import HomeJefeSeccionFiscalizacion from "./HomeJefeSeccionFiscalizacion";
 import { NuevosCasos } from "./NuevosCasos";
 import { readAprobados } from "../lib/workflowStorage";
 
@@ -42,9 +43,6 @@ import ActaCierreFiscalizacion from "../components/ActaCierreFiscalizacion";
 import AutoArchivo from "../components/AutoArchivo";
 import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
 import ParametrizacionAlertas from "./ParametrizacionAlertas";
-
-/** ✅ NUEVO: PARAMETRIZACIÓN ALERTAS */
-
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
@@ -110,7 +108,6 @@ export const Layout: React.FC = () => {
         return <HomeJefeSeccionFiscalizacion />;
 
       // ================= PARAMETRIZACIÓN =================
-      // Sidebar envía: "PARAMETRIZACIÓN/ALERTAS" => leaf = "ALERTAS"
       case "ALERTAS":
         return <ParametrizacionAlertas />;
 
@@ -119,7 +116,10 @@ export const Layout: React.FC = () => {
         return <ComunicacionesForm />;
 
       case "ENVIOS":
-        return <ComunicacionesEnviosPage />;
+        return <ComunicacionesEnviosPage handleSelect={handleSelect} />;
+
+      case "TRAZABILIDAD DE COMUNICACIONES":
+        return <TrazabilidadComunicaciones />;
 
       // ================= CONSULTAS =================
       case "TRAZABILIDAD":
@@ -223,7 +223,6 @@ export const Layout: React.FC = () => {
       height="100vh"
       sx={{ overflow: "hidden" }}
     >
-      {/* ENCABEZADO */}
       <Box sx={{ width: "100%" }}>
         <img
           src={logoDos}
@@ -232,9 +231,7 @@ export const Layout: React.FC = () => {
         />
       </Box>
 
-      {/* CONTENIDO */}
       <Box display="flex" flexGrow={1} sx={{ minHeight: 0 }}>
-        {/* SIDEBAR */}
         <Box
           sx={{
             width: 300,
@@ -252,7 +249,6 @@ export const Layout: React.FC = () => {
           <Sidebar onSelect={handleSelect} selected={selectedPath} />
         </Box>
 
-        {/* MAIN */}
         <Box
           component="main"
           sx={{

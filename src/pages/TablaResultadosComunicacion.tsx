@@ -1,4 +1,3 @@
-// src/pages/TablaResultadosComunicacion.tsx
 import * as React from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
@@ -10,6 +9,9 @@ export type CasoInfo = {
   actaInicio: string;
   representanteLegal: string;
   correo: string;
+  correos?: string[]; // <-- corregido
+  fechaApertura?: string; // <-- agregado
+  estadoCaso?: string; // <-- agregado
 };
 
 type Props = {
@@ -18,7 +20,11 @@ type Props = {
   height?: number;
 };
 
-const TablaResultadosComunicacion: React.FC<Props> = ({ rows, onSelect, height = 420 }) => {
+const TablaResultadosComunicacion: React.FC<Props> = ({
+  rows,
+  onSelect,
+  height = 420,
+}) => {
   const columns = React.useMemo<GridColDef<CasoInfo>[]>(
     () => [
       {
@@ -26,11 +32,16 @@ const TablaResultadosComunicacion: React.FC<Props> = ({ rows, onSelect, height =
         headerName: "Trámite",
         minWidth: 150,
         flex: 0.6,
-        renderCell: (p) => <Typography fontWeight={800}>{p.value}</Typography>,
+        renderCell: (p) => <Typography fontWeight={800}>{String(p.value ?? "")}</Typography>,
       },
       { field: "ruc", headerName: "RUC", minWidth: 140, flex: 0.45 },
       { field: "razonSocial", headerName: "Razón Social", minWidth: 240, flex: 1.2 },
-      { field: "representanteLegal", headerName: "Representante Legal", minWidth: 200, flex: 0.9 },
+      {
+        field: "representanteLegal",
+        headerName: "Representante Legal",
+        minWidth: 200,
+        flex: 0.9,
+      },
       { field: "correo", headerName: "Correo", minWidth: 200, flex: 0.9 },
       {
         field: "actaInicio",

@@ -1,353 +1,665 @@
-// src/pages/EnviosComunicacion.tsx
 import * as React from "react";
 import {
+  Alert,
   Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Grid,
+  List,
+  ListItemButton,
+  ListItemText,
+  MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Stack,
   TextField,
-  Button,
   Typography,
-  Divider,
-  Grid,
-  MenuItem,
-  FormControlLabel,
-  Checkbox,
-  Alert,
-  Chip,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  IconButton,
-  Tooltip,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import CloseIcon from "@mui/icons-material/Close";
-
-import Trazabilidad from "../components/Trazabilidad";
-import { buildMockTrazas } from "../services/mockTrazas";
-import { addExtraTraza, getExtraTrazas, makeTrazaKey } from "../services/trazasStore";
 import type { CasoInfo } from "./TablaResultadosComunicacion";
-
-type ModalidadEnvio = "CORREO" | "PLATAFORMA" | "TODAS";
-type TipoNotificacionPlataforma = "ELECTRONICA" | "PRESENCIAL";
-type DocumentoFormal = "ACTA_INICIO" | "PROPUESTA_REG" | "RESOLUCION" | "ACTA_CIERRE";
-
-const DOCS: { value: DocumentoFormal; label: string }[] = [
-  { value: "ACTA_INICIO", label: "Acta de Inicio" },
-  { value: "PROPUESTA_REG", label: "Propuesta de Regularización" },
-  { value: "RESOLUCION", label: "Resolución" },
-  { value: "ACTA_CIERRE", label: "Acta de Cierre" },
-];
-
-const labelModalidad = (m: ModalidadEnvio) =>
-  m === "CORREO" ? "Correo Electrónico" : m === "PLATAFORMA" ? "Notificación por Plataforma" : "Todas";
-
-const buildActividad = (
-  m: ModalidadEnvio,
-  tipoNotif?: TipoNotificacionPlataforma,
-  doc?: DocumentoFormal,
-  adj?: boolean
-) => {
-  if (m === "CORREO") return adj ? `Envío de correo (con adjunto${doc ? `: ${doc}` : ""})` : "Envío de correo";
-  if (m === "PLATAFORMA") return `Notificación por plataforma (${tipoNotif ?? "ELECTRONICA"})`;
-  return "Envío por correo y plataforma";
-};
+import {
+  appendTrazabilidadComunicacion,
+  type TrazabilidadCorreo,
+} from "../lib/trazabilidadComunicacionesStorage";
 
 type Props = {
   caso: CasoInfo;
-  onClose?: () => void; // si lo montas en Dialog
+  onClose: () => void;
+  onGoTrazabilidad?: () => void;
 };
 
-const EnviosComunicacion: React.FC<Props> = ({ caso, onClose }) => {
-  const key = React.useMemo(() => makeTrazaKey(caso.ruc, caso.noTramite), [caso.ruc, caso.noTramite]);
+type TipoComunicacion =
+  | "NOTIFICACION_ACTA_INICIO"
+  | "NOTIFICACION_ACTA_CIERRE"
+  | "SOLICITUD_INFORMACION";
 
-  // trazas
-  const [trazas, setTrazas] = React.useState<any[]>([]);
+type DocumentoMock = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  fecha: string;
+  tamanoMb: number;
+};
 
-  // ✅ inicia CERRADO
-  const [expanded, setExpanded] = React.useState(false);
+const DOCUMENTOS_MOCK: DocumentoMock[] = [
+  {
+    id: "1",
+    nombre: "Acta de Inicio.pdf",
+    tipo: "ACTA",
+    fecha: "09/03/2026",
+    tamanoMb: 1.8,
+  },
+  {
+    id: "2",
+    nombre: "Acta de Cierre.pdf",
+    tipo: "ACTA",
+    fecha: "09/03/2026",
+    tamanoMb: 2.2,
+  },
+  {
+    id: "3",
+    nombre: "Solicitud de Información.pdf",
+    tipo: "OFICIO",
+    fecha: "09/03/2026",
+    tamanoMb: 0.9,
+  },
+  {
+    id: "4",
+    nombre: "Anexo Tributario.xlsx",
+    tipo: "ANEXO",
+    fecha: "08/03/2026",
+    tamanoMb: 3.1,
+  },
+];
 
-  // formulario envío
-  const [modalidad, setModalidad] = React.useState<ModalidadEnvio>("CORREO");
+const MAX_ASUNTO = 100;
+const MAX_MENSAJE = 4000;
+const MAX_MB = 10;
 
-  // correo
-  const [requiereAdjunto, setRequiereAdjunto] = React.useState(false);
-  const [documento, setDocumento] = React.useState<DocumentoFormal>("ACTA_INICIO");
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
 
-  // plataforma
-  const [tipoNotif, setTipoNotif] = React.useState<TipoNotificacionPlataforma>("ELECTRONICA");
+function formatDateTime(d: Date) {
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  const hh = d.getHours();
+  const min = pad(d.getMinutes());
 
-  // obligatorio
-  const [observacion, setObservacion] = React.useState("");
+  const ampm = hh >= 12 ? "p. m." : "a. m.";
+  const hour12 = hh % 12 === 0 ? 12 : hh % 12;
+
+  return `${dd}/${mm}/${yyyy}, ${pad(hour12)}:${min} ${ampm}`;
+}
+
+function formatDate(d: Date) {
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+function addDays(base: Date, days: number) {
+  const copy = new Date(base);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function getTipoLabel(tipo: TipoComunicacion | "") {
+  switch (tipo) {
+    case "NOTIFICACION_ACTA_INICIO":
+      return "Notificación Acta de Inicio";
+    case "NOTIFICACION_ACTA_CIERRE":
+      return "Notificación Acta de Cierre";
+    case "SOLICITUD_INFORMACION":
+      return "Solicitud de Información";
+    default:
+      return "";
+  }
+}
+
+function buildAsunto(tipo: TipoComunicacion | "", noTramite: string) {
+  switch (tipo) {
+    case "NOTIFICACION_ACTA_INICIO":
+      return `Notificación Acta de Inicio - Trámite ${noTramite}`;
+    case "NOTIFICACION_ACTA_CIERRE":
+      return `Notificación Acta de Cierre - Trámite ${noTramite}`;
+    case "SOLICITUD_INFORMACION":
+      return `Solicitud de Información - Trámite ${noTramite}`;
+    default:
+      return "";
+  }
+}
+
+function buildMensajeBase(caso: CasoInfo, tipo: TipoComunicacion | "") {
+  switch (tipo) {
+    case "NOTIFICACION_ACTA_INICIO":
+      return `Se envía notificación del Acta de Inicio asociada al trámite ${caso.noTramite}.`;
+    case "NOTIFICACION_ACTA_CIERRE":
+      return `Se envía notificación del Acta de Cierre asociada al trámite ${caso.noTramite}.`;
+    case "SOLICITUD_INFORMACION":
+      return `Se solicita información asociada al trámite ${caso.noTramite}.`;
+    default:
+      return "";
+  }
+}
+
+function buildNoDocumento(noTramite: string) {
+  const limpio = noTramite.replace(/[^\d]/g, "").slice(-8) || "00000000";
+  const hoy = new Date();
+  return `DOC-${hoy.getFullYear()}${pad(hoy.getMonth() + 1)}${pad(hoy.getDate())}-${limpio}`;
+}
+
+function buildNombreDocumento(noTramite: string) {
+  return `Correo_${noTramite}.pdf`;
+}
+
+const InfoItem = ({
+  label,
+  value,
+}: {
+  label: string;
+  value?: React.ReactNode;
+}) => (
+  <Box>
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ fontWeight: 700 }}
+    >
+      {label}
+    </Typography>
+    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+      {value || "-"}
+    </Typography>
+  </Box>
+);
+
+const EnviosComunicacion: React.FC<Props> = ({
+  caso,
+  onClose,
+  onGoTrazabilidad,
+}) => {
+  const correosDisponibles: string[] =
+    Array.isArray(caso.correos) && caso.correos.length > 0
+      ? caso.correos
+      : caso.correo
+        ? [caso.correo]
+        : [];
+
+  const correoDestino = correosDisponibles[0] ?? "";
+
+  const [tipoComunicacion, setTipoComunicacion] = React.useState<
+    TipoComunicacion | ""
+  >("");
+  const [adjuntar, setAdjuntar] = React.useState<"SI" | "NO">("NO");
+  const [documentoSeleccionado, setDocumentoSeleccionado] =
+    React.useState<string>("");
+  const [asunto, setAsunto] = React.useState<string>("");
+  const [mensaje, setMensaje] = React.useState<string>("");
+  const [diasMaxRespuesta, setDiasMaxRespuesta] = React.useState<number>(5);
+
   const [error, setError] = React.useState<string>("");
+  const [success, setSuccess] = React.useState<string>("");
+  const [enviando, setEnviando] = React.useState<boolean>(false);
+  const [previewOpen, setPreviewOpen] = React.useState<boolean>(false);
 
-  const resetFormEnvio = React.useCallback(() => {
-    setModalidad("CORREO");
-    setRequiereAdjunto(false);
-    setDocumento("ACTA_INICIO");
-    setTipoNotif("ELECTRONICA");
-    setObservacion("");
-    setError("");
-    setExpanded(false);
-  }, []);
+  const documentosDisponibles = React.useMemo(() => {
+    if (tipoComunicacion === "NOTIFICACION_ACTA_INICIO") {
+      return DOCUMENTOS_MOCK.filter((d) => d.nombre.includes("Inicio"));
+    }
+    if (tipoComunicacion === "NOTIFICACION_ACTA_CIERRE") {
+      return DOCUMENTOS_MOCK.filter((d) => d.nombre.includes("Cierre"));
+    }
+    if (tipoComunicacion === "SOLICITUD_INFORMACION") {
+      return DOCUMENTOS_MOCK.filter(
+        (d) =>
+          d.nombre.includes("Solicitud") ||
+          d.tipo === "ANEXO" ||
+          d.tipo === "OFICIO",
+      );
+    }
+    return DOCUMENTOS_MOCK;
+  }, [tipoComunicacion]);
 
-  const loadTrazas = React.useCallback(
-    (k: string) => {
-      const base = buildMockTrazas(k);
-      const extra = getExtraTrazas(k);
-      setTrazas([...extra, ...base]);
-    },
-    [setTrazas]
+  const documentoActual = documentosDisponibles.find(
+    (d) => d.id === documentoSeleccionado,
   );
+  const pesoTotal = documentoActual ? documentoActual.tamanoMb : 0;
 
-  // ✅ cada vez que cambie el caso seleccionado
+  const noDocumentoPreview = buildNoDocumento(caso.noTramite);
+  const nombreDocumentoPreview = buildNombreDocumento(caso.noTramite);
+
   React.useEffect(() => {
-    loadTrazas(key);
-    resetFormEnvio();
-  }, [key, loadTrazas, resetFormEnvio]);
+    if (!tipoComunicacion) return;
 
-  const handleEnviar = () => {
+    setAsunto(buildAsunto(tipoComunicacion, caso.noTramite));
+    setMensaje(buildMensajeBase(caso, tipoComunicacion));
+    setDocumentoSeleccionado("");
+    setSuccess("");
     setError("");
 
-    const obs = observacion.trim();
-    if (!obs) {
-      setError("La observación es obligatoria antes de enviar.");
-      return;
+    if (tipoComunicacion === "SOLICITUD_INFORMACION") {
+      setDiasMaxRespuesta(5);
+    } else {
+      setDiasMaxRespuesta(3);
+    }
+  }, [tipoComunicacion, caso]);
+
+  const validarFormulario = () => {
+    if (!correoDestino) {
+      setError("No hay correo electrónico disponible para el contribuyente.");
+      return false;
     }
 
-    if ((modalidad === "CORREO" || modalidad === "TODAS") && requiereAdjunto && !documento) {
-      setError("Debes seleccionar el documento a adjuntar.");
-      return;
+    if (!tipoComunicacion) {
+      setError("Debe seleccionar el tipo de comunicación.");
+      return false;
     }
 
-    const nowISO = new Date().toISOString();
+    if (!asunto.trim()) {
+      setError("Debe ingresar el asunto.");
+      return false;
+    }
 
-    const actividad = buildActividad(
-      modalidad,
-      modalidad === "PLATAFORMA" || modalidad === "TODAS" ? tipoNotif : undefined,
-      modalidad === "CORREO" || modalidad === "TODAS" ? documento : undefined,
-      modalidad === "CORREO" || modalidad === "TODAS" ? requiereAdjunto : false
-    );
+    if (!mensaje.trim()) {
+      setError("Debe ingresar el mensaje.");
+      return false;
+    }
 
-    const nuevo: any = {
-      id: `ENV-${Date.now()}`,
-      actividad,
-      usuarioGestion: "Auditor",
-      fechaInicialISO: nowISO,
-      fechaFinalISO: "",
-      estado: "PENDIENTE" as any,
-      observacion: obs,
-    };
+    if (asunto.length > MAX_ASUNTO || mensaje.length > MAX_MENSAJE) {
+      setError("El número de caracteres supera el límite permitido.");
+      return false;
+    }
 
-    addExtraTraza(key, nuevo);
-    loadTrazas(key);
+    if (adjuntar === "SI" && !documentoSeleccionado) {
+      setError("Debe seleccionar un documento para adjuntar.");
+      return false;
+    }
 
-    setObservacion("");
-    setExpanded(false);
+    if (pesoTotal > MAX_MB) {
+      setError(
+        "El tamaño total del correo supera el máximo permitido de 10 MB.",
+      );
+      return false;
+    }
+
+    if (diasMaxRespuesta < 1 || diasMaxRespuesta > 30) {
+      setError("Los días máximos de respuesta deben estar entre 1 y 30.");
+      return false;
+    }
+
+    setError("");
+    return true;
   };
 
-  const showCorreoBlock = modalidad === "CORREO" || modalidad === "TODAS";
-  const showPlataformaBlock = modalidad === "PLATAFORMA" || modalidad === "TODAS";
+  const handleOpenPreview = () => {
+    setSuccess("");
+    if (!validarFormulario()) return;
+    setPreviewOpen(true);
+  };
 
-  return (
-    <Box component={Paper} sx={{ p: 2 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="h6">Comunicaciones → Envíos</Typography>
+  const handleIrTrazabilidad = () => {
+    setPreviewOpen(false);
+    onGoTrazabilidad?.();
+  };
 
-        {onClose ? (
-          <Tooltip title="Cerrar">
-            <IconButton onClick={onClose}>
-              <CloseIcon />
-            </IconButton>
-          </Tooltip>
-        ) : null}
-      </Stack>
+  const handleEnviar = async () => {
+    if (!validarFormulario()) return;
 
-      {/* Info caso */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ mb: 1 }} alignItems="center" flexWrap="wrap">
-          <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+    setEnviando(true);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setEnviando(false);
+
+    const ahora = new Date();
+    const fechaLimite = addDays(ahora, diasMaxRespuesta);
+
+    const nuevaTraza: TrazabilidadCorreo = {
+      id: `mail-${Date.now()}`,
+      ruc: caso.ruc,
+      noTramite: caso.noTramite,
+      fechaEnvio: formatDateTime(ahora),
+      fechaRespuesta: "—",
+      origen: "Sistema",
+      destino: correoDestino || "Correo registrado",
+      asunto,
+      mensaje,
+      noDocumento: noDocumentoPreview,
+      nombreDocumento: nombreDocumentoPreview,
+      diasMaxRespuesta,
+      diasFaltantes: diasMaxRespuesta,
+      fechaLimiteRespuesta: formatDate(fechaLimite),
+      estado: "ENVIADO",
+    };
+
+    appendTrazabilidadComunicacion(nuevaTraza);
+
+    setPreviewOpen(false);
+    setSuccess(
+      `Comunicación enviada exitosamente. Se otorgaron ${diasMaxRespuesta} día(s) de respuesta.`,
+    );
+  };
+
+  const handleLimpiar = () => {
+    setMensaje("");
+    setAsunto("");
+    setError("");
+    setSuccess("");
+    setDocumentoSeleccionado("");
+    setAdjuntar("NO");
+  };
+
+return (
+  <Box sx={{ py: 1 }}>
+    <Grid container spacing={2}>
+      <Grid item xs={12}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <Typography sx={{ fontWeight: 900, mb: 1.5 }}>
             Información del Contribuyente / Caso
           </Typography>
-          <Chip size="small" label={`Trámite: ${caso.noTramite}`} />
-          <Chip size="small" label={`RUC: ${caso.ruc}`} />
-        </Stack>
 
-        <Grid container spacing={1.5}>
-          <Grid item xs={12} md={6}>
-            <Typography variant="body2" color="text.secondary">
-              Razón Social
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 800 }}>
-              {caso.razonSocial}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <Typography variant="body2" color="text.secondary">
-              No. Acta de Inicio
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 800 }}>
-              {caso.actaInicio}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <Typography variant="body2" color="text.secondary">
-              Correo
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 800 }}>
-              {caso.correo}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Typography variant="body2" color="text.secondary">
-              Representante Legal
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 800 }}>
-              {caso.representanteLegal}
-            </Typography>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Divider sx={{ my: 2 }} />
-
-      {/* Form envio */}
-      <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>
-        Envío de Comunicación Formal
-      </Typography>
-
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-          <TextField
-            select
-            fullWidth
-            label="Modalidad de Envío"
-            value={modalidad}
-            onChange={(e) => {
-              setModalidad(e.target.value as ModalidadEnvio);
-              setError("");
-            }}
-          >
-            <MenuItem value="CORREO">Correo Electrónico</MenuItem>
-            <MenuItem value="PLATAFORMA">Notificación por Plataforma</MenuItem>
-            <MenuItem value="TODAS">Todas</MenuItem>
-          </TextField>
-        </Grid>
-
-        {showPlataformaBlock ? (
-          <Grid item xs={12} md={4}>
-            <TextField
-              select
-              fullWidth
-              label="Tipo de Notificación (Plataforma)"
-              value={tipoNotif}
-              onChange={(e) => setTipoNotif(e.target.value as TipoNotificacionPlataforma)}
-            >
-              <MenuItem value="ELECTRONICA">Electrónica</MenuItem>
-              <MenuItem value="PRESENCIAL">Presencial</MenuItem>
-            </TextField>
-          </Grid>
-        ) : null}
-
-        {showCorreoBlock ? (
-          <Grid item xs={12} md={4}>
-            <Paper variant="outlined" sx={{ p: 1.5, height: "100%" }}>
-              <Typography variant="body2" sx={{ fontWeight: 900, mb: 0.5 }}>
-                Correo Electrónico
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={requiereAdjunto}
-                    onChange={(e) => setRequiereAdjunto(e.target.checked)}
-                  />
-                }
-                label="Requiere adjuntar documento"
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={5}>
+              <InfoItem label="Razón Social" value={caso.razonSocial} />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <InfoItem label="Trámite" value={caso.noTramite} />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <InfoItem label="RUC" value={caso.ruc} />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <InfoItem label="No. Acta de Inicio" value={caso.actaInicio} />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <InfoItem
+                label="Representante Legal"
+                value={caso.representanteLegal}
               />
-              {requiereAdjunto ? (
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <InfoItem label="Correo" value={correoDestino || caso.correo} />
+            </Grid>
+          </Grid>
+        </Paper>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Card variant="outlined" sx={{ borderRadius: 2 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 2 }}>
+              Envío de Comunicación
+            </Typography>
+
+            <Grid container spacing={2}>
+
+              {/* ================= CAMPOS ================= */}
+
+              <Grid item xs={12} md={6}>
                 <TextField
                   select
                   fullWidth
-                  label="Documento a enviar"
-                  value={documento}
-                  onChange={(e) => setDocumento(e.target.value as DocumentoFormal)}
-                  sx={{ mt: 1 }}
+                  label="Tipo de comunicación"
+                  value={tipoComunicacion}
+                  onChange={(e) =>
+                    setTipoComunicacion(e.target.value as TipoComunicacion)
+                  }
                 >
-                  {DOCS.map((d) => (
-                    <MenuItem key={d.value} value={d.value}>
-                      {d.label}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="NOTIFICACION_ACTA_INICIO">
+                    Notificación Acta de Inicio
+                  </MenuItem>
+                  <MenuItem value="NOTIFICACION_ACTA_CIERRE">
+                    Notificación Acta de Cierre
+                  </MenuItem>
+                  <MenuItem value="SOLICITUD_INFORMACION">
+                    Solicitud de Información
+                  </MenuItem>
                 </TextField>
-              ) : null}
-            </Paper>
-          </Grid>
-        ) : null}
+              </Grid>
 
-        {/* Observación obligatoria */}
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Observación (obligatoria antes de enviar)"
-            value={observacion}
-            onChange={(e) => {
-              setObservacion(e.target.value);
-              if (error) setError("");
-            }}
-            placeholder="Ej.: Se remite Acta de Inicio para notificación formal y constancia de entrega."
-            multiline
-            minRows={3}
-          />
-        </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Días máximos de respuesta"
+                  value={diasMaxRespuesta}
+                  onChange={(e) =>
+                    setDiasMaxRespuesta(Number(e.target.value || 0))
+                  }
+                  inputProps={{ min: 1, max: 30 }}
+                  helperText="Plazo otorgado al contribuyente"
+                />
+              </Grid>
 
-        <Grid item xs={12}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="flex-end">
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={() => {
-                setObservacion("");
-                setError("");
+              <Grid item xs={12}>
+                <FormControl>
+                  <FormLabel>Adjuntar documento</FormLabel>
+                  <RadioGroup
+                    row
+                    value={adjuntar}
+                    onChange={(e) =>
+                      setAdjuntar(e.target.value as "SI" | "NO")
+                    }
+                  >
+                    <FormControlLabel value="SI" control={<Radio />} label="Sí" />
+                    <FormControlLabel value="NO" control={<Radio />} label="No" />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+
+              {adjuntar === "SI" && (
+                <Grid item xs={12}>
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 1.5, borderRadius: 2, bgcolor: "grey.50" }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 800, mb: 1 }}
+                    >
+                      Documentos disponibles del caso (simulación BPM)
+                    </Typography>
+
+                    <List dense sx={{ py: 0 }}>
+                      {documentosDisponibles.map((doc) => {
+                        const selected = documentoSeleccionado === doc.id;
+
+                        return (
+                          <ListItemButton
+                            key={doc.id}
+                            selected={selected}
+                            onClick={() => setDocumentoSeleccionado(doc.id)}
+                            sx={{ borderRadius: 2, mb: 0.5 }}
+                          >
+                            <ListItemText
+                              primary={doc.nombre}
+                              secondary={`Tipo: ${doc.tipo} · Fecha: ${doc.fecha} · Tamaño: ${doc.tamanoMb} MB`}
+                            />
+                            {selected && (
+                              <Chip
+                                label="Seleccionado"
+                                color="primary"
+                                size="small"
+                              />
+                            )}
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+                  </Paper>
+                </Grid>
+              )}
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Asunto"
+                  value={asunto}
+                  onChange={(e) => setAsunto(e.target.value)}
+                  helperText={`${asunto.length}/${MAX_ASUNTO} caracteres`}
+                  error={asunto.length > MAX_ASUNTO}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={6}
+                  label="Mensaje"
+                  value={mensaje}
+                  onChange={(e) => setMensaje(e.target.value)}
+                  helperText={`${mensaje.length}/${MAX_MENSAJE} caracteres`}
+                  error={mensaje.length > MAX_MENSAJE}
+                />
+              </Grid>
+
+              {/* ================= ERRORES ================= */}
+
+              {error && (
+                <Grid item xs={12}>
+                  <Alert severity="error">{error}</Alert>
+                </Grid>
+              )}
+
+              {success && (
+                <>
+                  <Grid item xs={12}>
+                    <Alert severity="success">{success}</Alert>
+                  </Grid>
+
+                  {onGoTrazabilidad && (
+                    <Grid item xs={12}>
+                      <Button
+                        variant="contained"
+                        onClick={handleIrTrazabilidad}
+                      >
+                        Ver trazabilidad de comunicaciones
+                      </Button>
+                    </Grid>
+                  )}
+                </>
+              )}
+
+              {/* ================= BOTONES ================= */}
+
+              <Grid item xs={12}>
+                <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1.2}
+                  >
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      onClick={handleLimpiar}
+                    >
+                      Limpiar
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      onClick={onClose}
+                    >
+                      Cerrar
+                    </Button>
+
+                    <Button
+                      variant="contained"
+                      onClick={handleOpenPreview}
+                    >
+                      Vista previa
+                    </Button>
+                  </Stack>
+                </Box>
+              </Grid>
+
+            </Grid>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+
+    {/* ================= PREVIEW ================= */}
+
+    <Dialog
+      open={previewOpen}
+      onClose={() => setPreviewOpen(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle sx={{ fontWeight: 900 }}>
+        Vista previa del correo
+      </DialogTitle>
+
+      <DialogContent dividers>
+        <Paper
+          variant="outlined"
+          sx={{ p: 2, borderRadius: 2, bgcolor: "#fcfcfc" }}
+        >
+          <Stack spacing={1.5}>
+            <Typography variant="body2">
+              <b>De:</b> buzondgi@correo.com
+            </Typography>
+
+            <Typography variant="body2">
+              <b>Para:</b> {correoDestino || "-"}
+            </Typography>
+
+            <Typography variant="body2">
+              <b>Asunto:</b> {asunto || "-"}
+            </Typography>
+
+            <Divider />
+
+            <Box
+              sx={{
+                whiteSpace: "pre-wrap",
+                fontSize: 14,
+                lineHeight: 1.6,
+                p: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2,
+                bgcolor: "#fff",
+                minHeight: 180,
               }}
             >
-              Limpiar observación
-            </Button>
-            <Button variant="contained" onClick={handleEnviar}>
-              Enviar
-            </Button>
+              {mensaje || "Aquí se visualizará el contenido del correo."}
+            </Box>
           </Stack>
+        </Paper>
+      </DialogContent>
 
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-            Modalidad seleccionada: <b>{labelModalidad(modalidad)}</b>
-          </Typography>
-        </Grid>
-      </Grid>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => setPreviewOpen(false)}
+        >
+          Volver
+        </Button>
 
-      <Divider sx={{ my: 2 }} />
-
-      {/* Trazabilidad en acordeón (cerrado por defecto) */}
-      <Accordion expanded={expanded} onChange={(_, v) => setExpanded(v)} disableGutters>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography sx={{ fontWeight: 900 }}>Trazabilidad del Caso</Typography>
-        </AccordionSummary>
-
-        {expanded ? (
-          <AccordionDetails>
-            <Trazabilidad rows={trazas} height={460} />
-          </AccordionDetails>
-        ) : null}
-      </Accordion>
-    </Box>
-  );
+        <Button
+          variant="contained"
+          onClick={handleEnviar}
+          disabled={enviando}
+        >
+          {enviando ? "Enviando..." : "Enviar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  </Box>
+);
 };
 
 export default EnviosComunicacion;

@@ -99,7 +99,11 @@ const useMenuData = () => {
   const modulos: MenuNode[] = [
     {
       label: "MÓDULO COMUNICACIÓN",
-      children: [{ label: "COMUNICACIONES" }, { label: "ENVIOS" }],
+      children: [
+        { label: "COMUNICACIONES" },
+        { label: "ENVIOS" },
+        { label: "TRAZABILIDAD DE COMUNICACIONES" },
+      ],
     },
     { label: "MÓDULO CONSULTAS" },
     { label: "MÓDULO ALERTAS" },
