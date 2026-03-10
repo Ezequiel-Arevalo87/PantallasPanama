@@ -20,7 +20,6 @@ import TablaResultadosComunicacion, {
 } from "./TablaResultadosComunicacion";
 import EnviosComunicacion from "./EnviosComunicacion";
 
-/** ===================== MOCK HELPERS ===================== */
 const randomFrom = (seed: string, arr: string[]) => {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -127,10 +126,9 @@ const isRucValido = (value: string) => {
 };
 
 type Props = {
-  handleSelect: (ruta: string) => void;
+  handleSelect: (ruta: string, state?: any) => void;
 };
 
-/** ===================== PAGE ===================== */
 const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
   const [ruc, setRuc] = React.useState("");
   const [tramite, setTramite] = React.useState("");
@@ -194,7 +192,12 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
           Comunicaciones → Envíos
         </Typography>
 
-      
+        <Chip
+          label="Mockup funcional front"
+          color="primary"
+          variant="outlined"
+          size="small"
+        />
       </Stack>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -283,9 +286,12 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
             <EnviosComunicacion
               caso={selectedCaso}
               onClose={() => setSelectedCaso(null)}
-              onGoTrazabilidad={() => {
+              onGoTrazabilidad={({ ruc, noTramite }) => {
                 setSelectedCaso(null);
-                handleSelect("TRAZABILIDAD DE COMUNICACIONES");
+                handleSelect("TRAZABILIDAD DE COMUNICACIONES", {
+                  ruc,
+                  noTramite,
+                });
               }}
             />
           ) : null}

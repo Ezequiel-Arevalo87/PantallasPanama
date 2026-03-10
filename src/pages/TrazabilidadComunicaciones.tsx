@@ -20,6 +20,13 @@ import {
   type TrazabilidadCorreo,
 } from "../lib/trazabilidadComunicacionesStorage";
 
+type Props = {
+  initialFilters?: {
+    ruc?: string;
+    noTramite?: string;
+  };
+};
+
 const getEstadoColor = (estado: TrazabilidadCorreo["estado"]) => {
   switch (estado) {
     case "RESPONDIDO":
@@ -31,38 +38,63 @@ const getEstadoColor = (estado: TrazabilidadCorreo["estado"]) => {
   }
 };
 
-const TrazabilidadComunicaciones: React.FC = () => {
-  const [ruc, setRuc] = React.useState("");
-  const [tramite, setTramite] = React.useState("");
+const filtrarRows = (
+  all: TrazabilidadCorreo[],
+  rucValue: string,
+  tramiteValue: string
+) => {
+  const r = rucValue.trim().toLowerCase();
+  const t = tramiteValue.trim().toLowerCase();
+
+  return all.filter((item) => {
+    const matchRuc = !r || item.ruc.toLowerCase().includes(r);
+    const matchTramite = !t || item.noTramite.toLowerCase().includes(t);
+    return matchRuc && matchTramite;
+  });
+};
+
+const TrazabilidadComunicaciones: React.FC<Props> = ({ initialFilters }) => {
+  const [ruc, setRuc] = React.useState(initialFilters?.ruc ?? "");
+  const [tramite, setTramite] = React.useState(initialFilters?.noTramite ?? "");
   const [rows, setRows] = React.useState<TrazabilidadCorreo[]>([]);
   const [error, setError] = React.useState("");
 
   const loadData = React.useCallback(() => {
     const all = readTrazabilidadComunicaciones();
-    setRows(all);
-  }, []);
+    const filtered = filtrarRows(
+      all,
+      initialFilters?.ruc ?? ruc,
+      initialFilters?.noTramite ?? tramite
+    );
+
+    if ((initialFilters?.ruc || initialFilters?.noTramite) && !filtered.length) {
+      setRows([]);
+      setError("No se encontraron registros para el caso seleccionado.");
+      return;
+    }
+
+    setRows(filtered.length ? filtered : all);
+    setError("");
+  }, [initialFilters?.ruc, initialFilters?.noTramite, ruc, tramite]);
 
   React.useEffect(() => {
+    if (initialFilters?.ruc || initialFilters?.noTramite) {
+      setRuc(initialFilters?.ruc ?? "");
+      setTramite(initialFilters?.noTramite ?? "");
+    }
+
     loadData();
 
     const onFocus = () => loadData();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [loadData]);
+  }, [initialFilters?.ruc, initialFilters?.noTramite, loadData]);
 
   const handleBuscar = () => {
     setError("");
 
     const all = readTrazabilidadComunicaciones();
-
-    const r = ruc.trim().toLowerCase();
-    const t = tramite.trim().toLowerCase();
-
-    const filtered = all.filter((item) => {
-      const matchRuc = !r || item.ruc.toLowerCase().includes(r);
-      const matchTramite = !t || item.noTramite.toLowerCase().includes(t);
-      return matchRuc && matchTramite;
-    });
+    const filtered = filtrarRows(all, ruc, tramite);
 
     if (!filtered.length) {
       setRows([]);
@@ -162,10 +194,7 @@ const TrazabilidadComunicaciones: React.FC = () => {
                 <TableCell>{item.destino}</TableCell>
                 <TableCell>{item.asunto}</TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: "normal", lineHeight: 1.4 }}
-                  >
+                  <Typography variant="body2" sx={{ whiteSpace: "normal", lineHeight: 1.4 }}>
                     {item.mensaje}
                   </Typography>
                 </TableCell>

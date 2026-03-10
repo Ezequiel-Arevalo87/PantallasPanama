@@ -115,11 +115,18 @@ export const Layout: React.FC = () => {
       case "COMUNICACIONES":
         return <ComunicacionesForm />;
 
-      case "ENVIOS":
-        return <ComunicacionesEnviosPage handleSelect={handleSelect} />;
+     case "ENVIOS":
+  return <ComunicacionesEnviosPage handleSelect={handleGo} />;
 
-      case "TRAZABILIDAD DE COMUNICACIONES":
-        return <TrazabilidadComunicaciones />;
+case "TRAZABILIDAD DE COMUNICACIONES":
+  return (
+    <TrazabilidadComunicaciones
+      initialFilters={{
+        ruc: routeState?.ruc,
+        noTramite: routeState?.noTramite,
+      }}
+    />
+  );
 
       // ================= CONSULTAS =================
       case "TRAZABILIDAD":

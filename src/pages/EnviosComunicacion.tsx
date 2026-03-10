@@ -35,7 +35,7 @@ import {
 type Props = {
   caso: CasoInfo;
   onClose: () => void;
-  onGoTrazabilidad?: () => void;
+  onGoTrazabilidad?: (params: { ruc: string; noTramite: string }) => void;
 };
 
 type TipoComunicacion =
@@ -113,19 +113,6 @@ function addDays(base: Date, days: number) {
   return copy;
 }
 
-function getTipoLabel(tipo: TipoComunicacion | "") {
-  switch (tipo) {
-    case "NOTIFICACION_ACTA_INICIO":
-      return "Notificación Acta de Inicio";
-    case "NOTIFICACION_ACTA_CIERRE":
-      return "Notificación Acta de Cierre";
-    case "SOLICITUD_INFORMACION":
-      return "Solicitud de Información";
-    default:
-      return "";
-  }
-}
-
 function buildAsunto(tipo: TipoComunicacion | "", noTramite: string) {
   switch (tipo) {
     case "NOTIFICACION_ACTA_INICIO":
@@ -170,11 +157,7 @@ const InfoItem = ({
   value?: React.ReactNode;
 }) => (
   <Box>
-    <Typography
-      variant="caption"
-      color="text.secondary"
-      sx={{ fontWeight: 700 }}
-    >
+    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
       {label}
     </Typography>
     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -192,17 +175,14 @@ const EnviosComunicacion: React.FC<Props> = ({
     Array.isArray(caso.correos) && caso.correos.length > 0
       ? caso.correos
       : caso.correo
-        ? [caso.correo]
-        : [];
+      ? [caso.correo]
+      : [];
 
   const correoDestino = correosDisponibles[0] ?? "";
 
-  const [tipoComunicacion, setTipoComunicacion] = React.useState<
-    TipoComunicacion | ""
-  >("");
+  const [tipoComunicacion, setTipoComunicacion] = React.useState<TipoComunicacion | "">("");
   const [adjuntar, setAdjuntar] = React.useState<"SI" | "NO">("NO");
-  const [documentoSeleccionado, setDocumentoSeleccionado] =
-    React.useState<string>("");
+  const [documentoSeleccionado, setDocumentoSeleccionado] = React.useState<string>("");
   const [asunto, setAsunto] = React.useState<string>("");
   const [mensaje, setMensaje] = React.useState<string>("");
   const [diasMaxRespuesta, setDiasMaxRespuesta] = React.useState<number>(5);
@@ -224,19 +204,25 @@ const EnviosComunicacion: React.FC<Props> = ({
         (d) =>
           d.nombre.includes("Solicitud") ||
           d.tipo === "ANEXO" ||
-          d.tipo === "OFICIO",
+          d.tipo === "OFICIO"
       );
     }
     return DOCUMENTOS_MOCK;
   }, [tipoComunicacion]);
 
   const documentoActual = documentosDisponibles.find(
-    (d) => d.id === documentoSeleccionado,
+    (d) => d.id === documentoSeleccionado
   );
   const pesoTotal = documentoActual ? documentoActual.tamanoMb : 0;
 
   const noDocumentoPreview = buildNoDocumento(caso.noTramite);
   const nombreDocumentoPreview = buildNombreDocumento(caso.noTramite);
+
+  const nombreUsuarioPreview = "JUAN PEREZ GÓMEZ";
+  const rucConDvPreview = caso.ruc || "-";
+  const nombreContribuyentePreview = caso.razonSocial || "-";
+  const representantePreview = caso.representanteLegal || "-";
+  const correoPreview = correoDestino || caso.correo || "-";
 
   React.useEffect(() => {
     if (!tipoComunicacion) return;
@@ -286,9 +272,7 @@ const EnviosComunicacion: React.FC<Props> = ({
     }
 
     if (pesoTotal > MAX_MB) {
-      setError(
-        "El tamaño total del correo supera el máximo permitido de 10 MB.",
-      );
+      setError("El tamaño total del correo supera el máximo permitido de 10 MB.");
       return false;
     }
 
@@ -309,7 +293,10 @@ const EnviosComunicacion: React.FC<Props> = ({
 
   const handleIrTrazabilidad = () => {
     setPreviewOpen(false);
-    onGoTrazabilidad?.();
+    onGoTrazabilidad?.({
+      ruc: caso.ruc,
+      noTramite: caso.noTramite,
+    });
   };
 
   const handleEnviar = async () => {
@@ -344,7 +331,7 @@ const EnviosComunicacion: React.FC<Props> = ({
 
     setPreviewOpen(false);
     setSuccess(
-      `Comunicación enviada exitosamente. Se otorgaron ${diasMaxRespuesta} día(s) de respuesta.`,
+      `Comunicación enviada exitosamente. Se otorgaron ${diasMaxRespuesta} día(s) de respuesta.`
     );
   };
 
@@ -357,309 +344,267 @@ const EnviosComunicacion: React.FC<Props> = ({
     setAdjuntar("NO");
   };
 
-return (
-  <Box sx={{ py: 1 }}>
-    <Grid container spacing={2}>
-      <Grid item xs={12}>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-          <Typography sx={{ fontWeight: 900, mb: 1.5 }}>
-            Información del Contribuyente / Caso
-          </Typography>
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={5}>
-              <InfoItem label="Razón Social" value={caso.razonSocial} />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <InfoItem label="Trámite" value={caso.noTramite} />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <InfoItem label="RUC" value={caso.ruc} />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <InfoItem label="No. Acta de Inicio" value={caso.actaInicio} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <InfoItem
-                label="Representante Legal"
-                value={caso.representanteLegal}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <InfoItem label="Correo" value={correoDestino || caso.correo} />
-            </Grid>
-          </Grid>
-        </Paper>
-      </Grid>
-
-      <Grid item xs={12}>
-        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-          <CardContent>
-            <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 2 }}>
-              Envío de Comunicación
+  return (
+    <Box sx={{ py: 1 }}>
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+            <Typography sx={{ fontWeight: 900, mb: 1.5 }}>
+              Información del Contribuyente / Caso
             </Typography>
 
             <Grid container spacing={2}>
-
-              {/* ================= CAMPOS ================= */}
-
+              <Grid item xs={12} md={5}>
+                <InfoItem label="Razón Social" value={caso.razonSocial} />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <InfoItem label="Trámite" value={caso.noTramite} />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <InfoItem label="RUC" value={caso.ruc} />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <InfoItem label="No. Acta de Inicio" value={caso.actaInicio} />
+              </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Tipo de comunicación"
-                  value={tipoComunicacion}
-                  onChange={(e) =>
-                    setTipoComunicacion(e.target.value as TipoComunicacion)
-                  }
-                >
-                  <MenuItem value="NOTIFICACION_ACTA_INICIO">
-                    Notificación Acta de Inicio
-                  </MenuItem>
-                  <MenuItem value="NOTIFICACION_ACTA_CIERRE">
-                    Notificación Acta de Cierre
-                  </MenuItem>
-                  <MenuItem value="SOLICITUD_INFORMACION">
-                    Solicitud de Información
-                  </MenuItem>
-                </TextField>
+                <InfoItem label="Representante Legal" value={caso.representanteLegal} />
               </Grid>
-
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Días máximos de respuesta"
-                  value={diasMaxRespuesta}
-                  onChange={(e) =>
-                    setDiasMaxRespuesta(Number(e.target.value || 0))
-                  }
-                  inputProps={{ min: 1, max: 30 }}
-                  helperText="Plazo otorgado al contribuyente"
-                />
+                <InfoItem label="Correo" value={correoDestino || caso.correo} />
               </Grid>
-
-              <Grid item xs={12}>
-                <FormControl>
-                  <FormLabel>Adjuntar documento</FormLabel>
-                  <RadioGroup
-                    row
-                    value={adjuntar}
-                    onChange={(e) =>
-                      setAdjuntar(e.target.value as "SI" | "NO")
-                    }
-                  >
-                    <FormControlLabel value="SI" control={<Radio />} label="Sí" />
-                    <FormControlLabel value="NO" control={<Radio />} label="No" />
-                  </RadioGroup>
-                </FormControl>
-              </Grid>
-
-              {adjuntar === "SI" && (
-                <Grid item xs={12}>
-                  <Paper
-                    variant="outlined"
-                    sx={{ p: 1.5, borderRadius: 2, bgcolor: "grey.50" }}
-                  >
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ fontWeight: 800, mb: 1 }}
-                    >
-                      Documentos disponibles del caso (simulación BPM)
-                    </Typography>
-
-                    <List dense sx={{ py: 0 }}>
-                      {documentosDisponibles.map((doc) => {
-                        const selected = documentoSeleccionado === doc.id;
-
-                        return (
-                          <ListItemButton
-                            key={doc.id}
-                            selected={selected}
-                            onClick={() => setDocumentoSeleccionado(doc.id)}
-                            sx={{ borderRadius: 2, mb: 0.5 }}
-                          >
-                            <ListItemText
-                              primary={doc.nombre}
-                              secondary={`Tipo: ${doc.tipo} · Fecha: ${doc.fecha} · Tamaño: ${doc.tamanoMb} MB`}
-                            />
-                            {selected && (
-                              <Chip
-                                label="Seleccionado"
-                                color="primary"
-                                size="small"
-                              />
-                            )}
-                          </ListItemButton>
-                        );
-                      })}
-                    </List>
-                  </Paper>
-                </Grid>
-              )}
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Asunto"
-                  value={asunto}
-                  onChange={(e) => setAsunto(e.target.value)}
-                  helperText={`${asunto.length}/${MAX_ASUNTO} caracteres`}
-                  error={asunto.length > MAX_ASUNTO}
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={6}
-                  label="Mensaje"
-                  value={mensaje}
-                  onChange={(e) => setMensaje(e.target.value)}
-                  helperText={`${mensaje.length}/${MAX_MENSAJE} caracteres`}
-                  error={mensaje.length > MAX_MENSAJE}
-                />
-              </Grid>
-
-              {/* ================= ERRORES ================= */}
-
-              {error && (
-                <Grid item xs={12}>
-                  <Alert severity="error">{error}</Alert>
-                </Grid>
-              )}
-
-              {success && (
-                <>
-                  <Grid item xs={12}>
-                    <Alert severity="success">{success}</Alert>
-                  </Grid>
-
-                  {onGoTrazabilidad && (
-                    <Grid item xs={12}>
-                      <Button
-                        variant="contained"
-                        onClick={handleIrTrazabilidad}
-                      >
-                        Ver trazabilidad de comunicaciones
-                      </Button>
-                    </Grid>
-                  )}
-                </>
-              )}
-
-              {/* ================= BOTONES ================= */}
-
-              <Grid item xs={12}>
-                <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1.2}
-                  >
-                    <Button
-                      variant="outlined"
-                      color="inherit"
-                      onClick={handleLimpiar}
-                    >
-                      Limpiar
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      color="inherit"
-                      onClick={onClose}
-                    >
-                      Cerrar
-                    </Button>
-
-                    <Button
-                      variant="contained"
-                      onClick={handleOpenPreview}
-                    >
-                      Vista previa
-                    </Button>
-                  </Stack>
-                </Box>
-              </Grid>
-
             </Grid>
-          </CardContent>
-        </Card>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 2 }}>
+                Envío de Comunicación
+              </Typography>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Tipo de comunicación"
+                    value={tipoComunicacion}
+                    onChange={(e) => setTipoComunicacion(e.target.value as TipoComunicacion)}
+                  >
+                    <MenuItem value="NOTIFICACION_ACTA_INICIO">
+                      Notificación Acta de Inicio
+                    </MenuItem>
+                    <MenuItem value="NOTIFICACION_ACTA_CIERRE">
+                      Notificación Acta de Cierre
+                    </MenuItem>
+                    <MenuItem value="SOLICITUD_INFORMACION">
+                      Solicitud de Información
+                    </MenuItem>
+                  </TextField>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Días máximos de respuesta"
+                    value={diasMaxRespuesta}
+                    onChange={(e) => setDiasMaxRespuesta(Number(e.target.value || 0))}
+                    inputProps={{ min: 1, max: 30 }}
+                    helperText="Plazo otorgado al contribuyente"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <FormControl>
+                    <FormLabel>Adjuntar documento</FormLabel>
+                    <RadioGroup
+                      row
+                      value={adjuntar}
+                      onChange={(e) => setAdjuntar(e.target.value as "SI" | "NO")}
+                    >
+                      <FormControlLabel value="SI" control={<Radio />} label="Sí" />
+                      <FormControlLabel value="NO" control={<Radio />} label="No" />
+                    </RadioGroup>
+                  </FormControl>
+                </Grid>
+
+                {adjuntar === "SI" && (
+                  <Grid item xs={12}>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: "grey.50" }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                        Documentos disponibles del caso (simulación BPM)
+                      </Typography>
+
+                      <List dense sx={{ py: 0 }}>
+                        {documentosDisponibles.map((doc) => {
+                          const selected = documentoSeleccionado === doc.id;
+
+                          return (
+                            <ListItemButton
+                              key={doc.id}
+                              selected={selected}
+                              onClick={() => setDocumentoSeleccionado(doc.id)}
+                              sx={{ borderRadius: 2, mb: 0.5 }}
+                            >
+                              <ListItemText
+                                primary={doc.nombre}
+                                secondary={`Tipo: ${doc.tipo} · Fecha: ${doc.fecha} · Tamaño: ${doc.tamanoMb} MB`}
+                              />
+                              {selected && (
+                                <Chip label="Seleccionado" color="primary" size="small" />
+                              )}
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    </Paper>
+                  </Grid>
+                )}
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Asunto"
+                    value={asunto}
+                    onChange={(e) => setAsunto(e.target.value)}
+                    helperText={`${asunto.length}/${MAX_ASUNTO} caracteres`}
+                    error={asunto.length > MAX_ASUNTO}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={6}
+                    label="Mensaje"
+                    value={mensaje}
+                    onChange={(e) => setMensaje(e.target.value)}
+                    helperText={`${mensaje.length}/${MAX_MENSAJE} caracteres`}
+                    error={mensaje.length > MAX_MENSAJE}
+                  />
+                </Grid>
+
+                {error && (
+                  <Grid item xs={12}>
+                    <Alert severity="error">{error}</Alert>
+                  </Grid>
+                )}
+
+                {success && (
+                  <>
+                    <Grid item xs={12}>
+                      <Alert severity="success">{success}</Alert>
+                    </Grid>
+
+                    {onGoTrazabilidad && (
+                      <Grid item xs={12}>
+                        <Button variant="contained" onClick={handleIrTrazabilidad}>
+                          Ver trazabilidad de comunicaciones
+                        </Button>
+                      </Grid>
+                    )}
+                  </>
+                )}
+
+                <Grid item xs={12}>
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                      <Button variant="outlined" color="inherit" onClick={handleLimpiar}>
+                        Limpiar
+                      </Button>
+
+                      <Button variant="outlined" color="inherit" onClick={onClose}>
+                        Cerrar
+                      </Button>
+
+                      <Button variant="contained" onClick={handleOpenPreview}>
+                        Vista previa
+                      </Button>
+                    </Stack>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
-    </Grid>
 
-    {/* ================= PREVIEW ================= */}
+      <Dialog
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          Vista previa del correo
+        </DialogTitle>
 
-    <Dialog
-      open={previewOpen}
-      onClose={() => setPreviewOpen(false)}
-      maxWidth="md"
-      fullWidth
-    >
-      <DialogTitle sx={{ fontWeight: 900 }}>
-        Vista previa del correo
-      </DialogTitle>
+        <DialogContent dividers>
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: "#fcfcfc" }}>
+            <Stack spacing={2}>
+              <Divider />
 
-      <DialogContent dividers>
-        <Paper
-          variant="outlined"
-          sx={{ p: 2, borderRadius: 2, bgcolor: "#fcfcfc" }}
-        >
-          <Stack spacing={1.5}>
-            <Typography variant="body2">
-              <b>De:</b> buzondgi@correo.com
-            </Typography>
+              <Box
+                sx={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: 14,
+                  lineHeight: 1.8,
+                  p: 2.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  bgcolor: "#fff",
+                  minHeight: 260,
+                }}
+              >
+                <Typography variant="body2">Señor Contribuyente</Typography>
+                <Typography variant="body2">{nombreContribuyentePreview}</Typography>
+                <Typography variant="body2">No. RUC  Dv: {rucConDvPreview}-{13}</Typography>
+                <Typography variant="body2">{representantePreview}</Typography>
+                <Typography variant="body2" sx={{ mb: 3 }}>
+                  {correoPreview}
+                </Typography>
 
-            <Typography variant="body2">
-              <b>Para:</b> {correoDestino || "-"}
-            </Typography>
+                <Typography variant="body2" sx={{ mb: 3 }}>
+                  {mensaje || "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}
+                </Typography>
 
-            <Typography variant="body2">
-              <b>Asunto:</b> {asunto || "-"}
-            </Typography>
+                <Typography variant="body2" sx={{ mt: 4 }}>
+                  {nombreUsuarioPreview}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 3 }}>
+                  Departamento de Fiscalización Tributaria
+                </Typography>
 
-            <Divider />
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ fontStyle: "italic" }}
+                >
+                  Nota: Señor contribuyente usted puede responder a través de la
+                  plataforma de Buzón de Correo Electrónico, dispuesta por la DGI
+                  a su servicio.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        </DialogContent>
 
-            <Box
-              sx={{
-                whiteSpace: "pre-wrap",
-                fontSize: 14,
-                lineHeight: 1.6,
-                p: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 2,
-                bgcolor: "#fff",
-                minHeight: 180,
-              }}
-            >
-              {mensaje || "Aquí se visualizará el contenido del correo."}
-            </Box>
-          </Stack>
-        </Paper>
-      </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button variant="outlined" color="inherit" onClick={() => setPreviewOpen(false)}>
+            Volver
+          </Button>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button
-          variant="outlined"
-          color="inherit"
-          onClick={() => setPreviewOpen(false)}
-        >
-          Volver
-        </Button>
-
-        <Button
-          variant="contained"
-          onClick={handleEnviar}
-          disabled={enviando}
-        >
-          {enviando ? "Enviando..." : "Enviar"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  </Box>
-);
+          <Button variant="contained" onClick={handleEnviar} disabled={enviando}>
+            {enviando ? "Enviando..." : "Enviar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
 };
 
 export default EnviosComunicacion;
