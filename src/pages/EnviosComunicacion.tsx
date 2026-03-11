@@ -367,7 +367,10 @@ const EnviosComunicacion: React.FC<Props> = ({
                 <InfoItem label="No. Acta de Inicio" value={caso.actaInicio} />
               </Grid>
               <Grid item xs={12} md={6}>
-                <InfoItem label="Representante Legal" value={caso.representanteLegal} />
+                <InfoItem
+                  label="Representante Legal"
+                  value={caso.representanteLegal}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <InfoItem label="Correo" value={correoDestino || caso.correo} />
@@ -390,7 +393,9 @@ const EnviosComunicacion: React.FC<Props> = ({
                     fullWidth
                     label="Tipo de comunicación"
                     value={tipoComunicacion}
-                    onChange={(e) => setTipoComunicacion(e.target.value as TipoComunicacion)}
+                    onChange={(e) =>
+                      setTipoComunicacion(e.target.value as TipoComunicacion)
+                    }
                   >
                     <MenuItem value="NOTIFICACION_ACTA_INICIO">
                       Notificación Acta de Inicio
@@ -410,7 +415,9 @@ const EnviosComunicacion: React.FC<Props> = ({
                     type="number"
                     label="Días máximos de respuesta"
                     value={diasMaxRespuesta}
-                    onChange={(e) => setDiasMaxRespuesta(Number(e.target.value || 0))}
+                    onChange={(e) =>
+                      setDiasMaxRespuesta(Number(e.target.value || 0))
+                    }
                     inputProps={{ min: 1, max: 30 }}
                     helperText="Plazo otorgado al contribuyente"
                   />
@@ -422,18 +429,34 @@ const EnviosComunicacion: React.FC<Props> = ({
                     <RadioGroup
                       row
                       value={adjuntar}
-                      onChange={(e) => setAdjuntar(e.target.value as "SI" | "NO")}
+                      onChange={(e) =>
+                        setAdjuntar(e.target.value as "SI" | "NO")
+                      }
                     >
-                      <FormControlLabel value="SI" control={<Radio />} label="Sí" />
-                      <FormControlLabel value="NO" control={<Radio />} label="No" />
+                      <FormControlLabel
+                        value="SI"
+                        control={<Radio />}
+                        label="Sí"
+                      />
+                      <FormControlLabel
+                        value="NO"
+                        control={<Radio />}
+                        label="No"
+                      />
                     </RadioGroup>
                   </FormControl>
                 </Grid>
 
                 {adjuntar === "SI" && (
                   <Grid item xs={12}>
-                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: "grey.50" }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, bgcolor: "grey.50" }}
+                    >
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: 800, mb: 1 }}
+                      >
                         Documentos disponibles del caso (simulación BPM)
                       </Typography>
 
@@ -453,7 +476,11 @@ const EnviosComunicacion: React.FC<Props> = ({
                                 secondary={`Tipo: ${doc.tipo} · Fecha: ${doc.fecha} · Tamaño: ${doc.tamanoMb} MB`}
                               />
                               {selected && (
-                                <Chip label="Seleccionado" color="primary" size="small" />
+                                <Chip
+                                  label="Seleccionado"
+                                  color="primary"
+                                  size="small"
+                                />
                               )}
                             </ListItemButton>
                           );
@@ -501,7 +528,10 @@ const EnviosComunicacion: React.FC<Props> = ({
 
                     {onGoTrazabilidad && (
                       <Grid item xs={12}>
-                        <Button variant="contained" onClick={handleIrTrazabilidad}>
+                        <Button
+                          variant="contained"
+                          onClick={handleIrTrazabilidad}
+                        >
                           Ver trazabilidad de comunicaciones
                         </Button>
                       </Grid>
@@ -510,13 +540,30 @@ const EnviosComunicacion: React.FC<Props> = ({
                 )}
 
                 <Grid item xs={12}>
-                  <Box sx={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
-                      <Button variant="outlined" color="inherit" onClick={handleLimpiar}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      width: "100%",
+                    }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1.2}
+                    >
+                      <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={handleLimpiar}
+                      >
                         Limpiar
                       </Button>
 
-                      <Button variant="outlined" color="inherit" onClick={onClose}>
+                      <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={onClose}
+                      >
                         Cerrar
                       </Button>
 
@@ -543,7 +590,10 @@ const EnviosComunicacion: React.FC<Props> = ({
         </DialogTitle>
 
         <DialogContent dividers>
-          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: "#fcfcfc" }}>
+          <Paper
+            variant="outlined"
+            sx={{ p: 3, borderRadius: 2, bgcolor: "#fcfcfc" }}
+          >
             <Stack spacing={2}>
               <Divider />
 
@@ -561,22 +611,28 @@ const EnviosComunicacion: React.FC<Props> = ({
                 }}
               >
                 <Typography variant="body2">Señor Contribuyente</Typography>
-                <Typography variant="body2">{nombreContribuyentePreview}</Typography>
-                <Typography variant="body2">No. RUC  Dv: {rucConDvPreview}-{13}</Typography>
+                <Typography variant="body2">
+                  {nombreContribuyentePreview}
+                </Typography>
+                <Typography variant="body2">
+                  No. RUC Dv: {rucConDvPreview}-{13}
+                </Typography>
                 <Typography variant="body2">{representantePreview}</Typography>
+                <Typography variant="body2">REPRESENTANTE LEGAL</Typography>
                 <Typography variant="body2" sx={{ mb: 3 }}>
                   {correoPreview}
                 </Typography>
 
                 <Typography variant="body2" sx={{ mb: 3 }}>
-                  {mensaje || "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}
+                  {mensaje ||
+                    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}
                 </Typography>
 
                 <Typography variant="body2" sx={{ mt: 4 }}>
                   {nombreUsuarioPreview}
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 3 }}>
-                  Departamento de Fiscalización Tributaria
+                  Sección Auditoría Fiscal
                 </Typography>
 
                 <Typography
@@ -585,8 +641,8 @@ const EnviosComunicacion: React.FC<Props> = ({
                   sx={{ fontStyle: "italic" }}
                 >
                   Nota: Señor contribuyente usted puede responder a través de la
-                  plataforma de Buzón de Correo Electrónico, dispuesta por la DGI
-                  a su servicio.
+                  plataforma de Buzón de Correo Electrónico, dispuesta por la
+                  DGI a su servicio.
                 </Typography>
               </Box>
             </Stack>
@@ -594,11 +650,19 @@ const EnviosComunicacion: React.FC<Props> = ({
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button variant="outlined" color="inherit" onClick={() => setPreviewOpen(false)}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => setPreviewOpen(false)}
+          >
             Volver
           </Button>
 
-          <Button variant="contained" onClick={handleEnviar} disabled={enviando}>
+          <Button
+            variant="contained"
+            onClick={handleEnviar}
+            disabled={enviando}
+          >
             {enviando ? "Enviando..." : "Enviar"}
           </Button>
         </DialogActions>
