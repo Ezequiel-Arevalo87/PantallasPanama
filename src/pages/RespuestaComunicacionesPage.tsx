@@ -305,6 +305,6 @@ const RespuestaComunicacionesPage: React.FC<Props> = ({ handleSelect }) => {
       )}
     </Box>
   );
-};
+}; // que paso
 
 export default RespuestaComunicacionesPage;
