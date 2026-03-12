@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import RespuestaComunicaciones from "./RespuestaComunicaciones";
 
 export type CasoInfo = {
   noTramite: string;
@@ -9,22 +10,46 @@ export type CasoInfo = {
   actaInicio: string;
   representanteLegal: string;
   correo: string;
-  correos?: string[]; // <-- corregido
-  fechaApertura?: string; // <-- agregado
-  estadoCaso?: string; // <-- agregado
+  correos?: string[];
+  fechaApertura?: string;
+  estadoCaso?: string;
 };
 
 type Props = {
   rows: CasoInfo[];
   onSelect: (row: CasoInfo) => void;
+  onGoTrazabilidad?: (params: { ruc: string; noTramite: string }) => void;
   height?: number;
 };
 
 const TablaResultadosComunicacion: React.FC<Props> = ({
   rows,
   onSelect,
+  onGoTrazabilidad,
   height = 420,
 }) => {
+  const [respuestaOpen, setRespuestaOpen] = React.useState(false);
+  const [casoRespuesta, setCasoRespuesta] = React.useState<{
+    ruc: string;
+    noTramite: string;
+    correo?: string;
+    razonSocial?: string;
+  } | null>(null);
+
+  const handleOpenRespuesta = React.useCallback((row: CasoInfo) => {
+    setCasoRespuesta({
+      ruc: row.ruc,
+      noTramite: row.noTramite,
+      correo: row.correo,
+      razonSocial: row.razonSocial,
+    });
+    setRespuestaOpen(true);
+  }, []);
+
+  const handleCloseRespuesta = React.useCallback(() => {
+    setRespuestaOpen(false);
+  }, []);
+
   const columns = React.useMemo<GridColDef<CasoInfo>[]>(
     () => [
       {
@@ -32,10 +57,19 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
         headerName: "Trámite",
         minWidth: 150,
         flex: 0.6,
-        renderCell: (p) => <Typography fontWeight={800}>{String(p.value ?? "")}</Typography>,
+        renderCell: (p) => (
+          <Typography fontWeight={800}>
+            {String(p.value ?? "")}
+          </Typography>
+        ),
       },
       { field: "ruc", headerName: "RUC", minWidth: 140, flex: 0.45 },
-      { field: "razonSocial", headerName: "Razón Social", minWidth: 240, flex: 1.2 },
+      {
+        field: "razonSocial",
+        headerName: "Razón Social",
+        minWidth: 240,
+        flex: 1.2,
+      },
       {
         field: "representanteLegal",
         headerName: "Representante Legal",
@@ -53,17 +87,31 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
       {
         field: "__acciones__",
         headerName: "Acciones",
-        minWidth: 160,
+        minWidth: 250,
         sortable: false,
         filterable: false,
         renderCell: (p) => (
-          <Button variant="contained" size="small" onClick={() => onSelect(p.row)}>
-            Gestionar
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => onSelect(p.row)}
+            >
+              Gestionar
+            </Button>
+
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => handleOpenRespuesta(p.row)}
+            >
+              Responder
+            </Button>
+          </Stack>
         ),
       },
     ],
-    [onSelect]
+    [onSelect, handleOpenRespuesta]
   );
 
   return (
@@ -75,16 +123,33 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
 
       <Box sx={{ height, width: "100%" }}>
         <DataGrid
-          rows={rows.map((r) => ({ ...r, id: `${r.ruc}|${r.noTramite}` }))}
+          rows={rows.map((r) => ({
+            ...r,
+            id: `${r.ruc}|${r.noTramite}`,
+          }))}
           columns={columns as any}
           disableRowSelectionOnClick
           density="compact"
           pageSizeOptions={[5, 10, 25]}
           initialState={{
-            pagination: { paginationModel: { page: 0, pageSize: 10 } },
+            pagination: {
+              paginationModel: { page: 0, pageSize: 10 },
+            },
           }}
         />
       </Box>
+
+      {casoRespuesta && (
+        <RespuestaComunicaciones
+          open={respuestaOpen}
+          onClose={handleCloseRespuesta}
+          caso={casoRespuesta}
+          onGoTrazabilidad={({ ruc, noTramite }) => {
+            setRespuestaOpen(false);
+            onGoTrazabilidad?.({ ruc, noTramite });
+          }}
+        />
+      )}
     </Box>
   );
 };

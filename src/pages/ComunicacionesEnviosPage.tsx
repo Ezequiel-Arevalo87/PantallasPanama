@@ -267,6 +267,12 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
           <TablaResultadosComunicacion
             rows={rows}
             onSelect={(row) => setSelectedCaso(row)}
+            onGoTrazabilidad={({ ruc, noTramite }) => {
+              handleSelect("TRAZABILIDAD DE COMUNICACIONES", {
+                ruc,
+                noTramite,
+              });
+            }}
           />
         </>
       )}
@@ -292,6 +298,10 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
                   ruc,
                   noTramite,
                 });
+              }}
+              handleGo={(view) => {
+                setSelectedCaso(null);
+                handleSelect(view);
               }}
             />
           ) : null}

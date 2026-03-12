@@ -31,11 +31,13 @@ import {
   appendTrazabilidadComunicacion,
   type TrazabilidadCorreo,
 } from "../lib/trazabilidadComunicacionesStorage";
+import RespuestaComunicaciones from "./RespuestaComunicaciones";
 
 type Props = {
   caso: CasoInfo;
   onClose: () => void;
   onGoTrazabilidad?: (params: { ruc: string; noTramite: string }) => void;
+  handleGo?: (view: string) => void;
 };
 
 type TipoComunicacion =
@@ -157,7 +159,11 @@ const InfoItem = ({
   value?: React.ReactNode;
 }) => (
   <Box>
-    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+    <Typography
+      variant="caption"
+      color="text.secondary"
+      sx={{ fontWeight: 700 }}
+    >
       {label}
     </Typography>
     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -175,22 +181,27 @@ const EnviosComunicacion: React.FC<Props> = ({
     Array.isArray(caso.correos) && caso.correos.length > 0
       ? caso.correos
       : caso.correo
-      ? [caso.correo]
-      : [];
+        ? [caso.correo]
+        : [];
 
   const correoDestino = correosDisponibles[0] ?? "";
 
-  const [tipoComunicacion, setTipoComunicacion] = React.useState<TipoComunicacion | "">("");
+  const [tipoComunicacion, setTipoComunicacion] = React.useState<
+    TipoComunicacion | ""
+  >("");
   const [adjuntar, setAdjuntar] = React.useState<"SI" | "NO">("NO");
-  const [documentoSeleccionado, setDocumentoSeleccionado] = React.useState<string>("");
+  const [documentoSeleccionado, setDocumentoSeleccionado] =
+    React.useState<string>("");
   const [asunto, setAsunto] = React.useState<string>("");
   const [mensaje, setMensaje] = React.useState<string>("");
   const [diasMaxRespuesta, setDiasMaxRespuesta] = React.useState<number>(5);
 
   const [error, setError] = React.useState<string>("");
   const [success, setSuccess] = React.useState<string>("");
+  const [successRespuesta, setSuccessRespuesta] = React.useState<string>("");
   const [enviando, setEnviando] = React.useState<boolean>(false);
   const [previewOpen, setPreviewOpen] = React.useState<boolean>(false);
+
 
   const documentosDisponibles = React.useMemo(() => {
     if (tipoComunicacion === "NOTIFICACION_ACTA_INICIO") {
@@ -204,14 +215,14 @@ const EnviosComunicacion: React.FC<Props> = ({
         (d) =>
           d.nombre.includes("Solicitud") ||
           d.tipo === "ANEXO" ||
-          d.tipo === "OFICIO"
+          d.tipo === "OFICIO",
       );
     }
     return DOCUMENTOS_MOCK;
   }, [tipoComunicacion]);
 
   const documentoActual = documentosDisponibles.find(
-    (d) => d.id === documentoSeleccionado
+    (d) => d.id === documentoSeleccionado,
   );
   const pesoTotal = documentoActual ? documentoActual.tamanoMb : 0;
 
@@ -231,6 +242,7 @@ const EnviosComunicacion: React.FC<Props> = ({
     setMensaje(buildMensajeBase(caso, tipoComunicacion));
     setDocumentoSeleccionado("");
     setSuccess("");
+    setSuccessRespuesta("");
     setError("");
 
     if (tipoComunicacion === "SOLICITUD_INFORMACION") {
@@ -272,7 +284,9 @@ const EnviosComunicacion: React.FC<Props> = ({
     }
 
     if (pesoTotal > MAX_MB) {
-      setError("El tamaño total del correo supera el máximo permitido de 10 MB.");
+      setError(
+        "El tamaño total del correo supera el máximo permitido de 10 MB.",
+      );
       return false;
     }
 
@@ -287,6 +301,7 @@ const EnviosComunicacion: React.FC<Props> = ({
 
   const handleOpenPreview = () => {
     setSuccess("");
+    setSuccessRespuesta("");
     if (!validarFormulario()) return;
     setPreviewOpen(true);
   };
@@ -298,6 +313,8 @@ const EnviosComunicacion: React.FC<Props> = ({
       noTramite: caso.noTramite,
     });
   };
+
+
 
   const handleEnviar = async () => {
     if (!validarFormulario()) return;
@@ -331,8 +348,9 @@ const EnviosComunicacion: React.FC<Props> = ({
 
     setPreviewOpen(false);
     setSuccess(
-      `Comunicación enviada exitosamente. Se otorgaron ${diasMaxRespuesta} día(s) de respuesta.`
+      `Comunicación enviada exitosamente. Se otorgaron ${diasMaxRespuesta} día(s) de respuesta.`,
     );
+    setSuccessRespuesta("");
   };
 
   const handleLimpiar = () => {
@@ -340,6 +358,7 @@ const EnviosComunicacion: React.FC<Props> = ({
     setAsunto("");
     setError("");
     setSuccess("");
+    setSuccessRespuesta("");
     setDocumentoSeleccionado("");
     setAdjuntar("NO");
   };
@@ -539,6 +558,25 @@ const EnviosComunicacion: React.FC<Props> = ({
                   </>
                 )}
 
+                {successRespuesta && (
+                  <>
+                    <Grid item xs={12}>
+                      <Alert severity="success">{successRespuesta}</Alert>
+                    </Grid>
+
+                    {onGoTrazabilidad && (
+                      <Grid item xs={12}>
+                        <Button
+                          variant="contained"
+                          onClick={handleIrTrazabilidad}
+                        >
+                          Ver trazabilidad de comunicaciones
+                        </Button>
+                      </Grid>
+                    )}
+                  </>
+                )}
+
                 <Grid item xs={12}>
                   <Box
                     sx={{
@@ -570,6 +608,8 @@ const EnviosComunicacion: React.FC<Props> = ({
                       <Button variant="contained" onClick={handleOpenPreview}>
                         Vista previa
                       </Button>
+
+                   
                     </Stack>
                   </Box>
                 </Grid>
@@ -667,6 +707,8 @@ const EnviosComunicacion: React.FC<Props> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+     
     </Box>
   );
 };
