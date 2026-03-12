@@ -351,19 +351,19 @@ const RespuestaComunicaciones: React.FC<Props> = ({
             </Grid>
           )}
 
-          {/* {success && (
+          {success && (
             <>
               <Grid item xs={12}>
                 <Alert severity="success">{success}</Alert>
               </Grid>
 
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <Button variant="contained" onClick={handleIrTrazabilidad}>
                   Ver trazabilidad de comunicaciones
                 </Button>
-              </Grid>
+              </Grid> */}
             </>
-          )} */}
+          )}
         </Grid>
       </DialogContent>
 
