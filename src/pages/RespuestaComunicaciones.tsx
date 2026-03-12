@@ -178,7 +178,7 @@ const RespuestaComunicaciones: React.FC<Props> = ({
 
       appendTrazabilidadComunicacion(nuevaTraza);
 
-      setSuccess("Envío exitoso. La respuesta fue registrada en trazabilidad.");
+      setSuccess("Envío exitoso.");
       onSuccess?.();
     } catch {
       setError("No se pudo hacer el envío.");
@@ -341,9 +341,7 @@ const RespuestaComunicaciones: React.FC<Props> = ({
               color="text.secondary"
               sx={{ fontStyle: "italic" }}
             >
-              Nota: Señor contribuyente usted puede responder a través de la
-              plataforma de Buzón de Correo Electrónico dispuesta por la DGI.
-              Los documentos no deben superar los 10 MB.
+             Nota: Señor contribuyente recuerde que usted puede responder a través de esta plataforma de Buzon Electrónico, dispuesta por la DGI a su servicio, tenga en cuenta que los documentos no superen la capacidad de 10 MB. En caso contrario hacer llegar la documentación en físico a las Oficinas de la DGI
             </Typography>
           </Grid>
 
