@@ -102,7 +102,7 @@ const useMenuData = () => {
       children: [
         { label: "COMUNICACIONES" },
         { label: "ENVIOS" },
-        
+        { label: "RESPUESTAS" },
         { label: "TRAZABILIDAD DE COMUNICACIONES" },
       ],
     },

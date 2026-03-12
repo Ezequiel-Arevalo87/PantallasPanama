@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import RespuestaComunicaciones from "./RespuestaComunicaciones";
 
 export type CasoInfo = {
   noTramite: string;
@@ -18,38 +17,14 @@ export type CasoInfo = {
 type Props = {
   rows: CasoInfo[];
   onSelect: (row: CasoInfo) => void;
-  onGoTrazabilidad?: (params: { ruc: string; noTramite: string }) => void;
   height?: number;
 };
 
 const TablaResultadosComunicacion: React.FC<Props> = ({
   rows,
   onSelect,
-  onGoTrazabilidad,
   height = 420,
 }) => {
-  const [respuestaOpen, setRespuestaOpen] = React.useState(false);
-  const [casoRespuesta, setCasoRespuesta] = React.useState<{
-    ruc: string;
-    noTramite: string;
-    correo?: string;
-    razonSocial?: string;
-  } | null>(null);
-
-  const handleOpenRespuesta = React.useCallback((row: CasoInfo) => {
-    setCasoRespuesta({
-      ruc: row.ruc,
-      noTramite: row.noTramite,
-      correo: row.correo,
-      razonSocial: row.razonSocial,
-    });
-    setRespuestaOpen(true);
-  }, []);
-
-  const handleCloseRespuesta = React.useCallback(() => {
-    setRespuestaOpen(false);
-  }, []);
-
   const columns = React.useMemo<GridColDef<CasoInfo>[]>(
     () => [
       {
@@ -87,7 +62,7 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
       {
         field: "__acciones__",
         headerName: "Acciones",
-        minWidth: 250,
+        minWidth: 170,
         sortable: false,
         filterable: false,
         renderCell: (p) => (
@@ -99,19 +74,11 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
             >
               Gestionar
             </Button>
-
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => handleOpenRespuesta(p.row)}
-            >
-              Responder
-            </Button>
           </Stack>
         ),
       },
     ],
-    [onSelect, handleOpenRespuesta]
+    [onSelect]
   );
 
   return (
@@ -127,7 +94,7 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
             ...r,
             id: `${r.ruc}|${r.noTramite}`,
           }))}
-          columns={columns as any}
+          columns={columns}
           disableRowSelectionOnClick
           density="compact"
           pageSizeOptions={[5, 10, 25]}
@@ -138,18 +105,6 @@ const TablaResultadosComunicacion: React.FC<Props> = ({
           }}
         />
       </Box>
-
-      {casoRespuesta && (
-        <RespuestaComunicaciones
-          open={respuestaOpen}
-          onClose={handleCloseRespuesta}
-          caso={casoRespuesta}
-          onGoTrazabilidad={({ ruc, noTramite }) => {
-            setRespuestaOpen(false);
-            onGoTrazabilidad?.({ ruc, noTramite });
-          }}
-        />
-      )}
     </Box>
   );
 };

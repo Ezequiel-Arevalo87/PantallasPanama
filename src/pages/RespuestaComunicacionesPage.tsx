@@ -7,9 +7,6 @@ import {
   Button,
   Typography,
   Alert,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   Divider,
   Chip,
 } from "@mui/material";
@@ -18,7 +15,7 @@ import dayjs from "dayjs";
 import TablaResultadosComunicacion, {
   type CasoInfo,
 } from "./TablaResultadosComunicacion";
-import EnviosComunicacion from "./EnviosComunicacion";
+import RespuestaComunicaciones from "./RespuestaComunicaciones";
 
 const randomFrom = (seed: string, arr: string[]) => {
   let h = 0;
@@ -72,7 +69,7 @@ const buildMockCaso = (ruc: string, noTramite: string): CasoInfo => {
   ].slice(0, 3);
 
   const actaInicio = `AI-${dayjs().format("YYYY")}-${String(
-    noTramite.match(/\d+/)?.[0] ?? "1",
+    noTramite.match(/\d+/)?.[0] ?? "1"
   ).slice(-4)}`;
 
   const fechaApertura = dayjs()
@@ -129,13 +126,14 @@ type Props = {
   handleSelect: (ruta: string, state?: any) => void;
 };
 
-const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
+const RespuestaComunicacionesPage: React.FC<Props> = ({ handleSelect }) => {
   const [ruc, setRuc] = React.useState("");
   const [tramite, setTramite] = React.useState("");
 
   const [error, setError] = React.useState("");
   const [rows, setRows] = React.useState<CasoInfo[]>([]);
   const [selectedCaso, setSelectedCaso] = React.useState<CasoInfo | null>(null);
+  const [openRespuesta, setOpenRespuesta] = React.useState(false);
 
   const handleBuscar = () => {
     setError("");
@@ -146,12 +144,14 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
     if (!r && !t) {
       setRows([]);
       setSelectedCaso(null);
+      setOpenRespuesta(false);
       return;
     }
 
     if (r && !isRucValido(r)) {
       setRows([]);
       setSelectedCaso(null);
+      setOpenRespuesta(false);
       setError("RUC errado.");
       return;
     }
@@ -161,12 +161,14 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
     if (!data.length) {
       setRows([]);
       setSelectedCaso(null);
+      setOpenRespuesta(false);
       setError("No se encontraron resultados con los filtros ingresados.");
       return;
     }
 
     setRows(data);
     setSelectedCaso(null);
+    setOpenRespuesta(false);
   };
 
   const handleLimpiar = () => {
@@ -175,10 +177,21 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
     setError("");
     setRows([]);
     setSelectedCaso(null);
+    setOpenRespuesta(false);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleBuscar();
+  };
+
+  const handleGestionar = (row: CasoInfo) => {
+    setSelectedCaso(row);
+    setOpenRespuesta(true);
+  };
+
+  const handleCloseRespuesta = () => {
+    setOpenRespuesta(false);
+    setSelectedCaso(null);
   };
 
   return (
@@ -189,7 +202,7 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
         sx={{ mb: 2, alignItems: { xs: "flex-start", md: "center" } }}
       >
         <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Comunicaciones → Envíos
+          Comunicaciones → Respuestas
         </Typography>
 
         <Chip
@@ -202,7 +215,7 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Simulación visual del flujo de búsqueda, selección de caso y gestión de
-        envío al contribuyente.
+        respuesta del contribuyente con registro en trazabilidad.
       </Typography>
 
       <Stack
@@ -212,11 +225,7 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
           mb: 2,
           alignItems: "stretch",
           "& .MuiTextField-root": { flex: 1 },
-          "& .MuiButton-root": {
-            minWidth: 120,
-            fontWeight: "bold",
-            height: 56,
-          },
+          "& .MuiButton-root": { minWidth: 120, fontWeight: "bold", height: 56 },
         }}
       >
         <TextField
@@ -270,43 +279,32 @@ const ComunicacionesEnviosPage: React.FC<Props> = ({ handleSelect }) => {
           <Divider sx={{ my: 2 }} />
           <TablaResultadosComunicacion
             rows={rows}
-            onSelect={(row) => setSelectedCaso(row)}
+            onSelect={handleGestionar}
           />
         </>
       )}
 
-      <Dialog
-        open={!!selectedCaso}
-        onClose={() => setSelectedCaso(null)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle sx={{ fontWeight: 900 }}>
-          Gestión de Envíos / Comunicación
-        </DialogTitle>
-
-        <DialogContent sx={{ pt: 1 }}>
-          {selectedCaso ? (
-            <EnviosComunicacion
-              caso={selectedCaso}
-              onClose={() => setSelectedCaso(null)}
-              onGoTrazabilidad={({ ruc, noTramite }) => {
-                setSelectedCaso(null);
-                handleSelect("TRAZABILIDAD DE COMUNICACIONES", {
-                  ruc,
-                  noTramite,
-                });
-              }}
-              handleGo={(view) => {
-                setSelectedCaso(null);
-                handleSelect(view);
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {selectedCaso && (
+        <RespuestaComunicaciones
+          open={openRespuesta}
+          onClose={handleCloseRespuesta}
+          caso={{
+            ruc: selectedCaso.ruc,
+            noTramite: selectedCaso.noTramite,
+            correo: selectedCaso.correo,
+            razonSocial: selectedCaso.razonSocial,
+          }}
+          onGoTrazabilidad={({ ruc, noTramite }) => {
+            handleCloseRespuesta();
+            handleSelect("TRAZABILIDAD DE COMUNICACIONES", {
+              ruc,
+              noTramite,
+            });
+          }}
+        />
+      )}
     </Box>
   );
 };
 
-export default ComunicacionesEnviosPage;
+export default RespuestaComunicacionesPage;

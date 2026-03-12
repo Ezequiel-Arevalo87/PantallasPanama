@@ -44,6 +44,7 @@ import AutoArchivo from "../components/AutoArchivo";
 import { RequerimientoRegularizacion } from "../components/RequerimientoRegularizacion";
 import ParametrizacionAlertas from "./ParametrizacionAlertas";
 import RespuestaComunicaciones from "./RespuestaComunicaciones";
+import RespuestaComunicacionesPage from "./RespuestaComunicacionesPage";
 
 // Rutas base
 const AUD_PATH = "PROCESOS DE AUDITORIAS/AUDITOR";
@@ -119,7 +120,8 @@ export const Layout: React.FC = () => {
      case "ENVIOS":
   return <ComunicacionesEnviosPage handleSelect={handleGo} />;
 
-
+case "RESPUESTAS":
+  return <RespuestaComunicacionesPage handleSelect={handleGo} />;
 case "TRAZABILIDAD DE COMUNICACIONES":
   return (
     <TrazabilidadComunicaciones
