@@ -351,7 +351,7 @@ const RespuestaComunicaciones: React.FC<Props> = ({
             </Grid>
           )}
 
-          {success && (
+          {/* {success && (
             <>
               <Grid item xs={12}>
                 <Alert severity="success">{success}</Alert>
@@ -363,7 +363,7 @@ const RespuestaComunicaciones: React.FC<Props> = ({
                 </Button>
               </Grid>
             </>
-          )}
+          )} */}
         </Grid>
       </DialogContent>
 
